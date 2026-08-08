@@ -11,19 +11,21 @@ class NowPlayingScreen extends StatefulWidget {
   final String qualityBadge;
   final DlnaDevice activeDevice;
   final List<DlnaDevice> availableDevices;
-  final Function(DlnaDevice) onSelectDevice;
+  final Function(DlnaDevice)? onSelectDevice;
 
-  const NowPlayingScreen({
+  NowPlayingScreen({
     super.key,
     required this.title,
     required this.artist,
     required this.album,
     required this.coverUrl,
     this.qualityBadge = 'FLAC 16-bit 44.1kHz',
-    required this.activeDevice,
-    required this.availableDevices,
-    required this.onSelectDevice,
-  });
+    DlnaDevice? activeDevice,
+    DlnaDevice? selectedDevice,
+    List<DlnaDevice>? availableDevices,
+    this.onSelectDevice,
+  })  : activeDevice = activeDevice ?? selectedDevice ?? DlnaDevice.localSpeaker,
+        availableDevices = availableDevices ?? [DlnaDevice.localSpeaker];
 
   @override
   State<NowPlayingScreen> createState() => _NowPlayingScreenState();
@@ -58,7 +60,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                 context,
                 devices: widget.availableDevices,
                 selectedDevice: widget.activeDevice,
-                onSelectDevice: widget.onSelectDevice,
+                onSelectDevice: widget.onSelectDevice ?? (_) {},
               );
             },
           ),
