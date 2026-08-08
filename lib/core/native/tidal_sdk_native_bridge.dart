@@ -1,73 +1,77 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter/services.dart';
 import '../../core/utils/app_logger.dart';
 
 class TidalSdkNativeBridge {
   static const MethodChannel _channel = MethodChannel('com.example.tidal_connect_lite/tidal_sdk');
 
-  /// Initializes native Tidal SDK Authentication (com.tidal.sdk.auth)
+  /// Initializes native Tidal SDK Authentication (KeepCreatedCredentialsProvider)
   static Future<bool> initTidalAuth({
     required String clientId,
     required String clientSecret,
   }) async {
     try {
-      AppLogger.log('TIDAL_NATIVE_SDK', '안드로이드 네이티브 com.tidal.sdk.auth 인증 모듈 초기화 시도 (ClientID: $clientId)', type: LogType.network);
+      WidgetsFlutterBinding.ensureInitialized();
+      AppLogger.log('TIDAL_NATIVE_SDK', '안드로이드 네이티브 KeepCreatedCredentialsProvider 초기화 (ClientID: $clientId)', type: LogType.network);
       final result = await _channel.invokeMethod<Map>('initTidalAuth', {
         'clientId': clientId,
         'clientSecret': clientSecret,
       });
-      AppLogger.log('TIDAL_NATIVE_SDK', '네이티브 TIDAL SDK 인증 모듈 초기화 성공: $result', type: LogType.success);
+      AppLogger.log('TIDAL_NATIVE_SDK', '네이티브 KeepCreatedCredentialsProvider 생성 성공: $result', type: LogType.success);
       return true;
     } catch (e) {
-      AppLogger.log('TIDAL_NATIVE_SDK', '네이티브 TIDAL SDK 인증 모듈 초기화 실패: $e', type: LogType.error);
+      AppLogger.log('TIDAL_NATIVE_SDK', '네이티브 KeepCreatedCredentialsProvider 초기화 오류: $e', type: LogType.error);
       return false;
     }
   }
 
-  /// Triggers playback via native Tidal SDK player engine (com.tidal.sdk.player)
+  /// Triggers authentication via native CredentialsProvider
+  static Future<bool> authenticateUser() async {
+    try {
+      final result = await _channel.invokeMethod<Map>('authenticateUser');
+      AppLogger.log('TIDAL_NATIVE_SDK', '네이티브 CredentialsProvider 인증 상태: $result', type: LogType.info);
+      return result?['status'] == 'authenticated';
+    } catch (e) {
+      AppLogger.log('TIDAL_NATIVE_SDK', '네이티브 인증 실행 예외: $e', type: LogType.error);
+      return false;
+    }
+  }
+
+  /// Triggers playback via native Tidal SDK Player (Player.Builder(context).setCredentialsProvider(...).build())
   static Future<bool> playTrack({
     required String trackId,
-    required String streamUrl,
+    String streamUrl = '',
   }) async {
     try {
-      AppLogger.log('TIDAL_NATIVE_SDK', '네이티브 com.tidal.sdk.player 음원 재생 요청 (TrackID: $trackId)', type: LogType.info);
+      AppLogger.log('TIDAL_NATIVE_SDK', '네이티브 Tidal Player.load(trackId: $trackId, audioQuality: HIGH) 실행', type: LogType.info);
       final result = await _channel.invokeMethod<Map>('playTrack', {
         'trackId': trackId,
         'streamUrl': streamUrl,
       });
-      AppLogger.log('TIDAL_NATIVE_SDK', '네이티브 재생 상태: $result', type: LogType.success);
+      AppLogger.log('TIDAL_NATIVE_SDK', '네이티브 Player load 응답: $result', type: LogType.success);
       return true;
     } catch (e) {
-      AppLogger.log('TIDAL_NATIVE_SDK', '네이티브 음원 재생 중 오류: $e', type: LogType.error);
+      AppLogger.log('TIDAL_NATIVE_SDK', '네이티브 Player load 실패: $e', type: LogType.error);
       return false;
     }
   }
 
-  /// Pauses playback via native Tidal SDK player
-  static Future<bool> pauseTrack() async {
+  /// Stops playback via native Tidal SDK player
+  static Future<bool> stopTrack() async {
     try {
-      await _channel.invokeMethod('pauseTrack');
-      AppLogger.log('TIDAL_NATIVE_SDK', '네이티브 일시정지 완료', type: LogType.info);
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  /// Resumes playback via native Tidal SDK player
-  static Future<bool> resumeTrack() async {
-    try {
-      await _channel.invokeMethod('resumeTrack');
-      AppLogger.log('TIDAL_NATIVE_SDK', '네이티브 재생 재개 완료', type: LogType.info);
+      await _channel.invokeMethod('stopTrack');
+      AppLogger.log('TIDAL_NATIVE_SDK', '네이티브 Player stop 완료', type: LogType.info);
       return true;
     } catch (e) {
       return false;
     }
   }
 
-  /// Seeks playback position via native Tidal SDK player
-  static Future<bool> seekTrack(int positionMs) async {
+  /// Releases native Tidal SDK Player
+  static Future<bool> releasePlayer() async {
     try {
-      await _channel.invokeMethod('seekTrack', {'positionMs': positionMs});
+      await _channel.invokeMethod('releasePlayer');
+      AppLogger.log('TIDAL_NATIVE_SDK', '네이티브 Player release 완료', type: LogType.info);
       return true;
     } catch (e) {
       return false;

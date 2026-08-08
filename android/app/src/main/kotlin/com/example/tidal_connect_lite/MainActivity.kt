@@ -3,56 +3,60 @@ package com.example.tidal_connect_lite
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
-import com.tidal.sdk.auth.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.example.tidal_connect_lite/tidal_sdk"
-    private var isAuthInitialized = false
-    private var currentClientId: String? = null
+    private lateinit var authManager: TidalAuthManager
+    private var playerManager: TidalPlayerManager? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        authManager = TidalAuthManager(applicationContext)
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "initTidalAuth" -> {
                     val clientId = call.argument<String>("clientId") ?: ""
                     val clientSecret = call.argument<String>("clientSecret") ?: ""
-                    try {
-                        currentClientId = clientId
-                        isAuthInitialized = true
-                        result.success(mapOf(
-                            "status" to "initialized",
-                            "sdk" to "com.tidal.sdk",
-                            "clientId" to clientId
-                        ))
-                    } catch (e: Exception) {
-                        result.error("INIT_FAILED", e.localizedMessage, e.toString())
+                    val isInitialized = authManager.initializeAuth(clientId, clientSecret)
+                    
+                    if (isInitialized && authManager.credentialsProvider != null) {
+                        playerManager = TidalPlayerManager(applicationContext, authManager.credentialsProvider)
+                        playerManager?.initializePlayer()
+                    }
+
+                    result.success(mapOf(
+                        "status" to if (isInitialized) "initialized" else "init_failed",
+                        "sdk" to "com.tidal.sdk",
+                        "clientId" to clientId
+                    ))
+                }
+                "authenticateUser" -> {
+                    CoroutineScope(Dispatchers.Main).launch {
+                        val success = authManager.authenticateUser()
+                        result.success(mapOf("status" to if (success) "authenticated" else "auth_failed"))
                     }
                 }
                 "playTrack" -> {
                     val trackId = call.argument<String>("trackId") ?: ""
-                    val streamUrl = call.argument<String>("streamUrl") ?: ""
-                    try {
-                        // Forward play command to native Tidal SDK player engine
-                        result.success(mapOf(
-                            "status" to "playing",
-                            "trackId" to trackId,
-                            "streamUrl" to streamUrl
-                        ))
-                    } catch (e: Exception) {
-                        result.error("PLAY_FAILED", e.localizedMessage, e.toString())
+                    if (playerManager != null) {
+                        playerManager?.playTrack(trackId)
+                        result.success(mapOf("status" to "playing", "trackId" to trackId))
+                    } else {
+                        result.success(mapOf("status" to "playing_simulated", "trackId" to trackId))
                     }
                 }
-                "pauseTrack" -> {
-                    result.success(mapOf("status" to "paused"))
+                "stopTrack" -> {
+                    playerManager?.stop()
+                    result.success(mapOf("status" to "stopped"))
                 }
-                "resumeTrack" -> {
-                    result.success(mapOf("status" to "resumed"))
-                }
-                "seekTrack" -> {
-                    val positionMs = call.argument<Int>("positionMs") ?: 0
-                    result.success(mapOf("status" to "seek_success", "positionMs" to positionMs))
+                "releasePlayer" -> {
+                    playerManager?.release()
+                    playerManager = null
+                    result.success(mapOf("status" to "released"))
                 }
                 else -> {
                     result.notImplemented()

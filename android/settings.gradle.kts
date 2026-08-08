@@ -31,6 +31,7 @@ dependencyResolutionManagement {
         mavenCentral()
         maven { url = java.net.URI("https://storage.googleapis.com/download.flutter.io") }
         maven { url = java.net.URI("https://jitpack.io") }
+        maven { url = java.net.URI("https://maven.pkg.github.com/tidal-music/tidal-sdk-android") }
     }
 }
 
