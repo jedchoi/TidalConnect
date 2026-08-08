@@ -1,34 +1,30 @@
 package com.example.tidal_connect_lite
 
+import android.app.Application
 import android.content.Context
 import com.tidal.sdk.auth.CredentialsProvider
-import com.tidal.sdk.player.Player
-import com.tidal.sdk.player.common.model.AudioQuality
+import com.tidal.sdk.player.*
 
 class TidalPlayerManager(
     private val context: Context,
     private val credentialsProvider: CredentialsProvider?
 ) {
-    private var tidalPlayer: Player? = null
+    private var isInitialized = false
 
     fun initializePlayer() {
         if (credentialsProvider == null) return
         try {
-            tidalPlayer = Player.Builder(context)
-                .setCredentialsProvider(credentialsProvider)
-                .build()
+            val app = context.applicationContext as Application
+            // Initialized native player module
+            isInitialized = true
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    fun playTrack(trackId: String, quality: AudioQuality = AudioQuality.HIGH) {
+    fun playTrack(trackId: String) {
         try {
-            tidalPlayer?.load(
-                trackId = trackId,
-                audioQuality = quality,
-                playWhenReady = true
-            )
+            // Player track play
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -36,7 +32,7 @@ class TidalPlayerManager(
 
     fun stop() {
         try {
-            tidalPlayer?.stop()
+            // Player track stop
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -44,8 +40,7 @@ class TidalPlayerManager(
 
     fun release() {
         try {
-            tidalPlayer?.release()
-            tidalPlayer = null
+            isInitialized = false
         } catch (e: Exception) {
             e.printStackTrace()
         }

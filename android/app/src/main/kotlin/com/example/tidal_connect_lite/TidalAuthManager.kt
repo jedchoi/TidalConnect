@@ -1,8 +1,9 @@
 package com.example.tidal_connect_lite
 
 import android.content.Context
-import com.tidal.sdk.auth.KeepCreatedCredentialsProvider
+import com.tidal.sdk.auth.TidalAuth
 import com.tidal.sdk.auth.CredentialsProvider
+import com.tidal.sdk.auth.model.AuthConfig
 
 class TidalAuthManager(private val context: Context) {
     var credentialsProvider: CredentialsProvider? = null
@@ -10,10 +11,13 @@ class TidalAuthManager(private val context: Context) {
 
     fun initializeAuth(clientId: String, clientSecret: String): Boolean {
         return try {
-            credentialsProvider = KeepCreatedCredentialsProvider(
-                context = context,
-                clientId = clientId
+            val authConfig = AuthConfig(
+                clientId = clientId,
+                clientSecret = clientSecret,
+                credentialsKey = "tidal_storage"
             )
+            val tidalAuth = TidalAuth.getInstance(authConfig, context)
+            credentialsProvider = tidalAuth.credentialsProvider
             true
         } catch (e: Exception) {
             e.printStackTrace()

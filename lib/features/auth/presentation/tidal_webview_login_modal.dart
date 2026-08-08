@@ -41,7 +41,7 @@ class _TidalWebViewLoginModalState extends State<TidalWebViewLoginModal> {
   late final WebViewController _controller;
   late final String _codeVerifier;
   late final String _codeChallenge;
-  final String _redirectUri = 'https://login.tidal.com/oauth2/callback';
+  final String _redirectUri = TidalConfig.redirectUri;
 
   bool _isLoadingPage = true;
   bool _isExchangingToken = false;
@@ -62,7 +62,7 @@ class _TidalWebViewLoginModalState extends State<TidalWebViewLoginModal> {
       'code_challenge_method': 'S256',
     });
 
-    AppLogger.log('TIDAL_AUTH', 'In-App WebView Tidal 로그인 시작: ${uri.toString()}', type: LogType.network);
+    AppLogger.log('TIDAL_AUTH', 'In-App WebView Tidal PKCE 로그인 시작 (RedirectURI: $_redirectUri): ${uri.toString()}', type: LogType.network);
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -75,6 +75,16 @@ class _TidalWebViewLoginModalState extends State<TidalWebViewLoginModal> {
           onPageFinished: (String url) {
             if (mounted) setState(() => _isLoadingPage = false);
             _checkInterceptUrl(url);
+          },
+          onUrlChange: (UrlChange change) {
+            if (change.url != null) {
+              _checkInterceptUrl(change.url!);
+            }
+          },
+          onWebResourceError: (WebResourceError error) {
+            if (error.url != null) {
+              _checkInterceptUrl(error.url!);
+            }
           },
           onNavigationRequest: (NavigationRequest request) {
             if (_checkInterceptUrl(request.url)) {
@@ -90,7 +100,7 @@ class _TidalWebViewLoginModalState extends State<TidalWebViewLoginModal> {
   bool _checkInterceptUrl(String url) {
     if (_isExchangingToken) return true;
 
-    if (url.startsWith(_redirectUri) || url.contains('code=')) {
+    if (url.startsWith(_redirectUri) || url.startsWith('tidalconnect://') || url.contains('code=')) {
       try {
         final parsedUri = Uri.parse(url);
         final code = parsedUri.queryParameters['code'];
@@ -99,18 +109,19 @@ class _TidalWebViewLoginModalState extends State<TidalWebViewLoginModal> {
           return true;
         }
       } catch (e) {
-        AppLogger.log('TIDAL_AUTH', 'Redirect URL 파싱 에러: $e', type: LogType.error);
+        AppLogger.log('TIDAL_AUTH', 'Redirect DeepLink 파싱 에러: $e', type: LogType.error);
       }
     }
     return false;
   }
 
   Future<void> _handleAuthorizationCode(String code) async {
+    if (_isExchangingToken) return;
     setState(() {
       _isExchangingToken = true;
     });
 
-    AppLogger.log('TIDAL_AUTH', 'WebView 리다이렉트 감지 ➔ Authorization Code 감지 성공!', type: LogType.success);
+    AppLogger.log('TIDAL_AUTH', 'TIDAL Authorization Code 획득 성공 (code: $code) ➔ Access Token 교환 시도', type: LogType.success);
 
     final token = await widget.authRepository.exchangeAuthorizationCode(
       code: code,
@@ -125,7 +136,7 @@ class _TidalWebViewLoginModalState extends State<TidalWebViewLoginModal> {
     } else {
       setState(() {
         _isExchangingToken = false;
-        _errorMessage = '인증 토큰 발급 실패. 다시 로그인해주세요.';
+        _errorMessage = '인증 토큰 교환 실패. Tidal 개발자 대시보드에 $_redirectUri 주소가 등록되어 있는지 확인해주세요.';
       });
     }
   }
@@ -135,7 +146,7 @@ class _TidalWebViewLoginModalState extends State<TidalWebViewLoginModal> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Tidal 계정 로그인', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        title: const Text('Tidal 계정 공식 로그인', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         backgroundColor: AppColors.surfaceCard,
         elevation: 0,
         leading: IconButton(
@@ -162,12 +173,12 @@ class _TidalWebViewLoginModalState extends State<TidalWebViewLoginModal> {
                     CircularProgressIndicator(color: AppColors.cyanAccent),
                     SizedBox(height: 16),
                     Text(
-                      'Tidal 계정 로그인 처리 중...',
+                      'TIDAL Authorization Code 획득 성공!',
                       style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                     SizedBox(height: 8),
                     Text(
-                      'Access Token을 안전하게 수신하고 있습니다.',
+                      'Tidal Access Token을 안전하게 발급받는 중입니다...',
                       style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
                     ),
                   ],
