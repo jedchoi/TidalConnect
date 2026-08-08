@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/config/tidal_config.dart';
 import '../../../core/theme/app_colors.dart';
@@ -60,11 +61,28 @@ class _TidalWebLoginDialogState extends State<TidalWebLoginDialog> {
 
   Future<void> _openTidalWebPage() async {
     final uri = Uri.parse(_authUrl);
-    AppLogger.log('TIDAL_AUTH', 'Tidal OAuth 웹 로그인 페이지 이동: $_authUrl', type: LogType.network);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      setState(() => _errorMessage = '브라우저를 열 수 없습니다. 아래 URL을 복사해 접속하세요:\n$_authUrl');
+    AppLogger.log('TIDAL_AUTH', 'Tidal OAuth 웹 로그인 페이지 이동 시도: $_authUrl', type: LogType.network);
+    try {
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
+      }
+    } catch (e) {
+      AppLogger.log('TIDAL_AUTH', '브라우저 자동 실행 예외: $e (주소 복사 기능으로 대체)', type: LogType.warning);
+      _copyUrlToClipboard();
+    }
+  }
+
+  void _copyUrlToClipboard() {
+    Clipboard.setData(ClipboardData(text: _authUrl));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tidal 로그인 URL이 클립보드에 복사되었습니다! 웹 브라우저 주소창에 붙여넣으세요.'),
+          backgroundColor: AppColors.cyanAccent,
+          duration: Duration(seconds: 4),
+        ),
+      );
     }
   }
 
@@ -125,7 +143,7 @@ class _TidalWebLoginDialogState extends State<TidalWebLoginDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              '1단계: 아래 버튼을 눌러 Tidal 공식 웹페이지에서 로그인해주세요.',
+              '1단계: 아래 버튼을 눌러 Tidal 웹페이지에서 로그인해주세요.',
               style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
@@ -137,8 +155,33 @@ class _TidalWebLoginDialogState extends State<TidalWebLoginDialog> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
               icon: const Icon(Icons.open_in_browser),
-              label: const Text('1. Tidal 공식 웹 로그인 페이지 열기', style: TextStyle(fontWeight: FontWeight.bold)),
+              label: const Text('1. Tidal 로그인 웹 브라우저 열기', style: TextStyle(fontWeight: FontWeight.bold)),
               onPressed: _openTidalWebPage,
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.cyanAccent,
+                side: const BorderSide(color: AppColors.cyanAccent),
+                minimumSize: const Size.fromHeight(40),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: const Icon(Icons.copy, size: 16),
+              label: const Text('Tidal 로그인 URL 클립보드 복사'),
+              onPressed: _copyUrlToClipboard,
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.black45,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.white12),
+              ),
+              child: SelectableText(
+                _authUrl,
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 10, fontFamily: 'monospace'),
+              ),
             ),
             const SizedBox(height: 20),
             const Text(
