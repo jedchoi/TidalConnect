@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 import '../../../core/config/tidal_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/app_logger.dart';
@@ -41,6 +43,7 @@ class _TidalWebViewLoginModalState extends State<TidalWebViewLoginModal> {
   late final WebViewController _controller;
   late final String _codeVerifier;
   late final String _codeChallenge;
+  late final Uri _authUri;
   final String _redirectUri = TidalConfig.redirectUri;
 
   bool _isLoadingPage = true;
@@ -53,7 +56,7 @@ class _TidalWebViewLoginModalState extends State<TidalWebViewLoginModal> {
     _codeVerifier = TidalPkceAuth.generateCodeVerifier();
     _codeChallenge = TidalPkceAuth.generateCodeChallenge(_codeVerifier);
 
-    final uri = Uri.parse('https://login.tidal.com/authorize').replace(queryParameters: {
+    _authUri = Uri.parse('https://login.tidal.com/authorize').replace(queryParameters: {
       'client_id': TidalConfig.clientId,
       'response_type': 'code',
       'redirect_uri': _redirectUri,
@@ -62,9 +65,10 @@ class _TidalWebViewLoginModalState extends State<TidalWebViewLoginModal> {
       'code_challenge_method': 'S256',
     });
 
-    AppLogger.log('TIDAL_AUTH', 'In-App WebView Tidal PKCE 로그인 시작 (RedirectURI: $_redirectUri): ${uri.toString()}', type: LogType.network);
+    AppLogger.log('TIDAL_AUTH', 'In-App WebView Tidal PKCE 로그인 시작 (RedirectURI: $_redirectUri): ${_authUri.toString()}', type: LogType.network);
 
     _controller = WebViewController()
+      ..setUserAgent("Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36")
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
@@ -93,8 +97,14 @@ class _TidalWebViewLoginModalState extends State<TidalWebViewLoginModal> {
             return NavigationDecision.navigate;
           },
         ),
-      )
-      ..loadRequest(uri);
+      );
+
+    if (_controller.platform is AndroidWebViewController) {
+      final androidController = _controller.platform as AndroidWebViewController;
+      androidController.setMediaPlaybackRequiresUserGesture(false);
+    }
+
+    _controller.loadRequest(_authUri);
   }
 
   bool _checkInterceptUrl(String url) {
@@ -141,6 +151,17 @@ class _TidalWebViewLoginModalState extends State<TidalWebViewLoginModal> {
     }
   }
 
+  Future<void> _openExternalBrowser() async {
+    try {
+      AppLogger.log('TIDAL_AUTH', '외부 브라우저(Chrome Custom Tabs)로 OAuth 로그인 페이지 실행', type: LogType.network);
+      if (await canLaunchUrl(_authUri)) {
+        await launchUrl(_authUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      AppLogger.log('TIDAL_AUTH', '외부 브라우저 호출 오류: $e', type: LogType.error);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -153,6 +174,13 @@ class _TidalWebViewLoginModalState extends State<TidalWebViewLoginModal> {
           icon: const Icon(Icons.close, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(null),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.open_in_browser, color: AppColors.cyanAccent),
+            tooltip: '외부 크롬 브라우저로 열기',
+            onPressed: _openExternalBrowser,
+          ),
+        ],
         bottom: _isLoadingPage || _isExchangingToken
             ? const PreferredSize(
                 preferredSize: Size.fromHeight(2),
