@@ -49,12 +49,11 @@ class TidalExternalAuthService {
       }
     });
 
-    // 2. Build official OAuth Authorize URL with scope=r_usr
+    // 2. Build official OAuth Authorize URL (scope 파라미터 제외하여 invalid_scope 11102 에러 방지)
     final authUrl = Uri.parse('https://login.tidal.com/authorize').replace(queryParameters: {
       'client_id': TidalConfig.clientId,
       'response_type': 'code',
       'redirect_uri': redirectUri,
-      'scope': 'r_usr',
       'code_challenge': codeChallenge,
       'code_challenge_method': 'S256',
     });
