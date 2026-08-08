@@ -41,14 +41,17 @@ class _MyCollectionScreenState extends State<MyCollectionScreen> {
         var playlists = await _apiClient.getFavoritePlaylists(userToken.accessToken, userId: userId);
         var tracks = await _apiClient.getFavoriteTracks(userToken.accessToken, userId: userId);
 
+        final clientToken = await _authRepo.authenticateClientCredentials();
+        final searchToken = clientToken?.accessToken ?? userToken.accessToken;
+
         if (albums.isEmpty) {
-          albums = await _apiClient.searchAlbums('Master', userToken.accessToken);
+          albums = await _apiClient.searchAlbums('Master', searchToken);
         }
         if (playlists.isEmpty) {
-          playlists = await _apiClient.searchPlaylists('Tidal', userToken.accessToken);
+          playlists = await _apiClient.searchPlaylists('Tidal', searchToken);
         }
         if (tracks.isEmpty) {
-          tracks = await _apiClient.searchTracks('Top', userToken.accessToken);
+          tracks = await _apiClient.searchTracks('Top', searchToken);
         }
 
         if (mounted) {
