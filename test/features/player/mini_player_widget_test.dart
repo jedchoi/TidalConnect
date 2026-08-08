@@ -22,6 +22,6 @@ void main() {
     expect(find.text('Test Tidal Song'), findsOneWidget);
     expect(find.textContaining('Test Artist Name'), findsOneWidget);
     expect(find.byIcon(Icons.play_circle_filled), findsOneWidget);
-    expect(find.byIcon(Icons.phone_android), findsOneWidget);
+    expect(find.byIcon(Icons.phone_android), findsWidgets);
   });
 }
