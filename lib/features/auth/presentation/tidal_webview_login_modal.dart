@@ -57,7 +57,7 @@ class _TidalWebViewLoginModalState extends State<TidalWebViewLoginModal> {
       'client_id': TidalConfig.clientId,
       'response_type': 'code',
       'redirect_uri': _redirectUri,
-      'scope': 'r_usr w_usr',
+      'scope': 'r_usr',
       'code_challenge': _codeChallenge,
       'code_challenge_method': 'S256',
     });
