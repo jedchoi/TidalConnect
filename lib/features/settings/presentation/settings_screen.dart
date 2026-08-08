@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/data/tidal_auth_repository.dart';
-import '../../auth/presentation/tidal_web_login_dialog.dart';
+import '../../auth/presentation/tidal_webview_login_modal.dart';
 import '../../dlna/data/dlna_manager.dart';
 import 'debug_log_screen.dart';
 
@@ -44,7 +44,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _handleTidalLogin() async {
     setState(() => _isAuthenticating = true);
     try {
-      final authToken = await TidalWebLoginDialog.show(
+      final authToken = await TidalWebViewLoginModal.show(
         context,
         authRepository: _authRepo,
       );
@@ -54,11 +54,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (authToken != null) {
         setState(() {
           _isLoggedIn = true;
-          _authStatusText = 'Tidal 사용자 OAuth 로그인 성공!';
+          _authStatusText = 'Tidal 사용자 계정 로그인 완료!';
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Tidal 계정 웹 로그인 성공! 이제 내 즐겨찾기 및 모든 음악을 가져올 수 있습니다.'),
+            content: Text('Tidal 계정 로그인 성공! 이제 내 즐겨찾기 및 모든 음악을 가져올 수 있습니다.'),
             backgroundColor: AppColors.cyanAccent,
           ),
         );
@@ -143,7 +143,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     leading: const Icon(Icons.account_circle, color: AppColors.cyanAccent, size: 36),
                     title: Text(_authStatusText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     subtitle: Text(
-                      _isLoggedIn ? '사용자 OAuth 인증 토큰 활성화됨' : 'Tidal 공식 웹페이지에서 계정 로그인',
+                      _isLoggedIn ? '사용자 OAuth 인증 토큰 활성화됨' : '앱 내부에서 ID/PW만 입력하여 바로 로그인',
                       style: const TextStyle(color: AppColors.textSecondary),
                     ),
                   ),

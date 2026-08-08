@@ -1,0 +1,199 @@
+import 'package:flutter/material.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import '../../../core/config/tidal_config.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_logger.dart';
+import '../data/tidal_auth_repository.dart';
+import '../data/tidal_pkce_auth.dart';
+import '../domain/models/auth_token.dart';
+
+class TidalWebViewLoginModal extends StatefulWidget {
+  final TidalAuthRepository authRepository;
+
+  const TidalWebViewLoginModal({
+    super.key,
+    required this.authRepository,
+  });
+
+  static Future<AuthToken?> show(
+    BuildContext context, {
+    required TidalAuthRepository authRepository,
+  }) {
+    return showModalBottomSheet<AuthToken>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.background,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => SizedBox(
+        height: MediaQuery.of(context).size.height * 0.85,
+        child: TidalWebViewLoginModal(authRepository: authRepository),
+      ),
+    );
+  }
+
+  @override
+  State<TidalWebViewLoginModal> createState() => _TidalWebViewLoginModalState();
+}
+
+class _TidalWebViewLoginModalState extends State<TidalWebViewLoginModal> {
+  late final WebViewController _controller;
+  late final String _codeVerifier;
+  late final String _codeChallenge;
+  final String _redirectUri = 'https://login.tidal.com/oauth2/callback';
+
+  bool _isLoadingPage = true;
+  bool _isExchangingToken = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _codeVerifier = TidalPkceAuth.generateCodeVerifier();
+    _codeChallenge = TidalPkceAuth.generateCodeChallenge(_codeVerifier);
+
+    final uri = Uri.parse('https://login.tidal.com/authorize').replace(queryParameters: {
+      'client_id': TidalConfig.clientId,
+      'response_type': 'code',
+      'redirect_uri': _redirectUri,
+      'scope': 'r_usr w_usr',
+      'code_challenge': _codeChallenge,
+      'code_challenge_method': 'S256',
+    });
+
+    AppLogger.log('TIDAL_AUTH', 'In-App WebView Tidal 로그인 시작: ${uri.toString()}', type: LogType.network);
+
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (String url) {
+            if (mounted) setState(() => _isLoadingPage = true);
+            _checkInterceptUrl(url);
+          },
+          onPageFinished: (String url) {
+            if (mounted) setState(() => _isLoadingPage = false);
+            _checkInterceptUrl(url);
+          },
+          onNavigationRequest: (NavigationRequest request) {
+            if (_checkInterceptUrl(request.url)) {
+              return NavigationDecision.prevent;
+            }
+            return NavigationDecision.navigate;
+          },
+        ),
+      )
+      ..loadRequest(uri);
+  }
+
+  bool _checkInterceptUrl(String url) {
+    if (_isExchangingToken) return true;
+
+    if (url.startsWith(_redirectUri) || url.contains('code=')) {
+      try {
+        final parsedUri = Uri.parse(url);
+        final code = parsedUri.queryParameters['code'];
+        if (code != null && code.isNotEmpty) {
+          _handleAuthorizationCode(code);
+          return true;
+        }
+      } catch (e) {
+        AppLogger.log('TIDAL_AUTH', 'Redirect URL 파싱 에러: $e', type: LogType.error);
+      }
+    }
+    return false;
+  }
+
+  Future<void> _handleAuthorizationCode(String code) async {
+    setState(() {
+      _isExchangingToken = true;
+    });
+
+    AppLogger.log('TIDAL_AUTH', 'WebView 리다이렉트 감지 ➔ Authorization Code 감지 성공!', type: LogType.success);
+
+    final token = await widget.authRepository.exchangeAuthorizationCode(
+      code: code,
+      codeVerifier: _codeVerifier,
+      redirectUri: _redirectUri,
+    );
+
+    if (!mounted) return;
+
+    if (token != null) {
+      Navigator.of(context).pop(token);
+    } else {
+      setState(() {
+        _isExchangingToken = false;
+        _errorMessage = '인증 토큰 발급 실패. 다시 로그인해주세요.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('Tidal 계정 로그인', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        backgroundColor: AppColors.surfaceCard,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(null),
+        ),
+        bottom: _isLoadingPage || _isExchangingToken
+            ? const PreferredSize(
+                preferredSize: Size.fromHeight(2),
+                child: LinearProgressIndicator(color: AppColors.cyanAccent, backgroundColor: Colors.transparent),
+              )
+            : null,
+      ),
+      body: Stack(
+        children: [
+          WebViewWidget(controller: _controller),
+          if (_isExchangingToken)
+            Container(
+              color: Colors.black87,
+              child: const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: AppColors.cyanAccent),
+                    SizedBox(height: 16),
+                    Text(
+                      'Tidal 계정 로그인 처리 중...',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Access Token을 안전하게 수신하고 있습니다.',
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          if (_errorMessage != null)
+            Positioned(
+              bottom: 20,
+              left: 20,
+              right: 20,
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _errorMessage!,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
