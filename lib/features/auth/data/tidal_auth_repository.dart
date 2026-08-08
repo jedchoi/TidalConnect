@@ -80,11 +80,12 @@ class TidalAuthRepository {
   /// Refreshes user access token using refresh_token
   Future<AuthToken?> refreshToken(String refreshToken) async {
     if (refreshToken.isEmpty) {
-      return authenticateClientCredentials();
+      return null;
     }
     final url = '${TidalConfig.authBaseUrl}/token';
     AppLogger.log('TIDAL_AUTH', 'POST $url (grant_type=refresh_token)', type: LogType.network);
     try {
+      final basicAuth = base64Encode(utf8.encode('${TidalConfig.clientId}:${TidalConfig.clientSecret}'));
       final response = await _dio.post(
         url,
         data: {
@@ -92,7 +93,10 @@ class TidalAuthRepository {
           'grant_type': 'refresh_token',
           'refresh_token': refreshToken,
         },
-        options: Options(contentType: Headers.formUrlEncodedContentType),
+        options: Options(
+          contentType: Headers.formUrlEncodedContentType,
+          headers: {'Authorization': 'Basic $basicAuth'},
+        ),
       );
 
       final data = response.data;
@@ -107,10 +111,10 @@ class TidalAuthRepository {
       );
 
       await saveToken(token);
-      AppLogger.log('TIDAL_AUTH', 'OAuth 토큰 갱신 성공 [HTTP ${response.statusCode}]', type: LogType.success);
+      AppLogger.log('TIDAL_AUTH', 'OAuth 사용자 토큰 갱신 성공 [HTTP ${response.statusCode}]', type: LogType.success);
       return token;
     } catch (e) {
-      AppLogger.log('TIDAL_AUTH', 'OAuth 토큰 갱신 실패: $e', type: LogType.error);
+      AppLogger.log('TIDAL_AUTH', 'OAuth 사용자 토큰 갱신 실패: $e', type: LogType.error);
       return null;
     }
   }
@@ -120,13 +124,17 @@ class TidalAuthRepository {
     final url = '${TidalConfig.authBaseUrl}/device_authorization';
     AppLogger.log('TIDAL_AUTH', 'POST $url (Device Code 요청)', type: LogType.network);
     try {
+      final basicAuth = base64Encode(utf8.encode('${TidalConfig.clientId}:${TidalConfig.clientSecret}'));
       final response = await _dio.post(
         url,
         data: {
           'client_id': TidalConfig.clientId,
           'scope': 'r_usr w_usr',
         },
-        options: Options(contentType: Headers.formUrlEncodedContentType),
+        options: Options(
+          contentType: Headers.formUrlEncodedContentType,
+          headers: {'Authorization': 'Basic $basicAuth'},
+        ),
       );
       AppLogger.log('TIDAL_AUTH', 'Device Code 발급 응답 [HTTP ${response.statusCode}]: ${response.data}', type: LogType.success);
       return response.data as Map<String, dynamic>?;

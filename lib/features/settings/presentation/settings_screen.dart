@@ -57,23 +57,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (authToken != null && mounted) {
           setState(() {
             _isLoggedIn = true;
-            _authStatusText = 'Tidal 사용자 로그인 성공!';
+            _authStatusText = 'Tidal 사용자 계정 로그인 완료!';
           });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Tidal 계정 로그인 성공! 이제 내 즐겨찾기 및 모든 음악을 가져올 수 있습니다.'),
+              content: Text('Tidal 웹 로그인 성공! 액세스 토큰이 저장되었습니다.'),
               backgroundColor: AppColors.cyanAccent,
             ),
           );
         }
       } else {
-        // Fallback to client credentials if device code is unhandled
-        final token = await _authRepo.authenticateClientCredentials();
-        if (token != null && mounted) {
-          setState(() {
-            _isLoggedIn = true;
-            _authStatusText = 'Tidal Client Credentials 토큰 발급 완료';
-          });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Tidal Device Auth 코드 발급 실패. 우측 상단 벌레 모양 아이콘(로그 콘솔)을 눌러 에러 응답을 확인하세요.'),
+              backgroundColor: Colors.redAccent,
+              duration: Duration(seconds: 5),
+            ),
+          );
         }
       }
     } catch (_) {

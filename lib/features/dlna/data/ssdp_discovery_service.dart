@@ -14,7 +14,8 @@ class SSDPDiscoveryService {
 
   Future<List<DlnaDevice>> discoverDevices({Duration timeout = const Duration(seconds: 4)}) async {
     final List<DlnaDevice> devices = [DlnaDevice.localSpeaker];
-    final Set<String> seenUsns = {DlnaDevice.localSpeaker.udn};
+    final Set<String> seenLocations = {};
+    final Set<String> seenUdns = {DlnaDevice.localSpeaker.udn};
 
     RawDatagramSocket? socket;
     try {
@@ -50,10 +51,10 @@ class SSDPDiscoveryService {
       Timer(const Duration(milliseconds: 600), () => sendMSearchBursts());
 
       final completer = Completer<List<DlnaDevice>>();
-      final timer = Timer(timeout, () {
+      Timer(timeout, () {
         socket?.close();
         if (!completer.isCompleted) {
-          AppLogger.log('SSDP_NET', 'SSDP 탐색 타임아웃 (${timeout.inSeconds}초 소요). 발견된 기기: ${devices.length}개', type: devices.length > 1 ? LogType.success : LogType.warning);
+          AppLogger.log('SSDP_NET', 'SSDP 탐색 종료 (${timeout.inSeconds}초 소요). 고유 발견 기기: ${devices.length}개', type: devices.length > 1 ? LogType.success : LogType.warning);
           completer.complete(devices);
         }
       });
@@ -65,16 +66,34 @@ class SSDPDiscoveryService {
             final response = utf8.decode(datagram.data);
             final headers = _parseHeaders(response);
             final location = headers['LOCATION'] ?? headers['location'];
-            final usn = headers['USN'] ?? headers['usn'] ?? location;
+            final rawUsn = headers['USN'] ?? headers['usn'] ?? location;
 
-            AppLogger.log('SSDP_NET', 'UDP 응답 수신 [from ${datagram.address.address}:${datagram.port}] LOCATION: $location', type: LogType.info);
+            if (location == null) return;
 
-            if (location != null && usn != null && !seenUsns.contains(usn)) {
-              seenUsns.add(usn);
-              final device = await _fetchDeviceDescription(location, usn);
-              if (device != null) {
+            // Extract base UUID / UDN (strip subservice suffix like ::urn:schemas-upnp-org:...)
+            final baseUdn = (rawUsn ?? location).split('::').first.trim();
+
+            // Strict Deduplication Check before HTTP fetch
+            if (seenLocations.contains(location) || seenUdns.contains(baseUdn)) {
+              return;
+            }
+
+            seenLocations.add(location);
+            seenUdns.add(baseUdn);
+
+            AppLogger.log('SSDP_NET', 'UDP 중복 없음 확인 ➔ XML 수신 시작 [from ${datagram.address.address}] LOCATION: $location', type: LogType.info);
+
+            final device = await _fetchDeviceDescription(location, baseUdn);
+            if (device != null) {
+              // Final duplicate safety check against existing list
+              final isDuplicate = devices.any((d) =>
+                  d.locationUrl == device.locationUrl ||
+                  (d.udn.isNotEmpty && d.udn == device.udn) ||
+                  (d.friendlyName == device.friendlyName && !d.isLocalSpeaker));
+
+              if (!isDuplicate) {
                 devices.add(device);
-                AppLogger.log('SSDP_NET', 'DLNA 렌더러 추가 성공: "${device.friendlyName}" (${device.locationUrl})', type: LogType.success);
+                AppLogger.log('SSDP_NET', 'DLNA 렌더러 등록 완료: "${device.friendlyName}" (${device.locationUrl})', type: LogType.success);
               }
             }
           }
@@ -105,7 +124,7 @@ class SSDPDiscoveryService {
 
   Future<DlnaDevice?> _fetchDeviceDescription(String locationUrl, String usn) async {
     try {
-      AppLogger.log('SSDP_NET', 'GET $locationUrl (XML 명세 수신 시도)', type: LogType.network);
+      AppLogger.log('SSDP_NET', 'GET $locationUrl (XML 명세 수신)', type: LogType.network);
       final response = await _dio.get(
         locationUrl,
         options: Options(responseType: ResponseType.plain),
@@ -117,7 +136,7 @@ class SSDPDiscoveryService {
           xmlStr.contains('RenderingControl');
 
       if (!isMediaDevice) {
-        AppLogger.log('SSDP_NET', '필터링됨: $locationUrl (MediaRenderer/AVTransport 미지원 기기)', type: LogType.info);
+        AppLogger.log('SSDP_NET', '필터링됨 (MediaRenderer 미지원): $locationUrl', type: LogType.info);
         return null;
       }
 
