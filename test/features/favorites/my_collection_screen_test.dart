@@ -8,12 +8,10 @@ void main() {
     await tester.pumpWidget(
       const ProviderScope(
         child: MaterialApp(
-          home: MyCollectionScreen(),
+          home: MyCollectionScreen(autoLoad: false),
         ),
       ),
     );
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 4));
 
     expect(find.text('내 즐겨찾기'), findsOneWidget);
     expect(find.text('즐겨찾기 앨범'), findsOneWidget);

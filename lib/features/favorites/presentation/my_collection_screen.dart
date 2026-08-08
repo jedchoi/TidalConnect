@@ -5,14 +5,16 @@ import '../../tidal_api/data/tidal_api_client.dart';
 import '../../tidal_api/domain/models/media_item.dart';
 
 class MyCollectionScreen extends StatefulWidget {
-  const MyCollectionScreen({super.key});
+  final bool autoLoad;
+
+  const MyCollectionScreen({super.key, this.autoLoad = true});
 
   @override
   State<MyCollectionScreen> createState() => _MyCollectionScreenState();
 }
 
 class _MyCollectionScreenState extends State<MyCollectionScreen> {
-  bool _isLoading = true;
+  bool _isLoading = false;
   List<MediaAlbum> _albums = [];
   List<MediaPlaylist> _playlists = [];
   List<MediaTrack> _tracks = [];
@@ -23,7 +25,9 @@ class _MyCollectionScreenState extends State<MyCollectionScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCollectionData();
+    if (widget.autoLoad) {
+      _loadCollectionData();
+    }
   }
 
   Future<void> _loadCollectionData() async {
