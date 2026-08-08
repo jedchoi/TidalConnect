@@ -5,6 +5,8 @@ import '../../../core/utils/app_logger.dart';
 import '../domain/models/auth_token.dart';
 import 'secure_storage_service.dart';
 
+import '../../../core/native/tidal_sdk_native_bridge.dart';
+
 class TidalAuthRepository {
   final SecureStorageService _storageService;
   final Dio _dio;
@@ -18,7 +20,16 @@ class TidalAuthRepository {
                 connectTimeout: const Duration(seconds: 5),
                 receiveTimeout: const Duration(seconds: 5),
               ),
-            );
+            ) {
+    initNativeSdk();
+  }
+
+  Future<void> initNativeSdk() async {
+    await TidalSdkNativeBridge.initTidalAuth(
+      clientId: TidalConfig.clientId,
+      clientSecret: TidalConfig.clientSecret,
+    );
+  }
 
   AuthToken? get currentToken => _currentToken;
 

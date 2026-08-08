@@ -45,4 +45,5 @@ flutter {
 
 dependencies {
     implementation("com.tidal.sdk:auth:0.10.1")
+    implementation("com.tidal.sdk:player:0.0.70")
 }
