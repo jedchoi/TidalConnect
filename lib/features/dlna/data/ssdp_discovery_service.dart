@@ -11,25 +11,40 @@ class SSDPDiscoveryService {
 
   SSDPDiscoveryService({Dio? dio}) : _dio = dio ?? Dio();
 
-  Future<List<DlnaDevice>> discoverDevices({Duration timeout = const Duration(seconds: 3)}) async {
+  Future<List<DlnaDevice>> discoverDevices({Duration timeout = const Duration(seconds: 4)}) async {
     final List<DlnaDevice> devices = [DlnaDevice.localSpeaker];
     final Set<String> seenUsns = {DlnaDevice.localSpeaker.udn};
 
     RawDatagramSocket? socket;
     try {
       socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
-      socket.multicastHops = 2;
+      socket.multicastHops = 4;
       socket.broadcastEnabled = true;
 
-      const mSearch =
-          'M-SEARCH * HTTP/1.1\r\n'
-          'HOST: 239.255.255.250:1900\r\n'
-          'MAN: "ssdp:discover"\r\n'
-          'MX: 2\r\n'
-          'ST: urn:schemas-upnp-org:device:MediaRenderer:1\r\n'
-          '\r\n';
+      final targets = [
+        'urn:schemas-upnp-org:device:MediaRenderer:1',
+        'urn:schemas-upnp-org:service:AVTransport:1',
+        'ssdp:all',
+        'upnp:rootdevice',
+      ];
 
-      socket.send(utf8.encode(mSearch), InternetAddress(multicastAddress), multicastPort);
+      void sendMSearchBursts() {
+        for (final target in targets) {
+          final mSearch =
+              'M-SEARCH * HTTP/1.1\r\n'
+              'HOST: 239.255.255.250:1900\r\n'
+              'MAN: "ssdp:discover"\r\n'
+              'MX: 3\r\n'
+              'ST: $target\r\n'
+              '\r\n';
+          socket?.send(utf8.encode(mSearch), InternetAddress(multicastAddress), multicastPort);
+          socket?.send(utf8.encode(mSearch), InternetAddress('255.255.255.255'), multicastPort);
+        }
+      }
+
+      // Initial burst & retry burst after 500ms
+      sendMSearchBursts();
+      Timer(const Duration(milliseconds: 600), () => sendMSearchBursts());
 
       final completer = Completer<List<DlnaDevice>>();
       final timer = Timer(timeout, () {
@@ -82,11 +97,27 @@ class SSDPDiscoveryService {
 
   Future<DlnaDevice?> _fetchDeviceDescription(String locationUrl, String usn) async {
     try {
-      final response = await _dio.get(locationUrl);
+      final response = await _dio.get(
+        locationUrl,
+        options: Options(responseType: ResponseType.plain),
+      );
       final xmlStr = response.data.toString();
-      final friendlyName = _extractXmlValue(xmlStr, 'friendlyName') ?? 'Chord Poly DLNA';
-      final avTransportUrl = _extractServiceUrl(xmlStr, 'AVTransport') ?? locationUrl;
-      final renderingControlUrl = _extractServiceUrl(xmlStr, 'RenderingControl') ?? locationUrl;
+
+      // Check if device is a renderer or supports AVTransport
+      final isMediaDevice = xmlStr.contains('MediaRenderer') ||
+          xmlStr.contains('AVTransport') ||
+          xmlStr.contains('RenderingControl');
+
+      if (!isMediaDevice) return null;
+
+      final friendlyName = _extractXmlValue(xmlStr, 'friendlyName') ?? 'DLNA Media Renderer';
+      final baseUri = Uri.parse(locationUrl);
+
+      final rawAvTransport = _extractServiceUrl(xmlStr, 'AVTransport');
+      final rawRenderingControl = _extractServiceUrl(xmlStr, 'RenderingControl');
+
+      final avTransportUrl = rawAvTransport != null ? baseUri.resolve(rawAvTransport).toString() : locationUrl;
+      final renderingControlUrl = rawRenderingControl != null ? baseUri.resolve(rawRenderingControl).toString() : locationUrl;
 
       return DlnaDevice(
         udn: usn,
@@ -96,9 +127,10 @@ class SSDPDiscoveryService {
         renderingControlUrl: renderingControlUrl,
       );
     } catch (_) {
+      final baseUri = Uri.parse(locationUrl);
       return DlnaDevice(
         udn: usn,
-        friendlyName: 'Chord Poly (DLNA)',
+        friendlyName: 'DLNA Audio Renderer (${baseUri.host})',
         locationUrl: locationUrl,
         avTransportControlUrl: locationUrl,
         renderingControlUrl: locationUrl,
