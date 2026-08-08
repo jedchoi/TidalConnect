@@ -11,18 +11,27 @@ class TidalApiClient {
             Dio(
               BaseOptions(
                 baseUrl: baseUrl,
-                connectTimeout: const Duration(seconds: 5),
-                receiveTimeout: const Duration(seconds: 5),
+                connectTimeout: const Duration(seconds: 8),
+                receiveTimeout: const Duration(seconds: 8),
               ),
             );
 
-  Future<List<MediaAlbum>> getFavoriteAlbums(String accessToken) async {
-    const endpoint = '/users/me/favorites/albums';
-    AppLogger.log('TIDAL_API', 'GET $baseUrl$endpoint', type: LogType.network);
+  Map<String, String> _buildHeaders(String accessToken) {
+    return {
+      'Authorization': 'Bearer $accessToken',
+      'Accept': 'application/json',
+    };
+  }
+
+  Future<List<MediaAlbum>> getFavoriteAlbums(String accessToken, {String userId = 'me'}) async {
+    final effectiveUserId = userId.isEmpty ? 'me' : userId;
+    final endpoint = '/users/$effectiveUserId/favorites/albums';
+    AppLogger.log('TIDAL_API', 'GET $baseUrl$endpoint (countryCode=US)', type: LogType.network);
     try {
       final response = await _dio.get(
         endpoint,
-        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+        queryParameters: {'countryCode': 'US', 'limit': 50},
+        options: Options(headers: _buildHeaders(accessToken)),
       );
       final items = response.data['items'] as List? ?? [];
       AppLogger.log('TIDAL_API', '내 즐겨찾기 앨범 수신 성공 [HTTP ${response.statusCode}]: ${items.length}개 항목', type: LogType.success);
@@ -35,13 +44,15 @@ class TidalApiClient {
     }
   }
 
-  Future<List<MediaPlaylist>> getFavoritePlaylists(String accessToken) async {
-    const endpoint = '/users/me/favorites/playlists';
-    AppLogger.log('TIDAL_API', 'GET $baseUrl$endpoint', type: LogType.network);
+  Future<List<MediaPlaylist>> getFavoritePlaylists(String accessToken, {String userId = 'me'}) async {
+    final effectiveUserId = userId.isEmpty ? 'me' : userId;
+    final endpoint = '/users/$effectiveUserId/favorites/playlists';
+    AppLogger.log('TIDAL_API', 'GET $baseUrl$endpoint (countryCode=US)', type: LogType.network);
     try {
       final response = await _dio.get(
         endpoint,
-        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+        queryParameters: {'countryCode': 'US', 'limit': 50},
+        options: Options(headers: _buildHeaders(accessToken)),
       );
       final items = response.data['items'] as List? ?? [];
       AppLogger.log('TIDAL_API', '내 즐겨찾기 플레이리스트 수신 성공 [HTTP ${response.statusCode}]: ${items.length}개 항목', type: LogType.success);
@@ -54,13 +65,15 @@ class TidalApiClient {
     }
   }
 
-  Future<List<MediaTrack>> getFavoriteTracks(String accessToken) async {
-    const endpoint = '/users/me/favorites/tracks';
-    AppLogger.log('TIDAL_API', 'GET $baseUrl$endpoint', type: LogType.network);
+  Future<List<MediaTrack>> getFavoriteTracks(String accessToken, {String userId = 'me'}) async {
+    final effectiveUserId = userId.isEmpty ? 'me' : userId;
+    final endpoint = '/users/$effectiveUserId/favorites/tracks';
+    AppLogger.log('TIDAL_API', 'GET $baseUrl$endpoint (countryCode=US)', type: LogType.network);
     try {
       final response = await _dio.get(
         endpoint,
-        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+        queryParameters: {'countryCode': 'US', 'limit': 50},
+        options: Options(headers: _buildHeaders(accessToken)),
       );
       final items = response.data['items'] as List? ?? [];
       AppLogger.log('TIDAL_API', '내 즐겨찾기 트랙 수신 성공 [HTTP ${response.statusCode}]: ${items.length}개 항목', type: LogType.success);
@@ -73,13 +86,15 @@ class TidalApiClient {
     }
   }
 
-  Future<List<MediaArtist>> getFavoriteArtists(String accessToken) async {
-    const endpoint = '/users/me/favorites/artists';
-    AppLogger.log('TIDAL_API', 'GET $baseUrl$endpoint', type: LogType.network);
+  Future<List<MediaArtist>> getFavoriteArtists(String accessToken, {String userId = 'me'}) async {
+    final effectiveUserId = userId.isEmpty ? 'me' : userId;
+    final endpoint = '/users/$effectiveUserId/favorites/artists';
+    AppLogger.log('TIDAL_API', 'GET $baseUrl$endpoint (countryCode=US)', type: LogType.network);
     try {
       final response = await _dio.get(
         endpoint,
-        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+        queryParameters: {'countryCode': 'US', 'limit': 50},
+        options: Options(headers: _buildHeaders(accessToken)),
       );
       final items = response.data['items'] as List? ?? [];
       AppLogger.log('TIDAL_API', '내 즐겨찾기 아티스트 수신 성공 [HTTP ${response.statusCode}]: ${items.length}개 항목', type: LogType.success);
@@ -91,13 +106,12 @@ class TidalApiClient {
 
   Future<List<MediaTrack>> searchTracks(String query, String accessToken, {int limit = 20}) async {
     if (query.trim().isEmpty) return [];
-    final endpoint = '/search/tracks?query=$query';
-    AppLogger.log('TIDAL_API', 'GET $baseUrl/search/tracks (query=$query)', type: LogType.network);
+    AppLogger.log('TIDAL_API', 'GET $baseUrl/search/tracks (query=$query, countryCode=US)', type: LogType.network);
     try {
       final response = await _dio.get(
         '/search/tracks',
         queryParameters: {'query': query, 'limit': limit, 'countryCode': 'US'},
-        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+        options: Options(headers: _buildHeaders(accessToken)),
       );
       final items = response.data['items'] as List? ?? [];
       AppLogger.log('TIDAL_API', '트랙 검색 성공 [HTTP ${response.statusCode}]: ${items.length}개 수신', type: LogType.success);
@@ -112,12 +126,12 @@ class TidalApiClient {
 
   Future<List<MediaAlbum>> searchAlbums(String query, String accessToken, {int limit = 20}) async {
     if (query.trim().isEmpty) return [];
-    AppLogger.log('TIDAL_API', 'GET $baseUrl/search/albums (query=$query)', type: LogType.network);
+    AppLogger.log('TIDAL_API', 'GET $baseUrl/search/albums (query=$query, countryCode=US)', type: LogType.network);
     try {
       final response = await _dio.get(
         '/search/albums',
         queryParameters: {'query': query, 'limit': limit, 'countryCode': 'US'},
-        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+        options: Options(headers: _buildHeaders(accessToken)),
       );
       final items = response.data['items'] as List? ?? [];
       AppLogger.log('TIDAL_API', '앨범 검색 성공 [HTTP ${response.statusCode}]: ${items.length}개 수신', type: LogType.success);
@@ -129,12 +143,12 @@ class TidalApiClient {
 
   Future<List<MediaPlaylist>> searchPlaylists(String query, String accessToken, {int limit = 20}) async {
     if (query.trim().isEmpty) return [];
-    AppLogger.log('TIDAL_API', 'GET $baseUrl/search/playlists (query=$query)', type: LogType.network);
+    AppLogger.log('TIDAL_API', 'GET $baseUrl/search/playlists (query=$query, countryCode=US)', type: LogType.network);
     try {
       final response = await _dio.get(
         '/search/playlists',
         queryParameters: {'query': query, 'limit': limit, 'countryCode': 'US'},
-        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+        options: Options(headers: _buildHeaders(accessToken)),
       );
       final items = response.data['items'] as List? ?? [];
       AppLogger.log('TIDAL_API', '플레이리스트 검색 성공 [HTTP ${response.statusCode}]: ${items.length}개 수신', type: LogType.success);
@@ -145,13 +159,12 @@ class TidalApiClient {
   }
 
   Future<String?> getStreamUrl(String trackId, String accessToken, {String soundQuality = 'LOSSLESS'}) async {
-    const endpoint = '/tracks/urlpostpaystream';
-    AppLogger.log('TIDAL_API', 'GET $baseUrl/tracks/$trackId/urlpostpaystream', type: LogType.network);
+    AppLogger.log('TIDAL_API', 'GET $baseUrl/tracks/$trackId/urlpostpaystream (soundQuality=$soundQuality, countryCode=US)', type: LogType.network);
     try {
       final response = await _dio.get(
         '/tracks/$trackId/urlpostpaystream',
-        queryParameters: {'soundQuality': soundQuality},
-        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+        queryParameters: {'soundQuality': soundQuality, 'countryCode': 'US'},
+        options: Options(headers: _buildHeaders(accessToken)),
       );
       final url = response.data['url'] as String?;
       AppLogger.log('TIDAL_API', '오디오 스트림 URL 발급 성공: $url', type: LogType.success);

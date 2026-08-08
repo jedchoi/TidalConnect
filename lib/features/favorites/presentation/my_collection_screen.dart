@@ -37,9 +37,10 @@ class _MyCollectionScreenState extends State<MyCollectionScreen> {
       token ??= await _authRepo.authenticateClientCredentials();
 
       if (token != null) {
-        var albums = await _apiClient.getFavoriteAlbums(token.accessToken);
-        var playlists = await _apiClient.getFavoritePlaylists(token.accessToken);
-        var tracks = await _apiClient.getFavoriteTracks(token.accessToken);
+        final userId = token.userId.isNotEmpty ? token.userId : 'me';
+        var albums = await _apiClient.getFavoriteAlbums(token.accessToken, userId: userId);
+        var playlists = await _apiClient.getFavoritePlaylists(token.accessToken, userId: userId);
+        var tracks = await _apiClient.getFavoriteTracks(token.accessToken, userId: userId);
 
         // Fallback to catalog search if user favorites return empty
         if (albums.isEmpty) {

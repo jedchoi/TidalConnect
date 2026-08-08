@@ -51,7 +51,7 @@ class TidalExternalAuthService {
       'client_id': TidalConfig.clientId,
       'response_type': 'code',
       'redirect_uri': redirectUri,
-      'scope': 'r_usr',
+      // 'scope': 'r_usr',
       'code_challenge': codeChallenge,
       'code_challenge_method': 'S256',
     });
@@ -60,7 +60,7 @@ class TidalExternalAuthService {
 
     // 3. Launch external Chrome browser directly
     if (await canLaunchUrl(authUrl)) {
-      await launchUrl(authUrl, mode: LaunchMode.externalApplication);
+      await launchUrl(authUrl, mode: LaunchMode.inAppBrowserView);
     } else {
       AppLogger.log('TIDAL_AUTH', '외부 브라우저를 띄울 수 없습니다.', type: LogType.error);
       if (!completer.isCompleted) {
