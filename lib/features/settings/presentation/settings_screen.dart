@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/data/tidal_auth_repository.dart';
+import '../../auth/data/tidal_external_auth_service.dart';
 import '../../auth/presentation/tidal_webview_login_modal.dart';
 import '../../dlna/data/dlna_manager.dart';
 import 'debug_log_screen.dart';
@@ -44,8 +45,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _handleTidalLogin() async {
     setState(() => _isAuthenticating = true);
     try {
-      final authToken = await TidalWebViewLoginModal.show(
-        context,
+      final externalAuthService = TidalExternalAuthService();
+      final authToken = await externalAuthService.startExternalLogin(
         authRepository: _authRepo,
       );
 
