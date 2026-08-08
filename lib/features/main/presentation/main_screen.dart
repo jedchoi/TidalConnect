@@ -3,6 +3,7 @@ import '../../favorites/presentation/my_collection_screen.dart';
 import '../../explore/presentation/explore_screen.dart';
 import '../../search/presentation/search_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
+import '../../player/presentation/mini_player_widget.dart';
 import '../../../core/theme/app_colors.dart';
 
 class MainScreen extends StatefulWidget {
@@ -29,29 +30,35 @@ class _MainScreenState extends State<MainScreen> {
         index: _currentIndex,
         children: _screens,
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: AppColors.surfaceCard,
-        selectedItemColor: AppColors.cyanAccent,
-        unselectedItemColor: AppColors.textSecondary,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.favorite),
-            label: '즐겨찾기',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.explore),
-            label: '추천',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.search),
-            label: '검색',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: '설정',
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const MiniPlayerWidget(),
+          BottomNavigationBar(
+            currentIndex: _currentIndex,
+            onTap: (index) => setState(() => _currentIndex = index),
+            type: BottomNavigationBarType.fixed,
+            backgroundColor: AppColors.surfaceCard,
+            selectedItemColor: AppColors.cyanAccent,
+            unselectedItemColor: AppColors.textSecondary,
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.favorite),
+                label: '즐겨찾기',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.explore),
+                label: '추천',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.search),
+                label: '검색',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.settings),
+                label: '설정',
+              ),
+            ],
           ),
         ],
       ),
