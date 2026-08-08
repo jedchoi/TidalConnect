@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../favorites/presentation/my_collection_screen.dart';
+import '../../explore/presentation/explore_screen.dart';
+import '../../search/presentation/search_screen.dart';
+import '../../settings/presentation/settings_screen.dart';
 import '../../../core/theme/app_colors.dart';
 
 class MainScreen extends StatefulWidget {
@@ -12,11 +15,11 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const MyCollectionScreen(),
-    const Center(child: Text('추천 & 최근 재생', style: TextStyle(color: Colors.white))),
-    const Center(child: Text('음악 검색', style: TextStyle(color: Colors.white))),
-    const Center(child: Text('앱 설정', style: TextStyle(color: Colors.white))),
+  final List<Widget> _screens = const [
+    MyCollectionScreen(),
+    ExploreScreen(),
+    SearchScreen(),
+    SettingsScreen(),
   ];
 
   @override
