@@ -5,7 +5,15 @@ class TidalApiClient {
   final Dio _dio;
   static const String baseUrl = 'https://api.tidal.com/v1';
 
-  TidalApiClient({Dio? dio}) : _dio = dio ?? Dio(BaseOptions(baseUrl: baseUrl));
+  TidalApiClient({Dio? dio})
+      : _dio = dio ??
+            Dio(
+              BaseOptions(
+                baseUrl: baseUrl,
+                connectTimeout: const Duration(seconds: 3),
+                receiveTimeout: const Duration(seconds: 3),
+              ),
+            );
 
   Future<List<MediaAlbum>> getFavoriteAlbums(String accessToken) async {
     try {

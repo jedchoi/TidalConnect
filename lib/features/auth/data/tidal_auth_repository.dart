@@ -11,7 +11,13 @@ class TidalAuthRepository {
 
   TidalAuthRepository({SecureStorageService? storageService, Dio? dio})
       : _storageService = storageService ?? SecureStorageService(),
-        _dio = dio ?? Dio();
+        _dio = dio ??
+            Dio(
+              BaseOptions(
+                connectTimeout: const Duration(seconds: 3),
+                receiveTimeout: const Duration(seconds: 3),
+              ),
+            );
 
   AuthToken? get currentToken => _currentToken;
 
