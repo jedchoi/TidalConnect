@@ -107,6 +107,7 @@ class TidalAuthRepository {
           'code': code,
           'code_verifier': codeVerifier,
           'redirect_uri': redirectUri,
+          'scope': 'r_usr',
         },
         options: Options(
           contentType: Headers.formUrlEncodedContentType,
@@ -183,6 +184,7 @@ class TidalAuthRepository {
           'client_id': TidalConfig.clientId,
           'grant_type': 'refresh_token',
           'refresh_token': refreshToken,
+          'scope': 'r_usr',
         },
         options: Options(
           contentType: Headers.formUrlEncodedContentType,

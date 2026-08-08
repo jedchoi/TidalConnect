@@ -20,17 +20,19 @@ class TidalApiClient {
     return {
       'Authorization': 'Bearer $accessToken',
       'Accept': 'application/json',
+      'X-Tidal-Scope': 'r_usr',
+      'X-Tidal-Scopes': 'r_usr',
     };
   }
 
   Future<List<MediaAlbum>> getFavoriteAlbums(String accessToken, {String userId = 'me'}) async {
     final effectiveUserId = userId.isEmpty ? 'me' : userId;
     final endpoint = '/users/$effectiveUserId/favorites/albums';
-    AppLogger.log('TIDAL_API', 'GET $baseUrl$endpoint (countryCode=US)', type: LogType.network);
+    AppLogger.log('TIDAL_API', 'GET $baseUrl$endpoint (countryCode=US, scope=r_usr)', type: LogType.network);
     try {
       final response = await _dio.get(
         endpoint,
-        queryParameters: {'countryCode': 'US', 'limit': 50},
+        queryParameters: {'countryCode': 'US', 'limit': 50, 'scope': 'r_usr', 'scopes': 'r_usr'},
         options: Options(headers: _buildHeaders(accessToken)),
       );
       final items = response.data['items'] as List? ?? [];
@@ -47,11 +49,11 @@ class TidalApiClient {
   Future<List<MediaPlaylist>> getFavoritePlaylists(String accessToken, {String userId = 'me'}) async {
     final effectiveUserId = userId.isEmpty ? 'me' : userId;
     final endpoint = '/users/$effectiveUserId/favorites/playlists';
-    AppLogger.log('TIDAL_API', 'GET $baseUrl$endpoint (countryCode=US)', type: LogType.network);
+    AppLogger.log('TIDAL_API', 'GET $baseUrl$endpoint (countryCode=US, scope=r_usr)', type: LogType.network);
     try {
       final response = await _dio.get(
         endpoint,
-        queryParameters: {'countryCode': 'US', 'limit': 50},
+        queryParameters: {'countryCode': 'US', 'limit': 50, 'scope': 'r_usr', 'scopes': 'r_usr'},
         options: Options(headers: _buildHeaders(accessToken)),
       );
       final items = response.data['items'] as List? ?? [];
@@ -68,11 +70,11 @@ class TidalApiClient {
   Future<List<MediaTrack>> getFavoriteTracks(String accessToken, {String userId = 'me'}) async {
     final effectiveUserId = userId.isEmpty ? 'me' : userId;
     final endpoint = '/users/$effectiveUserId/favorites/tracks';
-    AppLogger.log('TIDAL_API', 'GET $baseUrl$endpoint (countryCode=US)', type: LogType.network);
+    AppLogger.log('TIDAL_API', 'GET $baseUrl$endpoint (countryCode=US, scope=r_usr)', type: LogType.network);
     try {
       final response = await _dio.get(
         endpoint,
-        queryParameters: {'countryCode': 'US', 'limit': 50},
+        queryParameters: {'countryCode': 'US', 'limit': 50, 'scope': 'r_usr', 'scopes': 'r_usr'},
         options: Options(headers: _buildHeaders(accessToken)),
       );
       final items = response.data['items'] as List? ?? [];
@@ -89,11 +91,11 @@ class TidalApiClient {
   Future<List<MediaArtist>> getFavoriteArtists(String accessToken, {String userId = 'me'}) async {
     final effectiveUserId = userId.isEmpty ? 'me' : userId;
     final endpoint = '/users/$effectiveUserId/favorites/artists';
-    AppLogger.log('TIDAL_API', 'GET $baseUrl$endpoint (countryCode=US)', type: LogType.network);
+    AppLogger.log('TIDAL_API', 'GET $baseUrl$endpoint (countryCode=US, scope=r_usr)', type: LogType.network);
     try {
       final response = await _dio.get(
         endpoint,
-        queryParameters: {'countryCode': 'US', 'limit': 50},
+        queryParameters: {'countryCode': 'US', 'limit': 50, 'scope': 'r_usr', 'scopes': 'r_usr'},
         options: Options(headers: _buildHeaders(accessToken)),
       );
       final items = response.data['items'] as List? ?? [];

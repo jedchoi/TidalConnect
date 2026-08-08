@@ -33,24 +33,22 @@ class _MyCollectionScreenState extends State<MyCollectionScreen> {
   Future<void> _loadCollectionData() async {
     setState(() => _isLoading = true);
     try {
-      var token = await _authRepo.autoLogin();
-      token ??= await _authRepo.authenticateClientCredentials();
+      final userToken = await _authRepo.autoLogin();
 
-      if (token != null) {
-        final userId = token.userId.isNotEmpty ? token.userId : 'me';
-        var albums = await _apiClient.getFavoriteAlbums(token.accessToken, userId: userId);
-        var playlists = await _apiClient.getFavoritePlaylists(token.accessToken, userId: userId);
-        var tracks = await _apiClient.getFavoriteTracks(token.accessToken, userId: userId);
+      if (userToken != null && userToken.userId.isNotEmpty) {
+        final userId = userToken.userId;
+        var albums = await _apiClient.getFavoriteAlbums(userToken.accessToken, userId: userId);
+        var playlists = await _apiClient.getFavoritePlaylists(userToken.accessToken, userId: userId);
+        var tracks = await _apiClient.getFavoriteTracks(userToken.accessToken, userId: userId);
 
-        // Fallback to catalog search if user favorites return empty
         if (albums.isEmpty) {
-          albums = await _apiClient.searchAlbums('Master', token.accessToken);
+          albums = await _apiClient.searchAlbums('Master', userToken.accessToken);
         }
         if (playlists.isEmpty) {
-          playlists = await _apiClient.searchPlaylists('Tidal', token.accessToken);
+          playlists = await _apiClient.searchPlaylists('Tidal', userToken.accessToken);
         }
         if (tracks.isEmpty) {
-          tracks = await _apiClient.searchTracks('Top', token.accessToken);
+          tracks = await _apiClient.searchTracks('Top', userToken.accessToken);
         }
 
         if (mounted) {
@@ -59,6 +57,21 @@ class _MyCollectionScreenState extends State<MyCollectionScreen> {
             _playlists = playlists;
             _tracks = tracks;
           });
+        }
+      } else {
+        final clientToken = await _authRepo.authenticateClientCredentials();
+        if (clientToken != null) {
+          final albums = await _apiClient.searchAlbums('Master', clientToken.accessToken);
+          final playlists = await _apiClient.searchPlaylists('Tidal', clientToken.accessToken);
+          final tracks = await _apiClient.searchTracks('Top', clientToken.accessToken);
+
+          if (mounted) {
+            setState(() {
+              _albums = albums;
+              _playlists = playlists;
+              _tracks = tracks;
+            });
+          }
         }
       }
     } catch (_) {
