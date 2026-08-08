@@ -1,0 +1,9 @@
+# Flutter/Dart helper build artifacts
+.dart_tool/
+.flutter_sdk/
+.home/
+.pub-cache/
+.android_sdk/
+.packages
+.pub/
+build/
