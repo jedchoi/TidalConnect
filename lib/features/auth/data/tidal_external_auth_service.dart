@@ -14,9 +14,6 @@ class TidalExternalAuthService {
   Future<AuthToken?> startExternalLogin({
     required TidalAuthRepository authRepository,
   }) async {
-    // Clear existing unprivileged/invalid token before re-authenticating
-    await authRepository.logout();
-
     final completer = Completer<AuthToken?>();
     final codeVerifier = TidalPkceAuth.generateCodeVerifier();
     final codeChallenge = TidalPkceAuth.generateCodeChallenge(codeVerifier);
@@ -25,12 +22,12 @@ class TidalExternalAuthService {
     // 1. Listen for deep link callback (tidalconnect://oauth-callback)
     _linkSubscription?.cancel();
     _linkSubscription = _appLinks.uriLinkStream.listen((Uri uri) async {
-      AppLogger.log('TIDAL_AUTH', '외부 브라우저 리다이렉트 딥링크 수신: $uri', type: LogType.network);
+      AppLogger.log('TIDAL_AUTH', '리다이렉트 딥링크 수신: $uri', type: LogType.network);
 
       if (uri.scheme == 'tidalconnect' && uri.host == 'oauth-callback') {
         final authCode = uri.queryParameters['code'];
         if (authCode != null && authCode.isNotEmpty) {
-          AppLogger.log('TIDAL_AUTH', 'TIDAL Authorization Code 획득 성공! scope=r_usr 포함 Access Token 교환 시도중...', type: LogType.success);
+          AppLogger.log('TIDAL_AUTH', 'TIDAL Authorization Code 획득 성공! Access Token 교환 시도중...', type: LogType.success);
           final token = await authRepository.exchangeAuthorizationCode(
             code: authCode,
             codeVerifier: codeVerifier,
@@ -49,26 +46,30 @@ class TidalExternalAuthService {
       }
     });
 
-    // 2. Build official OAuth Authorize URL with scope=r_usr
+    // 2. Build official OAuth Authorize URL (scope 파라미터 제외하여 invalid_scope 11102 에러 방지)
     final authUrl = Uri.parse('https://login.tidal.com/authorize').replace(queryParameters: {
       'client_id': TidalConfig.clientId,
       'response_type': 'code',
       'redirect_uri': redirectUri,
-      'scope': 'r_usr',
       'code_challenge': codeChallenge,
       'code_challenge_method': 'S256',
     });
 
-    AppLogger.log('TIDAL_AUTH', '외부 브라우저로 점프 실행 (scope=r_usr): ${authUrl.toString()}', type: LogType.network);
+    AppLogger.log('TIDAL_AUTH', '내부 인앱 브라우저(Chrome Custom Tabs)로 로그인 시작: ${authUrl.toString()}', type: LogType.network);
 
-    // 3. Launch external Chrome browser directly
-    if (await canLaunchUrl(authUrl)) {
-      await launchUrl(authUrl, mode: LaunchMode.externalApplication);
-    } else {
-      AppLogger.log('TIDAL_AUTH', '외부 브라우저를 띄울 수 없습니다.', type: LogType.error);
-      if (!completer.isCompleted) {
-        completer.complete(null);
+    // 3. Launch In-App Custom Tabs browser (LaunchMode.inAppBrowserView)
+    try {
+      final launched = await launchUrl(
+        authUrl,
+        mode: LaunchMode.inAppBrowserView,
+      );
+      if (!launched) {
+        // Fallback to external application if inAppBrowserView fails
+        await launchUrl(authUrl, mode: LaunchMode.externalApplication);
       }
+    } catch (e) {
+      AppLogger.log('TIDAL_AUTH', '인앱 브라우저 실행 예외: $e -> 외부 브라우저 시도', type: LogType.warning);
+      await launchUrl(authUrl, mode: LaunchMode.externalApplication);
     }
 
     // Timeout safety after 3 minutes if user closes browser
