@@ -77,6 +77,56 @@ class TidalAuthRepository {
     }
   }
 
+  /// Exchanges PKCE Authorization Code for User Access Token & Refresh Token
+  Future<AuthToken?> exchangeAuthorizationCode({
+    required String code,
+    required String codeVerifier,
+    required String redirectUri,
+  }) async {
+    final url = '${TidalConfig.authBaseUrl}/token';
+    AppLogger.log('TIDAL_AUTH', 'POST $url (PKCE Authorization Code 교환 시도, RedirectURI=$redirectUri)', type: LogType.network);
+    try {
+      final basicAuth = base64Encode(utf8.encode('${TidalConfig.clientId}:${TidalConfig.clientSecret}'));
+      final response = await _dio.post(
+        url,
+        data: {
+          'client_id': TidalConfig.clientId,
+          'grant_type': 'authorization_code',
+          'code': code,
+          'code_verifier': codeVerifier,
+          'redirect_uri': redirectUri,
+          'scope': 'r_usr w_usr',
+        },
+        options: Options(
+          contentType: Headers.formUrlEncodedContentType,
+          headers: {'Authorization': 'Basic $basicAuth'},
+        ),
+      );
+
+      final data = response.data;
+      final accessToken = data['access_token'] as String;
+      final refreshToken = data['refresh_token'] as String? ?? '';
+      final expiresIn = data['expires_in'] as int? ?? 86400;
+
+      final token = AuthToken(
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+        expiresAt: DateTime.now().add(Duration(seconds: expiresIn)),
+      );
+
+      await saveToken(token);
+      AppLogger.log('TIDAL_AUTH', 'Tidal 사용자 PKCE OAuth 로그인 성공! [HTTP ${response.statusCode}] Access Token 저장됨', type: LogType.success);
+      return token;
+    } catch (e) {
+      if (e is DioException) {
+        AppLogger.log('TIDAL_AUTH', 'PKCE 토큰 교환 실패 [HTTP ${e.response?.statusCode}]: ${e.response?.data ?? e.message}', type: LogType.error);
+      } else {
+        AppLogger.log('TIDAL_AUTH', 'PKCE 토큰 교환 예외: $e', type: LogType.error);
+      }
+      return null;
+    }
+  }
+
   /// Refreshes user access token using refresh_token
   Future<AuthToken?> refreshToken(String refreshToken) async {
     if (refreshToken.isEmpty) {
@@ -119,7 +169,7 @@ class TidalAuthRepository {
     }
   }
 
-  /// Initiates Tidal Device Code Flow for User Login
+  /// Initiates Tidal Device Code Flow for User Login (for Limited Input Devices)
   Future<Map<String, dynamic>?> startDeviceCodeLogin() async {
     final url = '${TidalConfig.authBaseUrl}/device_authorization';
     AppLogger.log('TIDAL_AUTH', 'POST $url (Device Code 요청)', type: LogType.network);
