@@ -11,7 +11,7 @@ void main() {
       expect(AppColors.background, const Color(0xFF121212));
       expect(AppColors.surfaceCard, const Color(0xFF1E1E2E));
       expect(AppColors.surfaceLight, const Color(0xFF2A2A3D));
-      expect(AppColors.cyanAccent, const Color(0xFF00FFFF));
+      expect(AppColors.cyanAccent, const Color(0xFF00C4B4));
       expect(AppColors.textPrimary, Colors.white);
       expect(AppColors.textSecondary, const Color(0xFFA0A0B0));
     });

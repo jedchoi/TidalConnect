@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../dlna/domain/models/dlna_device.dart';
+import '../../dlna/data/ssdp_discovery_service.dart';
 import 'now_playing_screen.dart';
 
 class MiniPlayerWidget extends StatefulWidget {
@@ -24,16 +25,27 @@ class MiniPlayerWidget extends StatefulWidget {
 class _MiniPlayerWidgetState extends State<MiniPlayerWidget> {
   bool _isPlaying = false;
   DlnaDevice _selectedDevice = DlnaDevice.localSpeaker;
-  final List<DlnaDevice> _devices = [
-    DlnaDevice.localSpeaker,
-    DlnaDevice(
-      udn: 'chord_poly_123',
-      friendlyName: 'Chord Poly (DLNA)',
-      locationUrl: 'http://192.168.1.100:49152/description.xml',
-      avTransportControlUrl: 'http://192.168.1.100:49152/upnp/control/AVTransport',
-      renderingControlUrl: 'http://192.168.1.100:49152/upnp/control/RenderingControl',
-    ),
-  ];
+  List<DlnaDevice> _devices = [DlnaDevice.localSpeaker];
+  final SSDPDiscoveryService _ssdpService = SSDPDiscoveryService();
+
+  @override
+  void initState() {
+    super.initState();
+    _startDeviceDiscovery();
+  }
+
+  Future<void> _startDeviceDiscovery() async {
+    try {
+      final discovered = await _ssdpService.discoverDevices();
+      if (mounted) {
+        setState(() {
+          _devices = discovered;
+        });
+      }
+    } catch (_) {
+      // Fallback to local speaker on network discovery error/unsupported environment
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
