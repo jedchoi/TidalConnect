@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
+import '../../../core/utils/app_logger.dart';
 import '../domain/models/dlna_device.dart';
 
 class SSDPDiscoveryService {
@@ -20,6 +21,8 @@ class SSDPDiscoveryService {
       socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
       socket.multicastHops = 4;
       socket.broadcastEnabled = true;
+
+      AppLogger.log('SSDP_NET', 'UDP Multicast 소켓 바인딩 성공 (${socket.address.address}:${socket.port})', type: LogType.network);
 
       final targets = [
         'urn:schemas-upnp-org:device:MediaRenderer:1',
@@ -42,7 +45,7 @@ class SSDPDiscoveryService {
         }
       }
 
-      // Initial burst & retry burst after 500ms
+      AppLogger.log('SSDP_NET', 'M-SEARCH 패킷 전송 (Target: MediaRenderer, AVTransport, ssdp:all)', type: LogType.network);
       sendMSearchBursts();
       Timer(const Duration(milliseconds: 600), () => sendMSearchBursts());
 
@@ -50,6 +53,7 @@ class SSDPDiscoveryService {
       final timer = Timer(timeout, () {
         socket?.close();
         if (!completer.isCompleted) {
+          AppLogger.log('SSDP_NET', 'SSDP 탐색 타임아웃 (${timeout.inSeconds}초 소요). 발견된 기기: ${devices.length}개', type: devices.length > 1 ? LogType.success : LogType.warning);
           completer.complete(devices);
         }
       });
@@ -63,11 +67,14 @@ class SSDPDiscoveryService {
             final location = headers['LOCATION'] ?? headers['location'];
             final usn = headers['USN'] ?? headers['usn'] ?? location;
 
+            AppLogger.log('SSDP_NET', 'UDP 응답 수신 [from ${datagram.address.address}:${datagram.port}] LOCATION: $location', type: LogType.info);
+
             if (location != null && usn != null && !seenUsns.contains(usn)) {
               seenUsns.add(usn);
               final device = await _fetchDeviceDescription(location, usn);
               if (device != null) {
                 devices.add(device);
+                AppLogger.log('SSDP_NET', 'DLNA 렌더러 추가 성공: "${device.friendlyName}" (${device.locationUrl})', type: LogType.success);
               }
             }
           }
@@ -75,8 +82,9 @@ class SSDPDiscoveryService {
       });
 
       return await completer.future;
-    } catch (_) {
+    } catch (e) {
       socket?.close();
+      AppLogger.log('SSDP_NET', 'SSDP 소켓 오류 발생: $e', type: LogType.error);
       return devices;
     }
   }
@@ -97,18 +105,21 @@ class SSDPDiscoveryService {
 
   Future<DlnaDevice?> _fetchDeviceDescription(String locationUrl, String usn) async {
     try {
+      AppLogger.log('SSDP_NET', 'GET $locationUrl (XML 명세 수신 시도)', type: LogType.network);
       final response = await _dio.get(
         locationUrl,
         options: Options(responseType: ResponseType.plain),
       );
       final xmlStr = response.data.toString();
 
-      // Check if device is a renderer or supports AVTransport
       final isMediaDevice = xmlStr.contains('MediaRenderer') ||
           xmlStr.contains('AVTransport') ||
           xmlStr.contains('RenderingControl');
 
-      if (!isMediaDevice) return null;
+      if (!isMediaDevice) {
+        AppLogger.log('SSDP_NET', '필터링됨: $locationUrl (MediaRenderer/AVTransport 미지원 기기)', type: LogType.info);
+        return null;
+      }
 
       final friendlyName = _extractXmlValue(xmlStr, 'friendlyName') ?? 'DLNA Media Renderer';
       final baseUri = Uri.parse(locationUrl);
@@ -126,7 +137,8 @@ class SSDPDiscoveryService {
         avTransportControlUrl: avTransportUrl,
         renderingControlUrl: renderingControlUrl,
       );
-    } catch (_) {
+    } catch (e) {
+      AppLogger.log('SSDP_NET', 'XML 명세 수신 예외 [URL: $locationUrl]: $e', type: LogType.warning);
       final baseUri = Uri.parse(locationUrl);
       return DlnaDevice(
         udn: usn,

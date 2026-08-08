@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/data/tidal_auth_repository.dart';
-import '../../dlna/data/ssdp_discovery_service.dart';
+import '../../auth/presentation/tidal_device_login_dialog.dart';
+import '../../dlna/data/dlna_manager.dart';
+import 'debug_log_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -11,12 +13,11 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _isSearching = false;
   bool _isAuthenticating = false;
-  String _authStatusText = '로그인 필요 (Tidal OAuth 미인증)';
+  String _authStatusText = '로그인 필요 (Tidal 계정 미인증)';
   bool _isLoggedIn = false;
 
-  final SSDPDiscoveryService _ssdpService = SSDPDiscoveryService();
+  final DlnaManager _dlnaManager = DlnaManager.instance;
   final TidalAuthRepository _authRepo = TidalAuthRepository();
 
   @override
@@ -31,10 +32,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() {
         if (token != null && !token.isExpired) {
           _isLoggedIn = true;
-          _authStatusText = 'Tidal 계정 인증 완료 (OAuth 2.0 Token)';
+          _authStatusText = 'Tidal 사용자 로그인 완료';
         } else {
           _isLoggedIn = false;
-          _authStatusText = '로그인 필요 (Tidal OAuth 미인증)';
+          _authStatusText = '로그인 필요 (Tidal 계정 미인증)';
         }
       });
     }
@@ -43,27 +44,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _handleTidalLogin() async {
     setState(() => _isAuthenticating = true);
     try {
-      final token = await _authRepo.authenticateClientCredentials();
+      final deviceAuthData = await _authRepo.startDeviceCodeLogin();
       if (!mounted) return;
 
-      if (token != null) {
-        setState(() {
-          _isLoggedIn = true;
-          _authStatusText = 'Tidal Client ID/Secret OAuth 인증 성공!';
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Tidal OAuth 인증 성공! 액세스 토큰이 안전하게 저장되었습니다.'),
-            backgroundColor: AppColors.cyanAccent,
-          ),
+      if (deviceAuthData != null) {
+        final authToken = await TidalDeviceLoginDialog.show(
+          context,
+          deviceAuthData: deviceAuthData,
+          authRepository: _authRepo,
         );
+
+        if (authToken != null && mounted) {
+          setState(() {
+            _isLoggedIn = true;
+            _authStatusText = 'Tidal 사용자 로그인 성공!';
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Tidal 계정 로그인 성공! 이제 내 즐겨찾기 및 모든 음악을 가져올 수 있습니다.'),
+              backgroundColor: AppColors.cyanAccent,
+            ),
+          );
+        }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Tidal OAuth 인증 실패. Client Credentials를 확인하세요.'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        // Fallback to client credentials if device code is unhandled
+        final token = await _authRepo.authenticateClientCredentials();
+        if (token != null && mounted) {
+          setState(() {
+            _isLoggedIn = true;
+            _authStatusText = 'Tidal Client Credentials 토큰 발급 완료';
+          });
+        }
       }
     } catch (_) {
       if (mounted) {
@@ -95,37 +106,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _runDeviceDiscovery() async {
-    setState(() => _isSearching = true);
-    try {
-      final devices = await _ssdpService.discoverDevices();
-      if (!mounted) return;
+    final devices = await _dlnaManager.discoverDevices();
+    if (!mounted) return;
 
-      final remoteDevices = devices.where((d) => !d.isLocalSpeaker).toList();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            remoteDevices.isEmpty
-                ? 'Wi-Fi 네트워크에서 발견된 DLNA 스피커가 없습니다. 스피커의 Wi-Fi 연결을 확인하세요.'
-                : '${remoteDevices.length}개의 DLNA 스피커를 발견했습니다: ${remoteDevices.map((d) => "${d.friendlyName} (${d.locationUrl})").join(', ')}',
-          ),
-          backgroundColor: AppColors.surfaceCard,
-          duration: const Duration(seconds: 4),
+    final remoteDevices = devices.where((d) => !d.isLocalSpeaker).toList();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          remoteDevices.isEmpty
+              ? 'Wi-Fi 네트워크에서 발견된 DLNA 스피커가 없습니다. "실시간 네트워크 로그"에서 UDP 수신을 확인하세요.'
+              : '${remoteDevices.length}개의 DLNA 스피커를 발견했습니다: ${remoteDevices.map((d) => "${d.friendlyName} (${d.locationUrl})").join(', ')}',
         ),
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('SSDP 네트워크 탐색 중 오류가 발생했습니다.'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSearching = false);
-      }
-    }
+        backgroundColor: AppColors.surfaceCard,
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 
   @override
@@ -135,6 +130,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: const Text('앱 설정', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: AppColors.background,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.bug_report, color: AppColors.cyanAccent),
+            tooltip: '실시간 디버그 로그',
+            onPressed: () => DebugLogScreen.show(context),
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16.0),
@@ -154,7 +156,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     leading: const Icon(Icons.account_circle, color: AppColors.cyanAccent, size: 36),
                     title: Text(_authStatusText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     subtitle: Text(
-                      _isLoggedIn ? '자동 로그인 상태 유지 중' : '***REMOVED*** Client ID 적용됨',
+                      _isLoggedIn ? '사용자 OAuth 인증 토큰 활성화됨' : '1초 만에 Tidal 웹 페이지에서 로그인 가능',
                       style: const TextStyle(color: AppColors.textSecondary),
                     ),
                   ),
@@ -175,7 +177,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
                                 )
                               : const Icon(Icons.login),
-                          label: Text(_isLoggedIn ? 'OAuth 재인증' : 'Tidal 계정 로그인'),
+                          label: Text(_isLoggedIn ? '로그인 상태 재인증' : 'Tidal 계정 로그인'),
                           onPressed: _isAuthenticating ? null : _handleTidalLogin,
                         ),
                       ),
@@ -198,43 +200,96 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 24),
           const Text(
-            '오디오 스트리밍 음질 설정',
+            'DLNA / UPnP 네트워크 스피커 목록',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.cyanAccent),
           ),
           const SizedBox(height: 8),
-          Card(
-            color: AppColors.surfaceCard,
-            child: const ListTile(
-              leading: Icon(Icons.high_quality, color: AppColors.cyanAccent),
-              title: Text('스트리밍 음질: LOSSLESS (FLAC 16-bit)', style: TextStyle(color: Colors.white)),
-              trailing: Icon(Icons.arrow_drop_down, color: Colors.white54),
-            ),
+          ValueListenableBuilder<bool>(
+            valueListenable: _dlnaManager.isSearchingNotifier,
+            builder: (context, isSearching, child) {
+              return Card(
+                color: AppColors.surfaceCard,
+                child: ListTile(
+                  leading: const Icon(Icons.speaker_group, color: AppColors.cyanAccent),
+                  title: const Text('스피커 수동 재탐색', style: TextStyle(color: Colors.white)),
+                  subtitle: Text(
+                    isSearching ? 'SSDP M-SEARCH 멀티캐스트 전송 중...' : '실시간 Wi-Fi 네트워크 탐색',
+                    style: const TextStyle(color: AppColors.textSecondary),
+                  ),
+                  trailing: isSearching
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.cyanAccent),
+                        )
+                      : IconButton(
+                          icon: const Icon(Icons.refresh, color: AppColors.cyanAccent),
+                          onPressed: _runDeviceDiscovery,
+                        ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+          ValueListenableBuilder<List<dynamic>>(
+            valueListenable: _dlnaManager.devicesNotifier,
+            builder: (context, devices, child) {
+              return Column(
+                children: devices.map((device) {
+                  final isSelected = device.udn == _dlnaManager.selectedDevice.udn;
+                  return Card(
+                    color: isSelected ? AppColors.cyanAccent.withOpacity(0.15) : AppColors.surfaceCard,
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      leading: Icon(
+                        device.isLocalSpeaker ? Icons.phone_android : Icons.speaker,
+                        color: isSelected ? AppColors.cyanAccent : Colors.white70,
+                      ),
+                      title: Text(
+                        device.friendlyName,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                      subtitle: Text(
+                        device.isLocalSpeaker ? '스마트폰 내장 스피커' : device.locationUrl,
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                      ),
+                      trailing: isSelected
+                          ? const Icon(Icons.check_circle, color: AppColors.cyanAccent)
+                          : OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.cyanAccent,
+                                side: const BorderSide(color: AppColors.cyanAccent),
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _dlnaManager.selectDevice(device);
+                                });
+                              },
+                              child: const Text('선택'),
+                            ),
+                    ),
+                  );
+                }).toList(),
+              );
+            },
           ),
           const SizedBox(height: 24),
           const Text(
-            'DLNA / UPnP 네트워크',
+            '진단 및 디버그 디바이스 콘솔',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.cyanAccent),
           ),
           const SizedBox(height: 8),
           Card(
             color: AppColors.surfaceCard,
             child: ListTile(
-              leading: const Icon(Icons.speaker_group, color: AppColors.cyanAccent),
-              title: const Text('스피커 수동 재탐색', style: TextStyle(color: Colors.white)),
-              subtitle: Text(
-                _isSearching ? 'SSDP M-SEARCH 멀티캐스트 전송 중...' : '실시간 Wi-Fi 네트워크 탐색',
-                style: const TextStyle(color: AppColors.textSecondary),
-              ),
-              trailing: _isSearching
-                  ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.cyanAccent),
-                    )
-                  : IconButton(
-                      icon: const Icon(Icons.refresh, color: AppColors.cyanAccent),
-                      onPressed: _runDeviceDiscovery,
-                    ),
+              leading: const Icon(Icons.terminal, color: AppColors.cyanAccent),
+              title: const Text('실시간 네트워크 / OAuth 로그 콘솔 열기', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              subtitle: const Text('Tidal HTTP 응답 코드 및 SSDP UDP 패킷 로그를 눈으로 확인', style: TextStyle(color: AppColors.textSecondary)),
+              trailing: const Icon(Icons.chevron_right, color: Colors.white70),
+              onTap: () => DebugLogScreen.show(context),
             ),
           ),
         ],
