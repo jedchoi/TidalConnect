@@ -9,6 +9,7 @@ class MiniPlayerWidget extends StatefulWidget {
   final String artist;
   final String album;
   final String coverUrl;
+  final bool autoStartDiscovery;
 
   const MiniPlayerWidget({
     super.key,
@@ -16,6 +17,7 @@ class MiniPlayerWidget extends StatefulWidget {
     this.artist = 'Tidal Connect Lite',
     this.album = 'Tidal Collection',
     this.coverUrl = '',
+    this.autoStartDiscovery = true,
   });
 
   @override
@@ -31,7 +33,9 @@ class _MiniPlayerWidgetState extends State<MiniPlayerWidget> {
   @override
   void initState() {
     super.initState();
-    _startDeviceDiscovery();
+    if (widget.autoStartDiscovery) {
+      _startDeviceDiscovery();
+    }
   }
 
   Future<void> _startDeviceDiscovery() async {
@@ -43,7 +47,7 @@ class _MiniPlayerWidgetState extends State<MiniPlayerWidget> {
         });
       }
     } catch (_) {
-      // Fallback to local speaker on network discovery error/unsupported environment
+      // Fallback to local speaker on network error/test environment
     }
   }
 

@@ -12,6 +12,7 @@ void main() {
             bottomNavigationBar: MiniPlayerWidget(
               title: 'Test Tidal Song',
               artist: 'Test Artist Name',
+              autoStartDiscovery: false,
             ),
           ),
         ),
