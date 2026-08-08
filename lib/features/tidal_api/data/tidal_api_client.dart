@@ -37,7 +37,11 @@ class TidalApiClient {
       AppLogger.log('TIDAL_API', '내 즐겨찾기 앨범 수신 성공 [HTTP ${response.statusCode}]: ${items.length}개 항목', type: LogType.success);
       return items.map((e) => MediaAlbum.fromJson(e['item'] ?? e)).toList();
     } catch (e) {
-      AppLogger.log('TIDAL_API', '즐겨찾기 앨범 목록 수신 완료 (권한 정책 보호 적용)', type: LogType.info);
+      if (e is DioException && e.response != null) {
+        AppLogger.log('TIDAL_API', '내 즐겨찾기 앨범 수신 오류 [HTTP ${e.response?.statusCode}]: ${e.response?.data}', type: LogType.error);
+      } else {
+        AppLogger.log('TIDAL_API', '내 즐겨찾기 앨범 수신 오류: $e', type: LogType.error);
+      }
       return [];
     }
   }
@@ -56,7 +60,11 @@ class TidalApiClient {
       AppLogger.log('TIDAL_API', '내 즐겨찾기 플레이리스트 수신 성공 [HTTP ${response.statusCode}]: ${items.length}개 항목', type: LogType.success);
       return items.map((e) => MediaPlaylist.fromJson(e['playlist'] ?? e)).toList();
     } catch (e) {
-      AppLogger.log('TIDAL_API', '즐겨찾기 플레이리스트 수신 완료 (권한 정책 보호 적용)', type: LogType.info);
+      if (e is DioException && e.response != null) {
+        AppLogger.log('TIDAL_API', '내 즐겨찾기 플레이리스트 수신 오류 [HTTP ${e.response?.statusCode}]: ${e.response?.data}', type: LogType.error);
+      } else {
+        AppLogger.log('TIDAL_API', '내 즐겨찾기 플레이리스트 수신 오류: $e', type: LogType.error);
+      }
       return [];
     }
   }
@@ -75,7 +83,11 @@ class TidalApiClient {
       AppLogger.log('TIDAL_API', '내 즐겨찾기 트랙 수신 성공 [HTTP ${response.statusCode}]: ${items.length}개 항목', type: LogType.success);
       return items.map((e) => MediaTrack.fromJson(e['item'] ?? e)).toList();
     } catch (e) {
-      AppLogger.log('TIDAL_API', '즐겨찾기 트랙 수신 완료 (권한 정책 보호 적용)', type: LogType.info);
+      if (e is DioException && e.response != null) {
+        AppLogger.log('TIDAL_API', '내 즐겨찾기 트랙 수신 오류 [HTTP ${e.response?.statusCode}]: ${e.response?.data}', type: LogType.error);
+      } else {
+        AppLogger.log('TIDAL_API', '내 즐겨찾기 트랙 수신 오류: $e', type: LogType.error);
+      }
       return [];
     }
   }
@@ -111,7 +123,11 @@ class TidalApiClient {
       AppLogger.log('TIDAL_API', '트랙 검색 성공 [HTTP ${response.statusCode}]: ${items.length}개 수신', type: LogType.success);
       return items.map((e) => MediaTrack.fromJson(e)).toList();
     } catch (e) {
-      AppLogger.log('TIDAL_API', '트랙 검색 수신 완료 (카탈로그 미디어 바인딩 적용)', type: LogType.info);
+      if (e is DioException && e.response != null) {
+        AppLogger.log('TIDAL_API', '트랙 검색 오류 [HTTP ${e.response?.statusCode}]: ${e.response?.data}', type: LogType.error);
+      } else {
+        AppLogger.log('TIDAL_API', '트랙 검색 오류: $e', type: LogType.error);
+      }
       return [];
     }
   }
