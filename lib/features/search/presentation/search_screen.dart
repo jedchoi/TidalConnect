@@ -1,5 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../auth/data/tidal_auth_repository.dart';
+import '../../tidal_api/data/tidal_api_client.dart';
+import '../../tidal_api/domain/models/media_item.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -10,14 +14,49 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
-  int _selectedChipIndex = 0;
+  Timer? _debounce;
+  bool _isSearching = false;
+  List<MediaTrack> _searchTracks = [];
 
-  final List<String> _categories = ['전체', '트랙', '앨범', '아티스트', '플레이리스트'];
+  final TidalAuthRepository _authRepo = TidalAuthRepository();
+  final TidalApiClient _apiClient = TidalApiClient();
 
   @override
   void dispose() {
     _searchController.dispose();
+    _debounce?.cancel();
     super.dispose();
+  }
+
+  void _onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      _performSearch(query);
+    });
+  }
+
+  Future<void> _performSearch(String query) async {
+    if (query.trim().isEmpty) {
+      if (mounted) setState(() => _searchTracks = []);
+      return;
+    }
+    setState(() => _isSearching = true);
+    try {
+      var token = await _authRepo.autoLogin();
+      token ??= await _authRepo.authenticateClientCredentials();
+
+      if (token != null) {
+        final tracks = await _apiClient.searchTracks(query, token.accessToken);
+        if (mounted) {
+          setState(() => _searchTracks = tracks);
+        }
+      }
+    } catch (_) {
+    } finally {
+      if (mounted) {
+        setState(() => _isSearching = false);
+      }
+    }
   }
 
   @override
@@ -34,11 +73,21 @@ class _SearchScreenState extends State<SearchScreen> {
           children: [
             TextField(
               controller: _searchController,
+              onChanged: _onSearchChanged,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                hintText: '아티스트, 곡, 앨범 검색...',
+                hintText: '아티스트, 곡, 앨범 검색 (예: Queen, Jazz)',
                 hintStyle: const TextStyle(color: AppColors.textSecondary),
                 prefixIcon: const Icon(Icons.search, color: AppColors.cyanAccent),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, color: Colors.white54),
+                        onPressed: () {
+                          _searchController.clear();
+                          _performSearch('');
+                        },
+                      )
+                    : null,
                 filled: true,
                 fillColor: AppColors.surfaceCard,
                 border: OutlineInputBorder(
@@ -48,36 +97,37 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            SizedBox(
-              height: 40,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: _categories.length,
-                itemBuilder: (context, index) => Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: ChoiceChip(
-                    label: Text(_categories[index]),
-                    selected: _selectedChipIndex == index,
-                    selectedColor: AppColors.cyanAccent,
-                    backgroundColor: AppColors.surfaceCard,
-                    labelStyle: TextStyle(
-                      color: _selectedChipIndex == index ? Colors.black : Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    onSelected: (selected) {
-                      if (selected) setState(() => _selectedChipIndex = index);
-                    },
-                  ),
-                ),
-              ),
-            ),
-            const Expanded(
-              child: Center(
-                child: Text(
-                  '검색어를 입력하세요',
-                  style: TextStyle(color: AppColors.textSecondary),
-                ),
-              ),
+            Expanded(
+              child: _isSearching
+                  ? const Center(child: CircularProgressIndicator(color: AppColors.cyanAccent))
+                  : _searchTracks.isEmpty
+                      ? Center(
+                          child: Text(
+                            _searchController.text.isEmpty ? '검색어를 입력하세요' : '검색 결과가 없습니다',
+                            style: const TextStyle(color: AppColors.textSecondary),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: _searchTracks.length,
+                          itemBuilder: (context, index) {
+                            final track = _searchTracks[index];
+                            return Card(
+                              color: AppColors.surfaceCard,
+                              margin: const EdgeInsets.only(bottom: 8),
+                              child: ListTile(
+                                leading: track.coverUrl.isNotEmpty
+                                    ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Image.network(track.coverUrl, width: 44, height: 44, fit: BoxFit.cover),
+                                      )
+                                    : const Icon(Icons.music_note, color: AppColors.cyanAccent),
+                                title: Text(track.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                subtitle: Text('${track.artistName} • ${track.albumTitle}', style: const TextStyle(color: AppColors.textSecondary)),
+                                trailing: const Icon(Icons.play_circle_fill, color: AppColors.cyanAccent),
+                              ),
+                            );
+                          },
+                        ),
             ),
           ],
         ),

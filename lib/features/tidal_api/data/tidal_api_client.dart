@@ -59,6 +59,51 @@ class TidalApiClient {
     }
   }
 
+  Future<List<MediaTrack>> searchTracks(String query, String accessToken, {int limit = 20}) async {
+    if (query.trim().isEmpty) return [];
+    try {
+      final response = await _dio.get(
+        '/search/tracks',
+        queryParameters: {'query': query, 'limit': limit, 'countryCode': 'US'},
+        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+      );
+      final items = response.data['items'] as List? ?? [];
+      return items.map((e) => MediaTrack.fromJson(e)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<List<MediaAlbum>> searchAlbums(String query, String accessToken, {int limit = 20}) async {
+    if (query.trim().isEmpty) return [];
+    try {
+      final response = await _dio.get(
+        '/search/albums',
+        queryParameters: {'query': query, 'limit': limit, 'countryCode': 'US'},
+        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+      );
+      final items = response.data['items'] as List? ?? [];
+      return items.map((e) => MediaAlbum.fromJson(e)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<List<MediaPlaylist>> searchPlaylists(String query, String accessToken, {int limit = 20}) async {
+    if (query.trim().isEmpty) return [];
+    try {
+      final response = await _dio.get(
+        '/search/playlists',
+        queryParameters: {'query': query, 'limit': limit, 'countryCode': 'US'},
+        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+      );
+      final items = response.data['items'] as List? ?? [];
+      return items.map((e) => MediaPlaylist.fromJson(e)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<String?> getStreamUrl(String trackId, String accessToken, {String soundQuality = 'LOSSLESS'}) async {
     try {
       final response = await _dio.get(
