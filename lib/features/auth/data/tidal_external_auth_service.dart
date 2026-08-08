@@ -14,6 +14,9 @@ class TidalExternalAuthService {
   Future<AuthToken?> startExternalLogin({
     required TidalAuthRepository authRepository,
   }) async {
+    // Clear any previous unprivileged token before starting new OAuth
+    await authRepository.logout();
+
     final completer = Completer<AuthToken?>();
     final codeVerifier = TidalPkceAuth.generateCodeVerifier();
     final codeChallenge = TidalPkceAuth.generateCodeChallenge(codeVerifier);
@@ -46,16 +49,17 @@ class TidalExternalAuthService {
       }
     });
 
-    // 2. Build official OAuth Authorize URL (scope 파라미터 제외하여 invalid_scope 11102 에러 방지)
+    // 2. Build official OAuth Authorize URL with scope=r_usr
     final authUrl = Uri.parse('https://login.tidal.com/authorize').replace(queryParameters: {
       'client_id': TidalConfig.clientId,
       'response_type': 'code',
       'redirect_uri': redirectUri,
+      'scope': 'r_usr',
       'code_challenge': codeChallenge,
       'code_challenge_method': 'S256',
     });
 
-    AppLogger.log('TIDAL_AUTH', '내부 인앱 브라우저(Chrome Custom Tabs)로 로그인 시작: ${authUrl.toString()}', type: LogType.network);
+    AppLogger.log('TIDAL_AUTH', '인앱 브라우저(Chrome Custom Tabs)로 로그인 시작: ${authUrl.toString()}', type: LogType.network);
 
     // 3. Launch In-App Custom Tabs browser (LaunchMode.inAppBrowserView)
     try {
@@ -64,7 +68,6 @@ class TidalExternalAuthService {
         mode: LaunchMode.inAppBrowserView,
       );
       if (!launched) {
-        // Fallback to external application if inAppBrowserView fails
         await launchUrl(authUrl, mode: LaunchMode.externalApplication);
       }
     } catch (e) {
