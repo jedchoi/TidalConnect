@@ -3,6 +3,8 @@ import 'package:tidal_connect_lite/core/theme/app_colors.dart';
 import 'package:tidal_connect_lite/core/theme/app_theme.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('AppTheme should provide correct dark theme palette', () {
     final theme = AppTheme.darkTheme;
     expect(theme.scaffoldBackgroundColor, AppColors.background);
