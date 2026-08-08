@@ -107,7 +107,7 @@ class TidalAuthRepository {
           'code': code,
           'code_verifier': codeVerifier,
           'redirect_uri': redirectUri,
-          'scope': 'r_usr w_usr',
+          'scope': 'r_usr',
         },
         options: Options(
           contentType: Headers.formUrlEncodedContentType,

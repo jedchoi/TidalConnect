@@ -14,6 +14,9 @@ class TidalExternalAuthService {
   Future<AuthToken?> startExternalLogin({
     required TidalAuthRepository authRepository,
   }) async {
+    // Clear existing unprivileged/invalid token before re-authenticating
+    await authRepository.logout();
+
     final completer = Completer<AuthToken?>();
     final codeVerifier = TidalPkceAuth.generateCodeVerifier();
     final codeChallenge = TidalPkceAuth.generateCodeChallenge(codeVerifier);
@@ -27,7 +30,7 @@ class TidalExternalAuthService {
       if (uri.scheme == 'tidalconnect' && uri.host == 'oauth-callback') {
         final authCode = uri.queryParameters['code'];
         if (authCode != null && authCode.isNotEmpty) {
-          AppLogger.log('TIDAL_AUTH', 'TIDAL Authorization Code 획득 성공! Access Token 교환 시도중...', type: LogType.success);
+          AppLogger.log('TIDAL_AUTH', 'TIDAL Authorization Code 획득 성공! scope=r_usr 포함 Access Token 교환 시도중...', type: LogType.success);
           final token = await authRepository.exchangeAuthorizationCode(
             code: authCode,
             codeVerifier: codeVerifier,
@@ -46,21 +49,21 @@ class TidalExternalAuthService {
       }
     });
 
-    // 2. Build official OAuth Authorize URL
+    // 2. Build official OAuth Authorize URL with scope=r_usr
     final authUrl = Uri.parse('https://login.tidal.com/authorize').replace(queryParameters: {
       'client_id': TidalConfig.clientId,
       'response_type': 'code',
       'redirect_uri': redirectUri,
-      // 'scope': 'r_usr',
+      'scope': 'r_usr',
       'code_challenge': codeChallenge,
       'code_challenge_method': 'S256',
     });
 
-    AppLogger.log('TIDAL_AUTH', '외부 크롬 브라우저로 점프 실행: ${authUrl.toString()}', type: LogType.network);
+    AppLogger.log('TIDAL_AUTH', '외부 브라우저로 점프 실행 (scope=r_usr): ${authUrl.toString()}', type: LogType.network);
 
     // 3. Launch external Chrome browser directly
     if (await canLaunchUrl(authUrl)) {
-      await launchUrl(authUrl, mode: LaunchMode.inAppBrowserView);
+      await launchUrl(authUrl, mode: LaunchMode.externalApplication);
     } else {
       AppLogger.log('TIDAL_AUTH', '외부 브라우저를 띄울 수 없습니다.', type: LogType.error);
       if (!completer.isCompleted) {
