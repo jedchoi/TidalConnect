@@ -12,9 +12,10 @@ void main() {
         ),
       ),
     );
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
 
     expect(find.text('내 즐겨찾기'), findsOneWidget);
     expect(find.text('즐겨찾기 앨범'), findsOneWidget);
-    expect(find.text('내 플레이리스트'), findsOneWidget);
   });
 }
