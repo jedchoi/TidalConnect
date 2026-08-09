@@ -21,6 +21,8 @@ class TidalApiClient {
     return {
       'Authorization': 'Bearer $accessToken',
       'Accept': 'application/json',
+      'User-Agent': 'TIDAL_ANDROID/1057 (Android 14)',
+      'X-Tidal-Token': '***REMOVED***',
     };
   }
 
@@ -155,7 +157,7 @@ class TidalApiClient {
   }
 
   // ──────────────────────────────────────────────
-  // 실시간 오디오 스트리밍 URL 발급 (playbackinfopostpaywall + BTS Manifest Base64 디코딩)
+  // 실시간 오디오 스트리밍 URL 발급 (playbackinfopostpaywall + BTS/EMU Manifest Base64 & DASH MPD)
   // ──────────────────────────────────────────────
 
   Future<String?> getStreamUrl(String trackId, String accessToken, {String soundQuality = 'HIGH'}) async {
@@ -180,15 +182,39 @@ class TidalApiClient {
 
           if (manifest.isNotEmpty) {
             try {
-              // Base64 decode manifest JSON
+              // Base64 decode manifest
               final decodedBytes = base64.decode(manifest);
-              final decodedStr = utf8.decode(decodedBytes);
-              final decodedJson = jsonDecode(decodedStr);
+              final decodedStr = utf8.decode(decodedBytes, allowMalformed: true);
 
-              if (decodedJson is Map && decodedJson['urls'] is List && (decodedJson['urls'] as List).isNotEmpty) {
-                final streamUrl = (decodedJson['urls'] as List).first.toString();
-                AppLogger.log('TIDAL_API', '실제 오디오 스트림 URL 추출 성공 (Manifest $q): $streamUrl', type: LogType.success);
-                return streamUrl;
+              // 1. JSON BTS/EMU Manifest
+              if (decodedStr.trim().startsWith('{')) {
+                final decodedJson = jsonDecode(decodedStr);
+                if (decodedJson is Map) {
+                  if (decodedJson['urls'] is List && (decodedJson['urls'] as List).isNotEmpty) {
+                    final streamUrl = (decodedJson['urls'] as List).first.toString();
+                    AppLogger.log('TIDAL_API', '실제 오디오 스트림 URL 추출 성공 (JSON BTS/EMU): $streamUrl', type: LogType.success);
+                    return streamUrl;
+                  }
+                  if (decodedJson['url'] != null && decodedJson['url'].toString().isNotEmpty) {
+                    final streamUrl = decodedJson['url'].toString();
+                    AppLogger.log('TIDAL_API', '실제 오디오 스트림 URL 추출 성공 (JSON url): $streamUrl', type: LogType.success);
+                    return streamUrl;
+                  }
+                }
+              } else {
+                // 2. DASH MPD XML Manifest
+                final baseUrlMatch = RegExp(r'<BaseURL>(https?://[^<]+)</BaseURL>').firstMatch(decodedStr);
+                if (baseUrlMatch != null) {
+                  final streamUrl = baseUrlMatch.group(1)!;
+                  AppLogger.log('TIDAL_API', '실제 오디오 스트림 URL 추출 성공 (DASH MPD BaseURL): $streamUrl', type: LogType.success);
+                  return streamUrl;
+                }
+                final urlMatch = RegExp(r'https?://[^\s"<>\\]+\.(?:mp4|m4a|flac|aac)[^\s"<>\\]*').firstMatch(decodedStr);
+                if (urlMatch != null) {
+                  final streamUrl = urlMatch.group(0)!;
+                  AppLogger.log('TIDAL_API', '실제 오디오 스트림 URL 추출 성공 (DASH Regex): $streamUrl', type: LogType.success);
+                  return streamUrl;
+                }
               }
             } catch (e) {
               AppLogger.log('TIDAL_API', '매니페스트 파싱 예외: $e', type: LogType.warning);
@@ -221,6 +247,20 @@ class TidalApiClient {
     } catch (e) {
       AppLogger.log('TIDAL_API', 'urlpostpaystream 시도 실패: $e', type: LogType.warning);
     }
+
+    // 3차 폴백: /tracks/$trackId/streamUrl
+    try {
+      final response = await _dio.get(
+        '/tracks/$trackId/streamUrl',
+        queryParameters: {'countryCode': 'US'},
+        options: Options(headers: _buildHeaders(accessToken)),
+      );
+      final url = response.data['url'] as String?;
+      if (url != null && url.isNotEmpty) {
+        AppLogger.log('TIDAL_API', '오디오 스트림 URL 발급 성공 (streamUrl): $url', type: LogType.success);
+        return url;
+      }
+    } catch (_) {}
 
     return null;
   }

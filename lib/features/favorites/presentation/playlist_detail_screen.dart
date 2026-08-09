@@ -3,6 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../auth/data/tidal_auth_repository.dart';
 import '../../player/data/player_manager.dart';
+import '../../player/presentation/mini_player_widget.dart';
 import '../../tidal_api/data/tidal_api_client.dart';
 import '../../tidal_api/domain/models/media_item.dart';
 import 'playlist_artwork_widget.dart';
@@ -77,6 +78,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
         backgroundColor: AppColors.surfaceCard,
         elevation: 0,
       ),
+      bottomNavigationBar: const MiniPlayerWidget(autoStartDiscovery: false),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.cyanAccent))
           : CustomScrollView(

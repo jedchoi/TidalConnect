@@ -45,7 +45,8 @@ class MainActivity : FlutterActivity() {
                 "playTrack" -> {
                     val trackId = call.argument<String>("trackId") ?: ""
                     val streamUrl = call.argument<String>("streamUrl") ?: ""
-                    playerManager?.playTrack(trackId, streamUrl)
+                    val token = call.argument<String>("token") ?: ""
+                    playerManager?.playTrack(trackId, streamUrl, token)
                     result.success(mapOf("status" to "playing", "trackId" to trackId, "streamUrl" to streamUrl))
                 }
                 "pauseTrack" -> {

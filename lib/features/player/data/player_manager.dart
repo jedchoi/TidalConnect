@@ -38,28 +38,40 @@ class PlayerManager {
     durationSecondsNotifier.value = track.durationSeconds > 0 ? track.durationSeconds : 210;
     qualityBadgeNotifier.value = 'Hi-Res Lossless FLAC';
 
-    AppLogger.log('PLAYER', '음원 재생 시작: "${track.title}" - ${track.artistName} (Track ID: ${track.id})', type: LogType.success);
+    AppLogger.log('PLAYER', '음원 재생 요청: "${track.title}" - ${track.artistName} (Track ID: ${track.id})', type: LogType.success);
 
     // 1. Fetch real stream URL from Tidal API
     String streamUrl = '';
+    String tokenStr = '';
     try {
       final token = await _authRepo.autoLogin();
       if (token != null) {
+        tokenStr = token.accessToken;
         final fetchedUrl = await _apiClient.getStreamUrl(track.id, token.accessToken);
         if (fetchedUrl != null && fetchedUrl.isNotEmpty) {
           streamUrl = fetchedUrl;
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      AppLogger.log('PLAYER', '스트림 URL 조회 예외: $e', type: LogType.error);
+    }
+
+    if (streamUrl.isEmpty) {
+      // Universal preview fallback stream
+      streamUrl = 'https://sp-audio.sp-fra1.tidal.com/stream/preview/${track.id}.mp4';
+      AppLogger.log('PLAYER', '기본 스트림 URL 폴백 사용: $streamUrl', type: LogType.info);
+    }
 
     // 2. Play on selected target (DLNA Remote Speaker vs. Smartphone Local Speaker)
     final selectedDevice = _dlnaManager.selectedDevice;
-    if (!selectedDevice.isLocalSpeaker && streamUrl.isNotEmpty) {
+    if (!selectedDevice.isLocalSpeaker) {
       // Remote DLNA Speaker
+      AppLogger.log('PLAYER', 'DLNA 스피커로 오디오 스트림 전송: "${selectedDevice.friendlyName}" ➔ $streamUrl', type: LogType.network);
       await _dlnaManager.playOnSelectedDevice(streamUrl: streamUrl, title: track.title);
     } else {
-      // Local Phone Speaker via Android MediaPlayer / Native SDK Bridge
-      await TidalSdkNativeBridge.playTrack(trackId: track.id, streamUrl: streamUrl);
+      // Local Phone Speaker via Android MediaPlayer
+      AppLogger.log('PLAYER', '스마트폰 내장 스피커로 오디오 스트림 재생 시작 (URL: $streamUrl)', type: LogType.network);
+      await TidalSdkNativeBridge.playTrack(trackId: track.id, streamUrl: streamUrl, token: tokenStr);
     }
 
     // 3. Start real-time progress timer

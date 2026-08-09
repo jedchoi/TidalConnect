@@ -18,11 +18,19 @@ class TidalPlayerManager(
         Log.d("TidalPlayerManager", "TidalPlayerManager initialized with context")
     }
 
-    fun playTrack(trackId: String, streamUrl: String = "") {
+    fun playTrack(trackId: String, streamUrl: String = "", token: String = "") {
         try {
             stop()
             if (streamUrl.isNotEmpty()) {
                 Log.d("TidalPlayerManager", "Playing audio stream on mobile speaker: $streamUrl")
+
+                val headers = mutableMapOf<String, String>()
+                if (token.isNotEmpty()) {
+                    headers["Authorization"] = "Bearer $token"
+                }
+                headers["User-Agent"] = "TIDAL_ANDROID/1057 (Android 14)"
+                headers["X-Tidal-Token"] = "***REMOVED***"
+
                 mediaPlayer = MediaPlayer().apply {
                     setAudioAttributes(
                         AudioAttributes.Builder()
@@ -30,15 +38,20 @@ class TidalPlayerManager(
                             .setUsage(AudioAttributes.USAGE_MEDIA)
                             .build()
                     )
-                    setDataSource(context, Uri.parse(streamUrl))
+                    try {
+                        setDataSource(context, Uri.parse(streamUrl), headers)
+                    } catch (e: Exception) {
+                        Log.w("TidalPlayerManager", "setDataSource with headers failed: ${e.message}, falling back to plain URL")
+                        setDataSource(context, Uri.parse(streamUrl))
+                    }
                     setOnPreparedListener { mp ->
                         mp.start()
                         this@TidalPlayerManager.isCurrentlyPlaying = true
-                        Log.d("TidalPlayerManager", "MediaPlayer playback started successfully on phone speaker")
+                        Log.i("TidalPlayerManager", "MediaPlayer playback started successfully on phone speaker")
                     }
                     setOnCompletionListener {
                         this@TidalPlayerManager.isCurrentlyPlaying = false
-                        Log.d("TidalPlayerManager", "MediaPlayer playback completed")
+                        Log.i("TidalPlayerManager", "MediaPlayer playback completed")
                     }
                     setOnErrorListener { _, what, extra ->
                         Log.e("TidalPlayerManager", "MediaPlayer error: what=$what, extra=$extra")
@@ -48,7 +61,7 @@ class TidalPlayerManager(
                     prepareAsync()
                 }
             } else {
-                Log.d("TidalPlayerManager", "playTrack invoked without streamUrl for trackId: $trackId")
+                Log.w("TidalPlayerManager", "playTrack invoked without streamUrl for trackId: $trackId")
             }
         } catch (e: Exception) {
             Log.e("TidalPlayerManager", "Exception starting MediaPlayer: ${e.message}", e)

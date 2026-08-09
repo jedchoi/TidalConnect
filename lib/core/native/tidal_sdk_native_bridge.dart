@@ -41,12 +41,14 @@ class TidalSdkNativeBridge {
   static Future<bool> playTrack({
     required String trackId,
     String streamUrl = '',
+    String token = '',
   }) async {
     try {
       AppLogger.log('TIDAL_NATIVE_SDK', '스마트폰 스피커 오디오 재생 명령 (trackId: $trackId, streamUrl: $streamUrl)', type: LogType.info);
       final result = await _channel.invokeMethod<Map>('playTrack', {
         'trackId': trackId,
         'streamUrl': streamUrl,
+        'token': token,
       });
       AppLogger.log('TIDAL_NATIVE_SDK', '스마트폰 스피커 재생 응답: $result', type: LogType.success);
       return true;
