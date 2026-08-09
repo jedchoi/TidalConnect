@@ -108,7 +108,11 @@ class PlayerManager {
   void pause() {
     isPlayingNotifier.value = false;
     _stopProgressTimer();
-    TidalSdkNativeBridge.pauseTrack();
+    if (_dlnaManager.selectedDevice.isLocalSpeaker) {
+      TidalSdkNativeBridge.pauseTrack();
+    } else {
+      _dlnaManager.pauseCurrent();
+    }
     AppLogger.log('PLAYER', '음원 일시정지', type: LogType.info);
   }
 
@@ -116,19 +120,29 @@ class PlayerManager {
     if (currentTrackNotifier.value == null) return;
     isPlayingNotifier.value = true;
     _startProgressTimer();
-    TidalSdkNativeBridge.resumeTrack();
+    if (_dlnaManager.selectedDevice.isLocalSpeaker) {
+      TidalSdkNativeBridge.resumeTrack();
+    } else {
+      _dlnaManager.resumeCurrent();
+    }
     AppLogger.log('PLAYER', '음원 재생 재개: ${currentTrackNotifier.value!.title}', type: LogType.info);
   }
 
   void seekTo(int seconds) {
     progressSecondsNotifier.value = seconds.clamp(0, durationSecondsNotifier.value);
-    TidalSdkNativeBridge.seekTrack(seconds * 1000);
+    if (_dlnaManager.selectedDevice.isLocalSpeaker) {
+      TidalSdkNativeBridge.seekTrack(seconds * 1000);
+    }
   }
 
   void stop() {
     _stopProgressTimer();
     isPlayingNotifier.value = false;
     progressSecondsNotifier.value = 0;
-    TidalSdkNativeBridge.stopTrack();
+    if (_dlnaManager.selectedDevice.isLocalSpeaker) {
+      TidalSdkNativeBridge.stopTrack();
+    } else {
+      _dlnaManager.stopCurrent();
+    }
   }
 }

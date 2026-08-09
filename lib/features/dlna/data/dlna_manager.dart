@@ -26,7 +26,7 @@ class DlnaManager {
   Future<bool> playOnSelectedDevice({required String streamUrl, required String title}) async {
     final device = selectedDevice;
     if (device.isLocalSpeaker) {
-      // Local mobile speaker
+      // Local mobile speaker handled natively via TIDAL SDK Player
       return true;
     }
 
@@ -48,6 +48,30 @@ class DlnaManager {
       AppLogger.log('DLNA_PLAY', 'DLNA 스피커 재생 전송 실패: $e', type: LogType.error);
     }
     return false;
+  }
+
+  Future<bool> pauseCurrent() async {
+    final device = selectedDevice;
+    if (device.isLocalSpeaker) return true;
+    final targetControlUrl = device.avTransportControlUrl.isNotEmpty ? device.avTransportControlUrl : device.locationUrl;
+    if (targetControlUrl.isEmpty) return false;
+    return await _soapClient.pause(targetControlUrl);
+  }
+
+  Future<bool> resumeCurrent() async {
+    final device = selectedDevice;
+    if (device.isLocalSpeaker) return true;
+    final targetControlUrl = device.avTransportControlUrl.isNotEmpty ? device.avTransportControlUrl : device.locationUrl;
+    if (targetControlUrl.isEmpty) return false;
+    return await _soapClient.play(targetControlUrl);
+  }
+
+  Future<bool> stopCurrent() async {
+    final device = selectedDevice;
+    if (device.isLocalSpeaker) return true;
+    final targetControlUrl = device.avTransportControlUrl.isNotEmpty ? device.avTransportControlUrl : device.locationUrl;
+    if (targetControlUrl.isEmpty) return false;
+    return await _soapClient.stop(targetControlUrl);
   }
 
   Future<List<DlnaDevice>> discoverDevices() async {
