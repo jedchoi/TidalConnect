@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../dlna/domain/models/dlna_device.dart';
+import '../data/player_manager.dart';
 import 'speaker_selector_modal.dart';
 
 class NowPlayingScreen extends StatefulWidget {
@@ -32,7 +33,7 @@ class NowPlayingScreen extends StatefulWidget {
 }
 
 class _NowPlayingScreenState extends State<NowPlayingScreen> {
-  bool _isPlaying = true;
+  final PlayerManager _playerManager = PlayerManager.instance;
   double _sliderValue = 45.0;
   final double _maxDuration = 210.0;
 
@@ -85,8 +86,19 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                   ),
                 ],
               ),
-              child: const Center(
-                child: Icon(Icons.music_note, size: 100, color: AppColors.cyanAccent),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: widget.coverUrl.isNotEmpty
+                    ? Image.network(
+                        widget.coverUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Center(
+                          child: Icon(Icons.music_note, size: 100, color: AppColors.cyanAccent),
+                        ),
+                      )
+                    : const Center(
+                        child: Icon(Icons.music_note, size: 100, color: AppColors.cyanAccent),
+                      ),
               ),
             ),
             const Spacer(),
@@ -158,13 +170,20 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                   icon: const Icon(Icons.skip_previous, size: 36, color: Colors.white),
                   onPressed: () {},
                 ),
-                IconButton(
-                  icon: Icon(
-                    _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
-                    size: 64,
-                    color: AppColors.cyanAccent,
-                  ),
-                  onPressed: () => setState(() => _isPlaying = !_isPlaying),
+                ValueListenableBuilder<bool>(
+                  valueListenable: _playerManager.isPlayingNotifier,
+                  builder: (context, isPlaying, _) {
+                    return IconButton(
+                      icon: Icon(
+                        isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                        size: 64,
+                        color: AppColors.cyanAccent,
+                      ),
+                      onPressed: () {
+                        _playerManager.togglePlayPause();
+                      },
+                    );
+                  },
                 ),
                 IconButton(
                   icon: const Icon(Icons.skip_next, size: 36, color: Colors.white),

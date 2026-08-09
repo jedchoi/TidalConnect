@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/data/tidal_auth_repository.dart';
+import '../../player/data/player_manager.dart';
 import '../../tidal_api/data/tidal_api_client.dart';
 import '../../tidal_api/domain/models/media_item.dart';
 
@@ -14,12 +15,13 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final TidalAuthRepository _authRepo = TidalAuthRepository();
+  final TidalApiClient _apiClient = TidalApiClient();
+  final PlayerManager _playerManager = PlayerManager.instance;
+
   Timer? _debounce;
   bool _isSearching = false;
   List<MediaTrack> _searchTracks = [];
-
-  final TidalAuthRepository _authRepo = TidalAuthRepository();
-  final TidalApiClient _apiClient = TidalApiClient();
 
   @override
   void dispose() {
@@ -62,9 +64,10 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('음악 검색', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: AppColors.background,
+        backgroundColor: AppColors.surfaceCard,
         elevation: 0,
       ),
       body: Padding(
@@ -76,7 +79,7 @@ class _SearchScreenState extends State<SearchScreen> {
               onChanged: _onSearchChanged,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                hintText: '아티스트, 곡, 앨범 검색 (예: Queen, Jazz)',
+                hintText: '아티스트, 곡, 앨범 검색 (예: Queen, Master)',
                 hintStyle: const TextStyle(color: AppColors.textSecondary),
                 prefixIcon: const Icon(Icons.search, color: AppColors.cyanAccent),
                 suffixIcon: _searchController.text.isNotEmpty
@@ -111,20 +114,71 @@ class _SearchScreenState extends State<SearchScreen> {
                           itemCount: _searchTracks.length,
                           itemBuilder: (context, index) {
                             final track = _searchTracks[index];
-                            return Card(
-                              color: AppColors.surfaceCard,
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: ListTile(
-                                leading: track.coverUrl.isNotEmpty
-                                    ? ClipRRect(
-                                        borderRadius: BorderRadius.circular(6),
-                                        child: Image.network(track.coverUrl, width: 44, height: 44, fit: BoxFit.cover),
-                                      )
-                                    : const Icon(Icons.music_note, color: AppColors.cyanAccent),
-                                title: Text(track.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                subtitle: Text('${track.artistName} • ${track.albumTitle}', style: const TextStyle(color: AppColors.textSecondary)),
-                                trailing: const Icon(Icons.play_circle_fill, color: AppColors.cyanAccent),
-                              ),
+                            return ValueListenableBuilder<MediaTrack?>(
+                              valueListenable: _playerManager.currentTrackNotifier,
+                              builder: (context, currentTrack, _) {
+                                final isCurrent = currentTrack?.id == track.id;
+                                return Card(
+                                  color: isCurrent ? AppColors.cyanAccent.withOpacity(0.1) : AppColors.surfaceCard,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    side: BorderSide(color: isCurrent ? AppColors.cyanAccent : AppColors.surfaceLight),
+                                  ),
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  child: ListTile(
+                                    leading: ClipRRect(
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: track.coverUrl.isNotEmpty
+                                          ? Image.network(
+                                              track.coverUrl,
+                                              width: 44,
+                                              height: 44,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (_, __, ___) => const Icon(Icons.music_note, color: AppColors.cyanAccent),
+                                            )
+                                          : const Icon(Icons.music_note, color: AppColors.cyanAccent),
+                                    ),
+                                    title: Text(
+                                      track.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: isCurrent ? AppColors.cyanAccent : Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      '${track.artistName} • ${track.albumTitle}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                                    ),
+                                    trailing: IconButton(
+                                      icon: Icon(
+                                        isCurrent && _playerManager.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill,
+                                        color: AppColors.cyanAccent,
+                                      ),
+                                      onPressed: () {
+                                        if (isCurrent) {
+                                          _playerManager.togglePlayPause();
+                                        } else {
+                                          _playerManager.playTrack(track);
+                                        }
+                                      },
+                                    ),
+                                    onTap: () {
+                                      _playerManager.playTrack(track);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('"${track.title}" 재생을 시작합니다.'),
+                                          backgroundColor: AppColors.cyanAccent,
+                                          duration: const Duration(seconds: 2),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                );
+                              },
                             );
                           },
                         ),
