@@ -3,7 +3,6 @@ package com.example.tidal_connect_lite
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer
-import android.net.Uri
 import android.util.Log
 import com.tidal.sdk.auth.CredentialsProvider
 
@@ -22,14 +21,7 @@ class TidalPlayerManager(
         try {
             stop()
             if (streamUrl.isNotEmpty()) {
-                Log.d("TidalPlayerManager", "Playing audio stream on mobile speaker: $streamUrl")
-
-                val headers = mutableMapOf<String, String>()
-                if (token.isNotEmpty()) {
-                    headers["Authorization"] = "Bearer $token"
-                }
-                headers["User-Agent"] = "TIDAL_ANDROID/1057 (Android 14)"
-                headers["X-Tidal-Token"] = "***REMOVED***"
+                Log.i("TidalPlayerManager", "Starting audio playback on mobile speaker: $streamUrl")
 
                 mediaPlayer = MediaPlayer().apply {
                     setAudioAttributes(
@@ -38,23 +30,19 @@ class TidalPlayerManager(
                             .setUsage(AudioAttributes.USAGE_MEDIA)
                             .build()
                     )
-                    try {
-                        setDataSource(context, Uri.parse(streamUrl), headers)
-                    } catch (e: Exception) {
-                        Log.w("TidalPlayerManager", "setDataSource with headers failed: ${e.message}, falling back to plain URL")
-                        setDataSource(context, Uri.parse(streamUrl))
-                    }
+                    // Direct stream URL setting for HTTP/HTTPS streaming
+                    setDataSource(streamUrl)
                     setOnPreparedListener { mp ->
                         mp.start()
                         this@TidalPlayerManager.isCurrentlyPlaying = true
-                        Log.i("TidalPlayerManager", "MediaPlayer playback started successfully on phone speaker")
+                        Log.i("TidalPlayerManager", "MediaPlayer playback started successfully on phone speaker for track $trackId")
                     }
                     setOnCompletionListener {
                         this@TidalPlayerManager.isCurrentlyPlaying = false
-                        Log.i("TidalPlayerManager", "MediaPlayer playback completed")
+                        Log.i("TidalPlayerManager", "MediaPlayer playback completed for track $trackId")
                     }
                     setOnErrorListener { _, what, extra ->
-                        Log.e("TidalPlayerManager", "MediaPlayer error: what=$what, extra=$extra")
+                        Log.e("TidalPlayerManager", "MediaPlayer error: what=$what, extra=$extra for track $trackId")
                         this@TidalPlayerManager.isCurrentlyPlaying = false
                         false
                     }

@@ -21,8 +21,6 @@ class TidalApiClient {
     return {
       'Authorization': 'Bearer $accessToken',
       'Accept': 'application/json',
-      'User-Agent': 'TIDAL_ANDROID/1057 (Android 14)',
-      'X-Tidal-Token': '***REMOVED***',
     };
   }
 
@@ -157,12 +155,13 @@ class TidalApiClient {
   }
 
   // ──────────────────────────────────────────────
-  // 실시간 오디오 스트리밍 URL 발급 (playbackinfopostpaywall + BTS/EMU Manifest Base64 & DASH MPD)
+  // 실시간 오디오 스트리밍 URL 발급
   // ──────────────────────────────────────────────
 
   Future<String?> getStreamUrl(String trackId, String accessToken, {String soundQuality = 'HIGH'}) async {
     final qualities = [soundQuality, 'HIGH', 'LOSSLESS', 'LOW'];
 
+    // 1. playbackinfopostpaywall 시도
     for (final q in qualities.toSet()) {
       try {
         AppLogger.log('TIDAL_API', 'GET $baseUrl/tracks/$trackId/playbackinfopostpaywall (audioquality=$q)', type: LogType.network);
@@ -182,11 +181,9 @@ class TidalApiClient {
 
           if (manifest.isNotEmpty) {
             try {
-              // Base64 decode manifest
               final decodedBytes = base64.decode(manifest);
               final decodedStr = utf8.decode(decodedBytes, allowMalformed: true);
 
-              // 1. JSON BTS/EMU Manifest
               if (decodedStr.trim().startsWith('{')) {
                 final decodedJson = jsonDecode(decodedStr);
                 if (decodedJson is Map) {
@@ -202,7 +199,6 @@ class TidalApiClient {
                   }
                 }
               } else {
-                // 2. DASH MPD XML Manifest
                 final baseUrlMatch = RegExp(r'<BaseURL>(https?://[^<]+)</BaseURL>').firstMatch(decodedStr);
                 if (baseUrlMatch != null) {
                   final streamUrl = baseUrlMatch.group(1)!;
@@ -232,7 +228,29 @@ class TidalApiClient {
       }
     }
 
-    // 2차 폴백: /tracks/$trackId/urlpostpaystream
+    // 2. 트랙 상세 메타데이터 엔드포인트에서 previewUrl / streamUrl 조회
+    try {
+      final response = await _dio.get(
+        '/tracks/$trackId',
+        queryParameters: {'countryCode': 'US'},
+        options: Options(headers: _buildHeaders(accessToken)),
+      );
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        if (data['previewUrl'] != null && data['previewUrl'].toString().isNotEmpty) {
+          final url = data['previewUrl'].toString();
+          AppLogger.log('TIDAL_API', '트랙 previewUrl 추출 성공: $url', type: LogType.success);
+          return url;
+        }
+        if (data['streamUrl'] != null && data['streamUrl'].toString().isNotEmpty) {
+          final url = data['streamUrl'].toString();
+          AppLogger.log('TIDAL_API', '트랙 streamUrl 추출 성공: $url', type: LogType.success);
+          return url;
+        }
+      }
+    } catch (_) {}
+
+    // 3. /tracks/$trackId/urlpostpaystream
     try {
       final response = await _dio.get(
         '/tracks/$trackId/urlpostpaystream',
@@ -244,11 +262,9 @@ class TidalApiClient {
         AppLogger.log('TIDAL_API', '오디오 스트림 URL 발급 성공 (urlpostpaystream): $url', type: LogType.success);
         return url;
       }
-    } catch (e) {
-      AppLogger.log('TIDAL_API', 'urlpostpaystream 시도 실패: $e', type: LogType.warning);
-    }
+    } catch (_) {}
 
-    // 3차 폴백: /tracks/$trackId/streamUrl
+    // 4. /tracks/$trackId/streamUrl
     try {
       final response = await _dio.get(
         '/tracks/$trackId/streamUrl',
