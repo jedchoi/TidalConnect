@@ -37,23 +37,25 @@ class TidalSdkNativeBridge {
     }
   }
 
-  /// Triggers playback via native Android MediaPlayer or Tidal SDK Player
+  /// Triggers playback via native ExoPlayer (MPEG-DASH / Direct Stream)
   static Future<bool> playTrack({
     required String trackId,
     String streamUrl = '',
-    String token = '',
+    String manifest = '',
+    String mimeType = '',
   }) async {
     try {
-      AppLogger.log('TIDAL_NATIVE_SDK', '스마트폰 스피커 오디오 재생 명령 (trackId: $trackId, streamUrl: $streamUrl)', type: LogType.info);
+      AppLogger.log('TIDAL_NATIVE_SDK', '스마트폰 ExoPlayer 오디오 재생 명령 (trackId: $trackId, manifestLen: ${manifest.length})', type: LogType.info);
       final result = await _channel.invokeMethod<Map>('playTrack', {
         'trackId': trackId,
         'streamUrl': streamUrl,
-        'token': token,
+        'manifest': manifest,
+        'mimeType': mimeType,
       });
-      AppLogger.log('TIDAL_NATIVE_SDK', '스마트폰 스피커 재생 응답: $result', type: LogType.success);
+      AppLogger.log('TIDAL_NATIVE_SDK', '스마트폰 ExoPlayer 재생 응답: $result', type: LogType.success);
       return true;
     } catch (e) {
-      AppLogger.log('TIDAL_NATIVE_SDK', '스마트폰 스피커 재생 실패: $e', type: LogType.error);
+      AppLogger.log('TIDAL_NATIVE_SDK', '스마트폰 ExoPlayer 재생 실패: $e', type: LogType.error);
       return false;
     }
   }

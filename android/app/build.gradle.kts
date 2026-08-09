@@ -45,7 +45,5 @@ flutter {
 
 dependencies {
     implementation("com.tidal.sdk:auth:0.10.1")
-    implementation("com.tidal.sdk:player:0.0.70") {
-        exclude(group = "androidx.media3", module = "media3-extractor")
-    }
+    implementation("com.tidal.sdk:player:0.0.70")
 }
