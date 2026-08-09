@@ -45,8 +45,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _handleTidalLogin() async {
     setState(() => _isAuthenticating = true);
     try {
-      final externalAuthService = TidalExternalAuthService();
-      final authToken = await externalAuthService.startExternalLogin(
+      final authToken = await TidalWebViewLoginModal.show(
+        context,
         authRepository: _authRepo,
       );
 

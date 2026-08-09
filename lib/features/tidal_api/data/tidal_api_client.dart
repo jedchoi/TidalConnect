@@ -39,24 +39,21 @@ class TidalApiClient {
   // ──────────────────────────────────────────────
 
   Future<List<MediaAlbum>> getFavoriteAlbums(String accessToken, {String userId = 'me'}) async {
-    // 1차: v2 OpenAPI 시도
-    final v2Albums = await _getFavoriteAlbumsV2(accessToken);
-    if (v2Albums.isNotEmpty) return v2Albums;
-
-    // 2차: v1 레거시 API 폴백
-    return _getFavoriteAlbumsV1(accessToken, userId: userId);
+    final v1Albums = await _getFavoriteAlbumsV1(accessToken, userId: userId);
+    if (v1Albums.isNotEmpty) return v1Albums;
+    return _getFavoriteAlbumsV2(accessToken);
   }
 
   Future<List<MediaPlaylist>> getFavoritePlaylists(String accessToken, {String userId = 'me'}) async {
-    final v2Playlists = await _getFavoritePlaylistsV2(accessToken);
-    if (v2Playlists.isNotEmpty) return v2Playlists;
-    return _getFavoritePlaylistsV1(accessToken, userId: userId);
+    final v1Playlists = await _getFavoritePlaylistsV1(accessToken, userId: userId);
+    if (v1Playlists.isNotEmpty) return v1Playlists;
+    return _getFavoritePlaylistsV2(accessToken);
   }
 
   Future<List<MediaTrack>> getFavoriteTracks(String accessToken, {String userId = 'me'}) async {
-    final v2Tracks = await _getFavoriteTracksV2(accessToken);
-    if (v2Tracks.isNotEmpty) return v2Tracks;
-    return _getFavoriteTracksV1(accessToken, userId: userId);
+    final v1Tracks = await _getFavoriteTracksV1(accessToken, userId: userId);
+    if (v1Tracks.isNotEmpty) return v1Tracks;
+    return _getFavoriteTracksV2(accessToken);
   }
 
   // ── v2 구현 ──
