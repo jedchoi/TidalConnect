@@ -49,13 +49,11 @@ class TidalExternalAuthService {
       }
     });
 
-    // 2. Build official OAuth Authorize URL with modern granular scopes
-    //    (레거시 r_usr/w_usr 대신 현대 TIDAL Developer Platform의 세분화된 scope 사용)
+    // 2. Build official OAuth Authorize URL (scope 생략 - v2 OpenAPI 사용 시 scope 불필요)
     final authUrl = Uri.parse('https://login.tidal.com/authorize').replace(queryParameters: {
       'client_id': TidalConfig.clientId,
       'response_type': 'code',
       'redirect_uri': redirectUri,
-      'scope': 'collection.read user.read playlists.read',
       'code_challenge': codeChallenge,
       'code_challenge_method': 'S256',
     });
