@@ -155,7 +155,7 @@ class TidalApiClient {
   }
 
   // ──────────────────────────────────────────────
-  // 실시간 오디오 스트리밍 URL 발급
+  // 실시간 오디오 스트리밍 URL 발급 (Signed URL &amp; unescape 적용)
   // ──────────────────────────────────────────────
 
   Future<String?> getStreamUrl(String trackId, String accessToken, {String soundQuality = 'HIGH'}) async {
@@ -188,12 +188,12 @@ class TidalApiClient {
                 final decodedJson = jsonDecode(decodedStr);
                 if (decodedJson is Map) {
                   if (decodedJson['urls'] is List && (decodedJson['urls'] as List).isNotEmpty) {
-                    final streamUrl = (decodedJson['urls'] as List).first.toString();
+                    final streamUrl = (decodedJson['urls'] as List).first.toString().replaceAll('&amp;', '&');
                     AppLogger.log('TIDAL_API', '실제 오디오 스트림 URL 추출 성공 (JSON BTS/EMU): $streamUrl', type: LogType.success);
                     return streamUrl;
                   }
                   if (decodedJson['url'] != null && decodedJson['url'].toString().isNotEmpty) {
-                    final streamUrl = decodedJson['url'].toString();
+                    final streamUrl = decodedJson['url'].toString().replaceAll('&amp;', '&');
                     AppLogger.log('TIDAL_API', '실제 오디오 스트림 URL 추출 성공 (JSON url): $streamUrl', type: LogType.success);
                     return streamUrl;
                   }
@@ -201,13 +201,13 @@ class TidalApiClient {
               } else {
                 final baseUrlMatch = RegExp(r'<BaseURL>(https?://[^<]+)</BaseURL>').firstMatch(decodedStr);
                 if (baseUrlMatch != null) {
-                  final streamUrl = baseUrlMatch.group(1)!;
+                  final streamUrl = baseUrlMatch.group(1)!.replaceAll('&amp;', '&');
                   AppLogger.log('TIDAL_API', '실제 오디오 스트림 URL 추출 성공 (DASH MPD BaseURL): $streamUrl', type: LogType.success);
                   return streamUrl;
                 }
                 final urlMatch = RegExp(r'https?://[^\s"<>\\]+\.(?:mp4|m4a|flac|aac)[^\s"<>\\]*').firstMatch(decodedStr);
                 if (urlMatch != null) {
-                  final streamUrl = urlMatch.group(0)!;
+                  final streamUrl = urlMatch.group(0)!.replaceAll('&amp;', '&');
                   AppLogger.log('TIDAL_API', '실제 오디오 스트림 URL 추출 성공 (DASH Regex): $streamUrl', type: LogType.success);
                   return streamUrl;
                 }
@@ -218,7 +218,7 @@ class TidalApiClient {
           }
 
           if (data['url'] != null && data['url'].toString().isNotEmpty) {
-            final directUrl = data['url'].toString();
+            final directUrl = data['url'].toString().replaceAll('&amp;', '&');
             AppLogger.log('TIDAL_API', '직접 오디오 스트림 URL 수신: $directUrl', type: LogType.success);
             return directUrl;
           }
@@ -238,12 +238,12 @@ class TidalApiClient {
       final data = response.data;
       if (data is Map<String, dynamic>) {
         if (data['previewUrl'] != null && data['previewUrl'].toString().isNotEmpty) {
-          final url = data['previewUrl'].toString();
+          final url = data['previewUrl'].toString().replaceAll('&amp;', '&');
           AppLogger.log('TIDAL_API', '트랙 previewUrl 추출 성공: $url', type: LogType.success);
           return url;
         }
         if (data['streamUrl'] != null && data['streamUrl'].toString().isNotEmpty) {
-          final url = data['streamUrl'].toString();
+          final url = data['streamUrl'].toString().replaceAll('&amp;', '&');
           AppLogger.log('TIDAL_API', '트랙 streamUrl 추출 성공: $url', type: LogType.success);
           return url;
         }
@@ -259,8 +259,9 @@ class TidalApiClient {
       );
       final url = response.data['url'] as String?;
       if (url != null && url.isNotEmpty) {
-        AppLogger.log('TIDAL_API', '오디오 스트림 URL 발급 성공 (urlpostpaystream): $url', type: LogType.success);
-        return url;
+        final directUrl = url.replaceAll('&amp;', '&');
+        AppLogger.log('TIDAL_API', '오디오 스트림 URL 발급 성공 (urlpostpaystream): $directUrl', type: LogType.success);
+        return directUrl;
       }
     } catch (_) {}
 
@@ -273,8 +274,9 @@ class TidalApiClient {
       );
       final url = response.data['url'] as String?;
       if (url != null && url.isNotEmpty) {
-        AppLogger.log('TIDAL_API', '오디오 스트림 URL 발급 성공 (streamUrl): $url', type: LogType.success);
-        return url;
+        final directUrl = url.replaceAll('&amp;', '&');
+        AppLogger.log('TIDAL_API', '오디오 스트림 URL 발급 성공 (streamUrl): $directUrl', type: LogType.success);
+        return directUrl;
       }
     } catch (_) {}
 
