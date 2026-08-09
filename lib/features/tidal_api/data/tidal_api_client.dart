@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import '../../../core/utils/app_logger.dart';
 import '../domain/models/media_item.dart';
@@ -100,7 +101,6 @@ class TidalApiClient {
   // 앨범 및 플레이리스트 내부 세부 트랙 조회
   // ──────────────────────────────────────────────
 
-  /// 앨범 내 트랙 목록 조회
   Future<List<MediaTrack>> getAlbumTracks(String albumId, String accessToken) async {
     final endpoint = '/albums/$albumId/tracks';
     AppLogger.log('TIDAL_API', 'GET $baseUrl$endpoint (countryCode=US)', type: LogType.network);
@@ -119,7 +119,6 @@ class TidalApiClient {
     }
   }
 
-  /// 플레이리스트 내 트랙 목록 조회 (/tracks 및 /items 모두 지원)
   Future<List<MediaTrack>> getPlaylistTracks(String playlistId, String accessToken) async {
     AppLogger.log('TIDAL_API', '플레이리스트($playlistId) 트랙 조회 시작...', type: LogType.network);
     
@@ -153,6 +152,77 @@ class TidalApiClient {
       AppLogger.log('TIDAL_API', '/playlists/$playlistId/items 조회 실패: $e', type: LogType.error);
       return [];
     }
+  }
+
+  // ──────────────────────────────────────────────
+  // 실시간 오디오 스트리밍 URL 발급 (playbackinfopostpaywall + BTS Manifest Base64 디코딩)
+  // ──────────────────────────────────────────────
+
+  Future<String?> getStreamUrl(String trackId, String accessToken, {String soundQuality = 'HIGH'}) async {
+    final qualities = [soundQuality, 'HIGH', 'LOSSLESS', 'LOW'];
+
+    for (final q in qualities.toSet()) {
+      try {
+        AppLogger.log('TIDAL_API', 'GET $baseUrl/tracks/$trackId/playbackinfopostpaywall (audioquality=$q)', type: LogType.network);
+        final response = await _dio.get(
+          '/tracks/$trackId/playbackinfopostpaywall',
+          queryParameters: {
+            'audioquality': q,
+            'playbackmode': 'STREAM',
+            'assetpresentation': 'FULL',
+          },
+          options: Options(headers: _buildHeaders(accessToken)),
+        );
+
+        final data = response.data;
+        if (data is Map<String, dynamic>) {
+          final manifest = data['manifest'] as String? ?? '';
+
+          if (manifest.isNotEmpty) {
+            try {
+              // Base64 decode manifest JSON
+              final decodedBytes = base64.decode(manifest);
+              final decodedStr = utf8.decode(decodedBytes);
+              final decodedJson = jsonDecode(decodedStr);
+
+              if (decodedJson is Map && decodedJson['urls'] is List && (decodedJson['urls'] as List).isNotEmpty) {
+                final streamUrl = (decodedJson['urls'] as List).first.toString();
+                AppLogger.log('TIDAL_API', '실제 오디오 스트림 URL 추출 성공 (Manifest $q): $streamUrl', type: LogType.success);
+                return streamUrl;
+              }
+            } catch (e) {
+              AppLogger.log('TIDAL_API', '매니페스트 파싱 예외: $e', type: LogType.warning);
+            }
+          }
+
+          if (data['url'] != null && data['url'].toString().isNotEmpty) {
+            final directUrl = data['url'].toString();
+            AppLogger.log('TIDAL_API', '직접 오디오 스트림 URL 수신: $directUrl', type: LogType.success);
+            return directUrl;
+          }
+        }
+      } catch (e) {
+        AppLogger.log('TIDAL_API', 'playbackinfopostpaywall ($q) 시도 실패: $e', type: LogType.warning);
+      }
+    }
+
+    // 2차 폴백: /tracks/$trackId/urlpostpaystream
+    try {
+      final response = await _dio.get(
+        '/tracks/$trackId/urlpostpaystream',
+        queryParameters: {'soundQuality': 'HIGH', 'countryCode': 'US'},
+        options: Options(headers: _buildHeaders(accessToken)),
+      );
+      final url = response.data['url'] as String?;
+      if (url != null && url.isNotEmpty) {
+        AppLogger.log('TIDAL_API', '오디오 스트림 URL 발급 성공 (urlpostpaystream): $url', type: LogType.success);
+        return url;
+      }
+    } catch (e) {
+      AppLogger.log('TIDAL_API', 'urlpostpaystream 시도 실패: $e', type: LogType.warning);
+    }
+
+    return null;
   }
 
   // ──────────────────────────────────────────────
@@ -265,24 +335,5 @@ class TidalApiClient {
     } catch (e) {
       return [];
     }
-  }
-
-  Future<String?> getStreamUrl(String trackId, String accessToken, {String soundQuality = 'LOSSLESS'}) async {
-    AppLogger.log('TIDAL_API', 'GET $baseUrl/tracks/$trackId/urlpostpaystream (soundQuality=$soundQuality, countryCode=US)', type: LogType.network);
-    try {
-      final response = await _dio.get(
-        '/tracks/$trackId/urlpostpaystream',
-        queryParameters: {'soundQuality': soundQuality, 'countryCode': 'US'},
-        options: Options(headers: _buildHeaders(accessToken)),
-      );
-      final url = response.data['url'] as String?;
-      if (url != null && url.isNotEmpty) {
-        AppLogger.log('TIDAL_API', '오디오 스트림 URL 발급 성공: $url', type: LogType.success);
-        return url;
-      }
-    } catch (e) {
-      AppLogger.log('TIDAL_API', '스트림 URL(urlpostpaystream) 발급 예외: $e', type: LogType.info);
-    }
-    return null;
   }
 }
