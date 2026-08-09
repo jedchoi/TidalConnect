@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/data/tidal_auth_repository.dart';
 import '../../player/data/player_manager.dart';
@@ -18,16 +20,73 @@ class _SearchScreenState extends State<SearchScreen> {
   final TidalAuthRepository _authRepo = TidalAuthRepository();
   final TidalApiClient _apiClient = TidalApiClient();
   final PlayerManager _playerManager = PlayerManager.instance;
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+
+  static const String _historyKey = 'search_history_list';
+  List<String> _history = [];
 
   Timer? _debounce;
   bool _isSearching = false;
   List<MediaTrack> _searchTracks = [];
 
   @override
+  void initState() {
+    super.initState();
+    _loadSearchHistory();
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     _debounce?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadSearchHistory() async {
+    try {
+      final jsonStr = await _storage.read(key: _historyKey);
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final List list = jsonDecode(jsonStr);
+        if (mounted) {
+          setState(() {
+            _history = list.map((e) => e.toString()).toList();
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveSearchHistory(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return;
+
+    _history.remove(trimmed);
+    _history.insert(0, trimmed);
+    if (_history.length > 15) {
+      _history = _history.sublist(0, 15);
+    }
+    setState(() {});
+    try {
+      await _storage.write(key: _historyKey, value: jsonEncode(_history));
+    } catch (_) {}
+  }
+
+  Future<void> _removeHistoryItem(String item) async {
+    setState(() {
+      _history.remove(item);
+    });
+    try {
+      await _storage.write(key: _historyKey, value: jsonEncode(_history));
+    } catch (_) {}
+  }
+
+  Future<void> _clearAllHistory() async {
+    setState(() {
+      _history.clear();
+    });
+    try {
+      await _storage.delete(key: _historyKey);
+    } catch (_) {}
   }
 
   void _onSearchChanged(String query) {
@@ -42,6 +101,7 @@ class _SearchScreenState extends State<SearchScreen> {
       if (mounted) setState(() => _searchTracks = []);
       return;
     }
+    _saveSearchHistory(query);
     setState(() => _isSearching = true);
     try {
       var token = await _authRepo.autoLogin();
@@ -61,8 +121,15 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
+  void _searchWithQuery(String query) {
+    _searchController.text = query;
+    _performSearch(query);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hasQuery = _searchController.text.trim().isNotEmpty;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -77,9 +144,10 @@ class _SearchScreenState extends State<SearchScreen> {
             TextField(
               controller: _searchController,
               onChanged: _onSearchChanged,
+              onSubmitted: (val) => _performSearch(val),
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                hintText: '아티스트, 곡, 앨범 검색 (예: Queen, Master)',
+                hintText: '아티스트, 곡, 앨범 검색 (예: Queen, Jazz)',
                 hintStyle: const TextStyle(color: AppColors.textSecondary),
                 prefixIcon: const Icon(Icons.search, color: AppColors.cyanAccent),
                 suffixIcon: _searchController.text.isNotEmpty
@@ -103,89 +171,153 @@ class _SearchScreenState extends State<SearchScreen> {
             Expanded(
               child: _isSearching
                   ? const Center(child: CircularProgressIndicator(color: AppColors.cyanAccent))
-                  : _searchTracks.isEmpty
-                      ? Center(
-                          child: Text(
-                            _searchController.text.isEmpty ? '검색어를 입력하세요' : '검색 결과가 없습니다',
-                            style: const TextStyle(color: AppColors.textSecondary),
-                          ),
-                        )
-                      : ListView.builder(
-                          itemCount: _searchTracks.length,
-                          itemBuilder: (context, index) {
-                            final track = _searchTracks[index];
-                            return ValueListenableBuilder<MediaTrack?>(
-                              valueListenable: _playerManager.currentTrackNotifier,
-                              builder: (context, currentTrack, _) {
-                                final isCurrent = currentTrack?.id == track.id;
-                                return Card(
-                                  color: isCurrent ? AppColors.cyanAccent.withOpacity(0.1) : AppColors.surfaceCard,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    side: BorderSide(color: isCurrent ? AppColors.cyanAccent : AppColors.surfaceLight),
-                                  ),
-                                  margin: const EdgeInsets.only(bottom: 8),
-                                  child: ListTile(
-                                    leading: ClipRRect(
-                                      borderRadius: BorderRadius.circular(6),
-                                      child: track.coverUrl.isNotEmpty
-                                          ? Image.network(
-                                              track.coverUrl,
-                                              width: 44,
-                                              height: 44,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (_, __, ___) => const Icon(Icons.music_note, color: AppColors.cyanAccent),
-                                            )
-                                          : const Icon(Icons.music_note, color: AppColors.cyanAccent),
-                                    ),
-                                    title: Text(
-                                      track.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: isCurrent ? AppColors.cyanAccent : Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    subtitle: Text(
-                                      '${track.artistName} • ${track.albumTitle}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                                    ),
-                                    trailing: IconButton(
-                                      icon: Icon(
-                                        isCurrent && _playerManager.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill,
-                                        color: AppColors.cyanAccent,
-                                      ),
-                                      onPressed: () {
-                                        if (isCurrent) {
-                                          _playerManager.togglePlayPause();
-                                        } else {
-                                          _playerManager.playTrack(track);
-                                        }
-                                      },
-                                    ),
-                                    onTap: () {
-                                      _playerManager.playTrack(track);
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('"${track.title}" 재생을 시작합니다.'),
-                                          backgroundColor: AppColors.cyanAccent,
-                                          duration: const Duration(seconds: 2),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                );
-                              },
-                            );
-                          },
-                        ),
+                  : hasQuery
+                      ? _buildSearchResults()
+                      : _buildSearchHistory(),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSearchHistory() {
+    if (_history.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search, size: 64, color: AppColors.surfaceLight),
+            SizedBox(height: 16),
+            Text(
+              '검색어를 입력하여 TIDAL의 1억 곡 이상을 감상하세요',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              '최근 검색어',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            TextButton(
+              onPressed: _clearAllHistory,
+              child: const Text('전체 삭제', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _history.map((query) {
+            return Chip(
+              backgroundColor: AppColors.surfaceCard,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: const BorderSide(color: AppColors.surfaceLight),
+              ),
+              label: InkWell(
+                onTap: () => _searchWithQuery(query),
+                child: Text(query, style: const TextStyle(color: Colors.white, fontSize: 13)),
+              ),
+              deleteIcon: const Icon(Icons.close, size: 16, color: AppColors.textSecondary),
+              onDeleted: () => _removeHistoryItem(query),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSearchResults() {
+    if (_searchTracks.isEmpty) {
+      return const Center(
+        child: Text(
+          '검색 결과가 없습니다',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: _searchTracks.length,
+      itemBuilder: (context, index) {
+        final track = _searchTracks[index];
+        return ValueListenableBuilder<MediaTrack?>(
+          valueListenable: _playerManager.currentTrackNotifier,
+          builder: (context, currentTrack, _) {
+            final isCurrent = currentTrack?.id == track.id;
+            return Card(
+              color: isCurrent ? AppColors.cyanAccent.withOpacity(0.1) : AppColors.surfaceCard,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+                side: BorderSide(color: isCurrent ? AppColors.cyanAccent : AppColors.surfaceLight),
+              ),
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: track.coverUrl.isNotEmpty
+                      ? Image.network(
+                          track.coverUrl,
+                          width: 44,
+                          height: 44,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(Icons.music_note, color: AppColors.cyanAccent),
+                        )
+                      : const Icon(Icons.music_note, color: AppColors.cyanAccent),
+                ),
+                title: Text(
+                  track.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: isCurrent ? AppColors.cyanAccent : Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                subtitle: Text(
+                  '${track.artistName} • ${track.albumTitle}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                ),
+                trailing: IconButton(
+                  icon: Icon(
+                    isCurrent && _playerManager.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill,
+                    color: AppColors.cyanAccent,
+                  ),
+                  onPressed: () {
+                    if (isCurrent) {
+                      _playerManager.togglePlayPause();
+                    } else {
+                      _playerManager.playTrack(track);
+                    }
+                  },
+                ),
+                onTap: () {
+                  _playerManager.playTrack(track);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('"${track.title}" 재생을 시작합니다.'),
+                      backgroundColor: AppColors.cyanAccent,
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

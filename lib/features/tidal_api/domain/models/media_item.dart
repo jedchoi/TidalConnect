@@ -15,18 +15,60 @@ class MediaTrack {
     required this.durationSeconds,
   });
 
-  factory MediaTrack.fromJson(Map<String, dynamic> json) {
-    final coverUuid = json['album']?['cover'] as String? ?? '';
-    final coverPath = coverUuid.isNotEmpty
+  factory MediaTrack.fromJson(Map<String, dynamic> rawJson) {
+    final json = (rawJson['item'] is Map<String, dynamic>)
+        ? rawJson['item'] as Map<String, dynamic>
+        : (rawJson['track'] is Map<String, dynamic>)
+            ? rawJson['track'] as Map<String, dynamic>
+            : rawJson;
+
+    final id = json['id']?.toString() ?? '';
+    final title = json['title'] as String? ?? json['name'] as String? ?? '';
+    
+    // Artist name parsing
+    String artist = '';
+    if (json['artist'] is Map && json['artist']['name'] != null) {
+      artist = json['artist']['name'].toString();
+    } else if (json['artists'] is List && (json['artists'] as List).isNotEmpty) {
+      final firstArtist = (json['artists'] as List).first;
+      if (firstArtist is Map && firstArtist['name'] != null) {
+        artist = firstArtist['name'].toString();
+      }
+    } else if (json['artistName'] != null) {
+      artist = json['artistName'].toString();
+    }
+
+    // Album title parsing
+    String album = '';
+    if (json['album'] is Map && json['album']['title'] != null) {
+      album = json['album']['title'].toString();
+    } else if (json['albumTitle'] != null) {
+      album = json['albumTitle'].toString();
+    }
+
+    // Cover image UUID parsing
+    String coverUuid = '';
+    if (json['album'] is Map && json['album']['cover'] != null) {
+      coverUuid = json['album']['cover'].toString();
+    } else if (json['cover'] != null) {
+      coverUuid = json['cover'].toString();
+    }
+
+    final coverPath = (coverUuid.isNotEmpty && coverUuid.contains('-'))
         ? 'https://resources.tidal.com/images/${coverUuid.replaceAll("-", "/")}/640x640.jpg'
-        : '';
+        : (coverUuid.startsWith('http'))
+            ? coverUuid
+            : '';
+
+    final duration = (json['duration'] as num?)?.toInt() ?? 0;
+
     return MediaTrack(
-      id: json['id'].toString(),
-      title: json['title'] as String? ?? '',
-      artistName: json['artist']?['name'] as String? ?? '',
-      albumTitle: json['album']?['title'] as String? ?? '',
+      id: id,
+      title: title,
+      artistName: artist,
+      albumTitle: album,
       coverUrl: coverPath,
-      durationSeconds: json['duration'] as int? ?? 0,
+      durationSeconds: duration,
     );
   }
 }
@@ -46,17 +88,46 @@ class MediaAlbum {
     required this.numberOfTracks,
   });
 
-  factory MediaAlbum.fromJson(Map<String, dynamic> json) {
-    final coverUuid = json['cover'] as String? ?? '';
-    final coverPath = coverUuid.isNotEmpty
+  factory MediaAlbum.fromJson(Map<String, dynamic> rawJson) {
+    final json = (rawJson['item'] is Map<String, dynamic>)
+        ? rawJson['item'] as Map<String, dynamic>
+        : (rawJson['album'] is Map<String, dynamic>)
+            ? rawJson['album'] as Map<String, dynamic>
+            : rawJson;
+
+    final id = json['id']?.toString() ?? '';
+    final title = json['title'] as String? ?? json['name'] as String? ?? '';
+    
+    String artist = '';
+    if (json['artist'] is Map && json['artist']['name'] != null) {
+      artist = json['artist']['name'].toString();
+    } else if (json['artists'] is List && (json['artists'] as List).isNotEmpty) {
+      final firstArtist = (json['artists'] as List).first;
+      if (firstArtist is Map && firstArtist['name'] != null) {
+        artist = firstArtist['name'].toString();
+      }
+    } else if (json['artistName'] != null) {
+      artist = json['artistName'].toString();
+    }
+
+    final coverUuid = json['cover']?.toString() ?? '';
+    final coverPath = (coverUuid.isNotEmpty && coverUuid.contains('-'))
         ? 'https://resources.tidal.com/images/${coverUuid.replaceAll("-", "/")}/640x640.jpg'
-        : '';
+        : (coverUuid.startsWith('http'))
+            ? coverUuid
+            : '';
+
+    final numberOfTracks = (json['numberOfTracks'] as num?)?.toInt() ??
+        (json['trackCount'] as num?)?.toInt() ??
+        (json['itemsCount'] as num?)?.toInt() ??
+        0;
+
     return MediaAlbum(
-      id: json['id'].toString(),
-      title: json['title'] as String? ?? '',
-      artistName: json['artist']?['name'] as String? ?? '',
+      id: id,
+      title: title,
+      artistName: artist,
       coverUrl: coverPath,
-      numberOfTracks: json['numberOfTracks'] as int? ?? 0,
+      numberOfTracks: numberOfTracks,
     );
   }
 }
@@ -76,17 +147,36 @@ class MediaPlaylist {
     required this.numberOfTracks,
   });
 
-  factory MediaPlaylist.fromJson(Map<String, dynamic> json) {
-    final squareUuid = json['squareImage'] as String? ?? json['uuid'] as String? ?? '';
-    final coverPath = squareUuid.isNotEmpty
-        ? 'https://resources.tidal.com/images/${squareUuid.replaceAll("-", "/")}/640x640.jpg'
-        : '';
+  factory MediaPlaylist.fromJson(Map<String, dynamic> rawJson) {
+    final json = (rawJson['playlist'] is Map<String, dynamic>)
+        ? rawJson['playlist'] as Map<String, dynamic>
+        : (rawJson['item'] is Map<String, dynamic>)
+            ? rawJson['item'] as Map<String, dynamic>
+            : rawJson;
+
+    final id = json['uuid'] as String? ?? json['id']?.toString() ?? '';
+    final title = json['title'] as String? ?? json['name'] as String? ?? '';
+    final description = json['description'] as String? ?? '';
+
+    // Extract image UUID (squareImage or image, not uuid)
+    final imageUuid = json['squareImage'] as String? ?? json['image'] as String? ?? '';
+    final coverPath = (imageUuid.isNotEmpty && imageUuid.contains('-'))
+        ? 'https://resources.tidal.com/images/${imageUuid.replaceAll("-", "/")}/640x640.jpg'
+        : (imageUuid.startsWith('http'))
+            ? imageUuid
+            : '';
+
+    final numberOfTracks = (json['numberOfTracks'] as num?)?.toInt() ??
+        (json['trackCount'] as num?)?.toInt() ??
+        (json['itemsCount'] as num?)?.toInt() ??
+        0;
+
     return MediaPlaylist(
-      id: json['uuid'] as String? ?? json['id']?.toString() ?? '',
-      title: json['title'] as String? ?? '',
-      description: json['description'] as String? ?? '',
+      id: id,
+      title: title,
+      description: description,
       coverUrl: coverPath,
-      numberOfTracks: json['numberOfTracks'] as int? ?? 0,
+      numberOfTracks: numberOfTracks,
     );
   }
 }
@@ -104,9 +194,11 @@ class MediaArtist {
 
   factory MediaArtist.fromJson(Map<String, dynamic> json) {
     final picUuid = json['picture'] as String? ?? '';
-    final picPath = picUuid.isNotEmpty
+    final picPath = (picUuid.isNotEmpty && picUuid.contains('-'))
         ? 'https://resources.tidal.com/images/${picUuid.replaceAll("-", "/")}/320x320.jpg'
-        : '';
+        : (picUuid.startsWith('http'))
+            ? picUuid
+            : '';
     return MediaArtist(
       id: json['id'].toString(),
       name: json['name'] as String? ?? '',

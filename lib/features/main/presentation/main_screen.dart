@@ -4,6 +4,7 @@ import '../../explore/presentation/explore_screen.dart';
 import '../../search/presentation/search_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../../player/presentation/mini_player_widget.dart';
+import '../../dlna/data/dlna_manager.dart';
 import '../../../core/theme/app_colors.dart';
 
 class MainScreen extends StatefulWidget {
@@ -22,6 +23,13 @@ class _MainScreenState extends State<MainScreen> {
     SearchScreen(),
     SettingsScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // 앱 시작 시 주변 DLNA 스피커 자동 검색 및 목록 구성
+    DlnaManager.instance.discoverDevices();
+  }
 
   @override
   Widget build(BuildContext context) {

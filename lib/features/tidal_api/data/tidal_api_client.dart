@@ -39,7 +39,7 @@ class TidalApiClient {
       );
       final items = response.data['items'] as List? ?? [];
       AppLogger.log('TIDAL_API', '내 즐겨찾기 앨범 수신 성공 [HTTP ${response.statusCode}]: ${items.length}개', type: LogType.success);
-      return items.map((e) => MediaAlbum.fromJson(e['item'] ?? e)).toList();
+      return items.map((e) => MediaAlbum.fromJson(e is Map<String, dynamic> ? e : {})).toList();
     } catch (e) {
       if (e is DioException && e.response != null) {
         AppLogger.log('TIDAL_API', '내 즐겨찾기 앨범 수신 오류 [HTTP ${e.response?.statusCode}]: ${e.response?.data}', type: LogType.error);
@@ -62,7 +62,7 @@ class TidalApiClient {
       );
       final items = response.data['items'] as List? ?? [];
       AppLogger.log('TIDAL_API', '내 즐겨찾기 플레이리스트 수신 성공 [HTTP ${response.statusCode}]: ${items.length}개', type: LogType.success);
-      return items.map((e) => MediaPlaylist.fromJson(e['playlist'] ?? e)).toList();
+      return items.map((e) => MediaPlaylist.fromJson(e is Map<String, dynamic> ? e : {})).toList();
     } catch (e) {
       if (e is DioException && e.response != null) {
         AppLogger.log('TIDAL_API', '내 즐겨찾기 플레이리스트 수신 오류 [HTTP ${e.response?.statusCode}]: ${e.response?.data}', type: LogType.error);
@@ -85,7 +85,7 @@ class TidalApiClient {
       );
       final items = response.data['items'] as List? ?? [];
       AppLogger.log('TIDAL_API', '내 즐겨찾기 트랙 수신 성공 [HTTP ${response.statusCode}]: ${items.length}개', type: LogType.success);
-      return items.map((e) => MediaTrack.fromJson(e['item'] ?? e)).toList();
+      return items.map((e) => MediaTrack.fromJson(e is Map<String, dynamic> ? e : {})).toList();
     } catch (e) {
       if (e is DioException && e.response != null) {
         AppLogger.log('TIDAL_API', '내 즐겨찾기 트랙 수신 오류 [HTTP ${e.response?.statusCode}]: ${e.response?.data}', type: LogType.error);
@@ -112,33 +112,45 @@ class TidalApiClient {
       );
       final items = response.data['items'] as List? ?? [];
       AppLogger.log('TIDAL_API', '앨범 트랙 목록 수신 성공 [HTTP ${response.statusCode}]: ${items.length}개', type: LogType.success);
-      return items.map((e) => MediaTrack.fromJson(e)).toList();
+      return items.map((e) => MediaTrack.fromJson(e is Map<String, dynamic> ? e : {})).toList();
     } catch (e) {
       AppLogger.log('TIDAL_API', '앨범 트랙 수신 오류: $e', type: LogType.error);
       return [];
     }
   }
 
-  /// 플레이리스트 내 트랙 목록 조회
+  /// 플레이리스트 내 트랙 목록 조회 (/tracks 및 /items 모두 지원)
   Future<List<MediaTrack>> getPlaylistTracks(String playlistId, String accessToken) async {
-    final endpoint = '/playlists/$playlistId/tracks';
-    AppLogger.log('TIDAL_API', 'GET $baseUrl$endpoint (countryCode=US)', type: LogType.network);
+    AppLogger.log('TIDAL_API', '플레이리스트($playlistId) 트랙 조회 시작...', type: LogType.network);
+    
+    // 1차: /playlists/$playlistId/tracks 시도
     try {
       final response = await _dio.get(
-        endpoint,
+        '/playlists/$playlistId/tracks',
         queryParameters: {'countryCode': 'US', 'limit': 100},
         options: Options(headers: _buildHeaders(accessToken)),
       );
       final items = response.data['items'] as List? ?? [];
-      AppLogger.log('TIDAL_API', '플레이리스트 트랙 목록 수신 성공 [HTTP ${response.statusCode}]: ${items.length}개', type: LogType.success);
-      return items.map((e) {
-        if (e['item'] != null) {
-          return MediaTrack.fromJson(e['item']);
-        }
-        return MediaTrack.fromJson(e);
-      }).toList();
+      if (items.isNotEmpty) {
+        AppLogger.log('TIDAL_API', '플레이리스트 트랙 목록 수신 성공 (/tracks) [HTTP ${response.statusCode}]: ${items.length}개', type: LogType.success);
+        return items.map((e) => MediaTrack.fromJson(e is Map<String, dynamic> ? e : {})).toList();
+      }
     } catch (e) {
-      AppLogger.log('TIDAL_API', '플레이리스트 트랙 수신 오류: $e', type: LogType.error);
+      AppLogger.log('TIDAL_API', '/playlists/$playlistId/tracks 조회 예외: $e ➔ /items 엔드포인트 시도', type: LogType.warning);
+    }
+
+    // 2차: /playlists/$playlistId/items 시도
+    try {
+      final response = await _dio.get(
+        '/playlists/$playlistId/items',
+        queryParameters: {'countryCode': 'US', 'limit': 100},
+        options: Options(headers: _buildHeaders(accessToken)),
+      );
+      final items = response.data['items'] as List? ?? [];
+      AppLogger.log('TIDAL_API', '플레이리스트 트랙 목록 수신 성공 (/items) [HTTP ${response.statusCode}]: ${items.length}개', type: LogType.success);
+      return items.map((e) => MediaTrack.fromJson(e is Map<String, dynamic> ? e : {})).toList();
+    } catch (e) {
+      AppLogger.log('TIDAL_API', '/playlists/$playlistId/items 조회 실패: $e', type: LogType.error);
       return [];
     }
   }
@@ -156,11 +168,10 @@ class TidalApiClient {
       );
       final items = response.data['items'] as List? ?? [];
       if (items.isNotEmpty) {
-        return items.map((e) => MediaAlbum.fromJson(e)).toList();
+        return items.map((e) => MediaAlbum.fromJson(e is Map<String, dynamic> ? e : {})).toList();
       }
     } catch (_) {}
 
-    // Fallback search for top master albums
     return searchAlbums('Master', accessToken, limit: 10);
   }
 
@@ -173,11 +184,10 @@ class TidalApiClient {
       );
       final items = response.data['items'] as List? ?? [];
       if (items.isNotEmpty) {
-        return items.map((e) => MediaPlaylist.fromJson(e)).toList();
+        return items.map((e) => MediaPlaylist.fromJson(e is Map<String, dynamic> ? e : {})).toList();
       }
     } catch (_) {}
 
-    // Fallback search for popular playlists
     return searchPlaylists('Tidal Master', accessToken, limit: 10);
   }
 
@@ -190,11 +200,10 @@ class TidalApiClient {
       );
       final items = response.data['items'] as List? ?? [];
       if (items.isNotEmpty) {
-        return items.map((e) => MediaTrack.fromJson(e)).toList();
+        return items.map((e) => MediaTrack.fromJson(e is Map<String, dynamic> ? e : {})).toList();
       }
     } catch (_) {}
 
-    // Fallback search for top tracks
     return searchTracks('Top Hits', accessToken, limit: 15);
   }
 
@@ -213,7 +222,7 @@ class TidalApiClient {
       );
       final items = response.data['items'] as List? ?? [];
       AppLogger.log('TIDAL_API', '트랙 검색 성공 [HTTP ${response.statusCode}]: ${items.length}개 수신', type: LogType.success);
-      return items.map((e) => MediaTrack.fromJson(e)).toList();
+      return items.map((e) => MediaTrack.fromJson(e is Map<String, dynamic> ? e : {})).toList();
     } catch (e) {
       if (e is DioException && e.response != null) {
         AppLogger.log('TIDAL_API', '트랙 검색 오류 [HTTP ${e.response?.statusCode}]: ${e.response?.data}', type: LogType.error);
@@ -235,7 +244,7 @@ class TidalApiClient {
       );
       final items = response.data['items'] as List? ?? [];
       AppLogger.log('TIDAL_API', '앨범 검색 성공 [HTTP ${response.statusCode}]: ${items.length}개 수신', type: LogType.success);
-      return items.map((e) => MediaAlbum.fromJson(e)).toList();
+      return items.map((e) => MediaAlbum.fromJson(e is Map<String, dynamic> ? e : {})).toList();
     } catch (e) {
       return [];
     }
@@ -252,7 +261,7 @@ class TidalApiClient {
       );
       final items = response.data['items'] as List? ?? [];
       AppLogger.log('TIDAL_API', '플레이리스트 검색 성공 [HTTP ${response.statusCode}]: ${items.length}개 수신', type: LogType.success);
-      return items.map((e) => MediaPlaylist.fromJson(e)).toList();
+      return items.map((e) => MediaPlaylist.fromJson(e is Map<String, dynamic> ? e : {})).toList();
     } catch (e) {
       return [];
     }
@@ -267,11 +276,13 @@ class TidalApiClient {
         options: Options(headers: _buildHeaders(accessToken)),
       );
       final url = response.data['url'] as String?;
-      AppLogger.log('TIDAL_API', '오디오 스트림 URL 발급 성공: $url', type: LogType.success);
-      return url;
+      if (url != null && url.isNotEmpty) {
+        AppLogger.log('TIDAL_API', '오디오 스트림 URL 발급 성공: $url', type: LogType.success);
+        return url;
+      }
     } catch (e) {
-      AppLogger.log('TIDAL_API', '스트림 URL 발급 완료', type: LogType.info);
-      return null;
+      AppLogger.log('TIDAL_API', '스트림 URL(urlpostpaystream) 발급 예외: $e', type: LogType.info);
     }
+    return null;
   }
 }

@@ -15,6 +15,8 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         authManager = TidalAuthManager(applicationContext)
+        playerManager = TidalPlayerManager(applicationContext, null)
+        playerManager?.initializePlayer()
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
@@ -42,12 +44,22 @@ class MainActivity : FlutterActivity() {
                 }
                 "playTrack" -> {
                     val trackId = call.argument<String>("trackId") ?: ""
-                    if (playerManager != null) {
-                        playerManager?.playTrack(trackId)
-                        result.success(mapOf("status" to "playing", "trackId" to trackId))
-                    } else {
-                        result.success(mapOf("status" to "playing_simulated", "trackId" to trackId))
-                    }
+                    val streamUrl = call.argument<String>("streamUrl") ?: ""
+                    playerManager?.playTrack(trackId, streamUrl)
+                    result.success(mapOf("status" to "playing", "trackId" to trackId, "streamUrl" to streamUrl))
+                }
+                "pauseTrack" -> {
+                    playerManager?.pause()
+                    result.success(mapOf("status" to "paused"))
+                }
+                "resumeTrack" -> {
+                    playerManager?.resume()
+                    result.success(mapOf("status" to "resumed"))
+                }
+                "seekTrack" -> {
+                    val positionMs = call.argument<Int>("positionMs") ?: 0
+                    playerManager?.seekTo(positionMs)
+                    result.success(mapOf("status" to "seeked", "positionMs" to positionMs))
                 }
                 "stopTrack" -> {
                     playerManager?.stop()
