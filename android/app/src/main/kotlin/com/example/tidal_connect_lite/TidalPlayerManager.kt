@@ -1,157 +1,163 @@
 package com.example.tidal_connect_lite
 
+import android.app.Application
 import android.content.Context
-import android.net.Uri
 import android.util.Log
-import androidx.media3.common.AudioAttributes
-import androidx.media3.common.C
-import androidx.media3.common.MediaItem
-import androidx.media3.common.MimeTypes
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player as ExoPlayerListener
-import androidx.media3.exoplayer.ExoPlayer
 import com.tidal.sdk.auth.CredentialsProvider
-import java.io.File
+import com.tidal.sdk.eventproducer.EventProducer
+import com.tidal.sdk.eventproducer.model.EventsConfig
+import com.tidal.sdk.player.Player
+import com.tidal.sdk.player.common.model.MediaProduct
+import com.tidal.sdk.player.common.model.ProductType
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 class TidalPlayerManager(
     private val context: Context,
     private val credentialsProvider: CredentialsProvider?
 ) {
-    private var exoPlayer: ExoPlayer? = null
+    private var tidalPlayer: Player? = null
     private var isCurrentlyPlaying = false
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
+    /**
+     * TIDAL Player는 앱 전체에서 하나만 생성한다.
+     */
     fun initializePlayer() {
+        // 이미 생성되어 있으면 절대 다시 생성하지 않는다.
+        if (tidalPlayer != null) {
+            Log.i("TidalPlayerManager", "TIDAL Player already initialized. Skip initialization.")
+            return
+        }
+
+        if (credentialsProvider == null) {
+            Log.e("TidalPlayerManager", "Cannot initialize TIDAL Player: credentialsProvider is null")
+            return
+        }
+
         try {
-            if (exoPlayer == null) {
-                exoPlayer = ExoPlayer.Builder(context)
-                    .setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-                            .setUsage(C.USAGE_MEDIA)
-                            .build(),
-                        true
-                    )
-                    .build().apply {
-                        addListener(object : ExoPlayerListener.Listener {
-                            override fun onIsPlayingChanged(isPlaying: Boolean) {
-                                isCurrentlyPlaying = isPlaying
-                                Log.i("TidalPlayerManager", "ExoPlayer isPlaying changed: $isPlaying")
-                            }
-
-                            override fun onPlaybackStateChanged(playbackState: Int) {
-                                when (playbackState) {
-                                    ExoPlayerListener.STATE_READY -> {
-                                        Log.i("TidalPlayerManager", "ExoPlayer STATE_READY, duration: ${duration}ms")
-                                    }
-                                    ExoPlayerListener.STATE_ENDED -> {
-                                        Log.i("TidalPlayerManager", "ExoPlayer STATE_ENDED (playback completed)")
-                                        isCurrentlyPlaying = false
-                                    }
-                                    ExoPlayerListener.STATE_BUFFERING -> {
-                                        Log.d("TidalPlayerManager", "ExoPlayer STATE_BUFFERING...")
-                                    }
-                                    ExoPlayerListener.STATE_IDLE -> {
-                                        Log.d("TidalPlayerManager", "ExoPlayer STATE_IDLE")
-                                    }
-                                }
-                            }
-
-                            override fun onPlayerError(error: PlaybackException) {
-                                Log.e("TidalPlayerManager", "ExoPlayer error: ${error.errorCodeName} (${error.errorCode}) - ${error.message}", error)
-                                isCurrentlyPlaying = false
-                            }
-                        })
-                    }
-                Log.i("TidalPlayerManager", "ExoPlayer audio engine initialized successfully")
+            val app = context.applicationContext as? Application
+            if (app == null) {
+                Log.e("TidalPlayerManager", "Application context is not available")
+                return
             }
+
+            val eventsConfig = EventsConfig(
+                maxDiskUsageBytes = 10 * 1024 * 1024,
+                blockedConsentCategories = emptySet(),
+                appVersion = "1.0.0"
+            )
+
+            val eventProducer = EventProducer.getInstance(
+                credentialsProvider = credentialsProvider,
+                config = eventsConfig,
+                context = app,
+                coroutineScope = scope
+            )
+
+            tidalPlayer = Player(
+                application = app,
+                credentialsProvider = credentialsProvider,
+                eventSender = eventProducer.eventSender,
+                isDebuggable = true
+            )
+
+            Log.i("TidalPlayerManager", "TIDAL Official Player SDK initialized successfully")
         } catch (e: Exception) {
-            Log.e("TidalPlayerManager", "Exception initializing ExoPlayer: ${e.message}", e)
+            Log.e("TidalPlayerManager", "Failed to initialize TIDAL Player: ${e.message}", e)
+            tidalPlayer = null
         }
     }
 
-    fun playTrack(trackId: String, streamUrl: String = "", manifest: String = "", mimeType: String = "") {
+    /**
+     * TIDAL 공식 Player SDK로 Track 재생
+     */
+    fun playTrack(trackId: String) {
+        if (trackId.isEmpty()) {
+            Log.e("TidalPlayerManager", "playTrack: trackId is empty")
+            return
+        }
+
+        val player = tidalPlayer
+        if (player == null) {
+            Log.e("TidalPlayerManager", "playTrack: TIDAL Player is not initialized")
+            return
+        }
+
         try {
-            initializePlayer()
-            stop()
+            Log.i("TidalPlayerManager", "Loading TIDAL track: $trackId")
 
-            val fixedUrl = streamUrl.replace("&amp;", "&")
+            val mediaProduct = MediaProduct(
+                productType = ProductType.TRACK,
+                productId = trackId
+            )
 
-            // 1. MPEG-DASH MPD Manifest 스트리밍 (TIDAL Full-Track 표준)
-            if (manifest.isNotEmpty() && (mimeType.contains("dash") || manifest.contains("<MPD"))) {
-                val cleanManifest = manifest.replace("&amp;", "&")
-                val mpdFile = File(context.cacheDir, "track_${trackId}.mpd")
-                mpdFile.writeText(cleanManifest)
-                Log.i("TidalPlayerManager", "Playing MPEG-DASH manifest for track $trackId (${mpdFile.length()} bytes)")
+            player.playbackEngine.load(mediaProduct)
+            Log.i("TidalPlayerManager", "MediaProduct loaded: $trackId")
 
-                val mediaItem = MediaItem.Builder()
-                    .setUri(Uri.fromFile(mpdFile))
-                    .setMimeType(MimeTypes.APPLICATION_MPD)
-                    .build()
-
-                exoPlayer?.setMediaItem(mediaItem)
-                exoPlayer?.prepare()
-                exoPlayer?.play()
-                isCurrentlyPlaying = true
-                Log.i("TidalPlayerManager", "ExoPlayer started DASH playback for track $trackId")
-                return
-            }
-
-            // 2. 직접 음원 스트림 URL (FLAC / AAC / Preview)
-            if (fixedUrl.isNotEmpty()) {
-                Log.i("TidalPlayerManager", "Playing direct audio stream: $fixedUrl")
-                val mediaItem = MediaItem.fromUri(Uri.parse(fixedUrl))
-                exoPlayer?.setMediaItem(mediaItem)
-                exoPlayer?.prepare()
-                exoPlayer?.play()
-                isCurrentlyPlaying = true
-                Log.i("TidalPlayerManager", "ExoPlayer started direct playback for track $trackId")
-                return
-            }
-
-            Log.w("TidalPlayerManager", "playTrack invoked without streamUrl or manifest for trackId: $trackId")
+            player.playbackEngine.play()
+            isCurrentlyPlaying = true
+            Log.i("TidalPlayerManager", "TIDAL playback started: $trackId")
         } catch (e: Exception) {
-            Log.e("TidalPlayerManager", "Exception starting ExoPlayer playback: ${e.message}", e)
+            isCurrentlyPlaying = false
+            Log.e("TidalPlayerManager", "Failed to play TIDAL track $trackId: ${e.message}", e)
         }
     }
 
     fun pause() {
         try {
-            exoPlayer?.pause()
+            tidalPlayer?.playbackEngine?.pause()
             isCurrentlyPlaying = false
+            Log.i("TidalPlayerManager", "Playback paused")
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("TidalPlayerManager", "Failed to pause playback", e)
         }
     }
 
     fun resume() {
         try {
-            exoPlayer?.play()
+            val player = tidalPlayer
+            if (player == null) {
+                Log.e("TidalPlayerManager", "resume: Player is not initialized")
+                return
+            }
+
+            player.playbackEngine.play()
             isCurrentlyPlaying = true
+            Log.i("TidalPlayerManager", "Playback resumed")
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("TidalPlayerManager", "Failed to resume playback", e)
         }
     }
 
     fun seekTo(msec: Int) {
         try {
-            exoPlayer?.seekTo(msec.toLong())
+            tidalPlayer?.playbackEngine?.seek(msec / 1000f)
+            Log.i("TidalPlayerManager", "Seek: ${msec}ms")
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("TidalPlayerManager", "Failed to seek", e)
         }
     }
 
     fun stop() {
         try {
-            exoPlayer?.stop()
+            tidalPlayer?.playbackEngine?.reset()
             isCurrentlyPlaying = false
+            Log.i("TidalPlayerManager", "Playback stopped")
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("TidalPlayerManager", "Failed to stop playback", e)
         }
     }
 
     fun release() {
-        stop()
-        exoPlayer?.release()
-        exoPlayer = null
+        try {
+            tidalPlayer?.release()
+            tidalPlayer = null
+            isCurrentlyPlaying = false
+            Log.i("TidalPlayerManager", "TIDAL Player released")
+        } catch (e: Exception) {
+            Log.e("TidalPlayerManager", "Failed to release TIDAL Player", e)
+        }
     }
 }

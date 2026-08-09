@@ -5,7 +5,7 @@ import '../../core/utils/app_logger.dart';
 class TidalSdkNativeBridge {
   static const MethodChannel _channel = MethodChannel('com.example.tidal_connect_lite/tidal_sdk');
 
-  /// Initializes native Tidal SDK Authentication
+  /// Initializes native Tidal SDK Authentication and Player
   static Future<bool> initTidalAuth({
     required String clientId,
     required String clientSecret,
@@ -37,25 +37,19 @@ class TidalSdkNativeBridge {
     }
   }
 
-  /// Triggers playback via native ExoPlayer (MPEG-DASH / Direct Stream)
+  /// Triggers playback via official TIDAL SDK Player (playbackEngine)
   static Future<bool> playTrack({
     required String trackId,
-    String streamUrl = '',
-    String manifest = '',
-    String mimeType = '',
   }) async {
     try {
-      AppLogger.log('TIDAL_NATIVE_SDK', '스마트폰 ExoPlayer 오디오 재생 명령 (trackId: $trackId, manifestLen: ${manifest.length})', type: LogType.info);
+      AppLogger.log('TIDAL_NATIVE_SDK', 'TIDAL 공식 Player SDK 재생 명령 (trackId: $trackId)', type: LogType.info);
       final result = await _channel.invokeMethod<Map>('playTrack', {
         'trackId': trackId,
-        'streamUrl': streamUrl,
-        'manifest': manifest,
-        'mimeType': mimeType,
       });
-      AppLogger.log('TIDAL_NATIVE_SDK', '스마트폰 ExoPlayer 재생 응답: $result', type: LogType.success);
+      AppLogger.log('TIDAL_NATIVE_SDK', 'TIDAL 공식 Player SDK 재생 응답: $result', type: LogType.success);
       return true;
     } catch (e) {
-      AppLogger.log('TIDAL_NATIVE_SDK', '스마트폰 ExoPlayer 재생 실패: $e', type: LogType.error);
+      AppLogger.log('TIDAL_NATIVE_SDK', 'TIDAL 공식 Player SDK 재생 실패: $e', type: LogType.error);
       return false;
     }
   }

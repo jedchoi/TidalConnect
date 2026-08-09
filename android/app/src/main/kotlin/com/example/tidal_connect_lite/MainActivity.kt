@@ -1,5 +1,6 @@
 package com.example.tidal_connect_lite
 
+import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -15,8 +16,6 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         authManager = TidalAuthManager(applicationContext)
-        playerManager = TidalPlayerManager(applicationContext, null)
-        playerManager?.initializePlayer()
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
@@ -26,7 +25,10 @@ class MainActivity : FlutterActivity() {
                     val isInitialized = authManager.initializeAuth(clientId, clientSecret)
                     
                     if (isInitialized && authManager.credentialsProvider != null) {
-                        playerManager = TidalPlayerManager(applicationContext, authManager.credentialsProvider)
+                        if (playerManager == null) {
+                            playerManager = TidalPlayerManager(applicationContext, authManager.credentialsProvider)
+                        }
+                        Log.i("TIDAL_NATIVE_SDK", "initializePlayer() called")
                         playerManager?.initializePlayer()
                     }
 
@@ -44,11 +46,8 @@ class MainActivity : FlutterActivity() {
                 }
                 "playTrack" -> {
                     val trackId = call.argument<String>("trackId") ?: ""
-                    val streamUrl = call.argument<String>("streamUrl") ?: ""
-                    val manifest = call.argument<String>("manifest") ?: ""
-                    val mimeType = call.argument<String>("mimeType") ?: ""
-                    playerManager?.playTrack(trackId, streamUrl, manifest, mimeType)
-                    result.success(mapOf("status" to "playing", "trackId" to trackId, "streamUrl" to streamUrl))
+                    playerManager?.playTrack(trackId)
+                    result.success(mapOf("status" to "playing", "trackId" to trackId))
                 }
                 "pauseTrack" -> {
                     playerManager?.pause()
