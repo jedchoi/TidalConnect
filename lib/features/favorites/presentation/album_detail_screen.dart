@@ -75,7 +75,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         backgroundColor: AppColors.surfaceCard,
         elevation: 0,
       ),
-      bottomNavigationBar: const MiniPlayerWidget(autoStartDiscovery: false),
+      bottomNavigationBar: const MiniPlayerWidget(autoStartDiscovery: false, useSafeArea: true),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.cyanAccent))
           : CustomScrollView(
