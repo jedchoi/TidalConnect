@@ -36,10 +36,25 @@ class _MainScreenState extends State<MainScreen> {
 
     // 물리 볼륨 키 -> 폰 재생이면 폰 볼륨, 스피커 재생이면 스피커 볼륨을 한 단계씩 조절
     _volumeService.listenPhysicalVolumeKeys(PlayerManager.instance.onPhoneVolumeChanged);
+
+    PlayerManager.instance.errorNotifier.addListener(_showPlayerError);
+  }
+
+  void _showPlayerError() {
+    final error = PlayerManager.instance.errorNotifier.value;
+    if (error == null || !mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(error.message),
+        backgroundColor: Colors.redAccent,
+        duration: const Duration(seconds: 4),
+      ));
   }
 
   @override
   void dispose() {
+    PlayerManager.instance.errorNotifier.removeListener(_showPlayerError);
     _volumeService.dispose();
     super.dispose();
   }

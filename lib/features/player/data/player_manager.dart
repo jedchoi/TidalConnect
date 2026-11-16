@@ -15,6 +15,13 @@ import 'backends/playback_backend.dart';
 
 export '../domain/play_queue.dart' show PlaybackRepeatMode;
 
+/// 화면에 보여줄 재생 오류. 같은 문구가 반복되어도 매번 알리도록 순번을 둔다.
+class PlayerError {
+  final int id;
+  final String message;
+  const PlayerError(this.id, this.message);
+}
+
 /// 재생 상태의 단일 출처.
 ///
 /// 화면은 아래 notifier만 구독한다. 재생 상태·위치·곡 종료는 출력 기기(백엔드)가 보낸 이벤트로만 갱신하며,
@@ -51,6 +58,10 @@ class PlayerManager {
 
   /// 통합 볼륨 (0~100)
   final ValueNotifier<int> volumeNotifier = ValueNotifier(50);
+
+  /// 가장 최근 재생 오류. 메인 화면이 구독해 스낵바로 보여준다.
+  final ValueNotifier<PlayerError?> errorNotifier = ValueNotifier(null);
+  int _errorSeq = 0;
 
   /// 가장 최근 재생 요청의 순번. 오래된 요청의 비동기 결과를 버리는 데 쓴다.
   int _requestSeq = 0;
@@ -104,9 +115,10 @@ class PlayerManager {
       case BackendTrackEnded(:final trackId):
         if (trackId.isEmpty || trackId == currentTrack?.id) _onTrackEnded();
       case BackendError(:final code, :final message):
-        AppLogger.log('PLAYER', '출력 기기 오류 [$code]: $message', type: LogType.error);
+        AppLogger.log('PLAYER', '출력 기기 오류 [$code]', type: LogType.error);
         isPlayingNotifier.value = false;
         isBufferingNotifier.value = false;
+        _reportError(message);
     }
   }
 
@@ -197,6 +209,7 @@ class PlayerManager {
 
   void _reportError(String message) {
     AppLogger.log('PLAYER', message, type: LogType.error);
+    errorNotifier.value = PlayerError(++_errorSeq, message);
   }
 
   /// 유사곡을 대기열 끝에 붙인다. 붙인 곡 수를 돌려준다.
