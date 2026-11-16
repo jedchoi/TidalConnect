@@ -16,7 +16,8 @@ step "flutter analyze"
 flutter analyze --fatal-infos
 
 step "flutter test"
-flutter test
+# CI에서도 로컬과 같은 형식(실패 시 [E] 표시)으로 출력해 로그를 읽기 쉽게 한다.
+flutter test --reporter expanded
 
 if [[ "${1:-}" != "--skip-android" ]]; then
   step "Kotlin 단위 테스트 (android:testDebugUnitTest)"

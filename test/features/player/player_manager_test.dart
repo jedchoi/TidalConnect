@@ -155,7 +155,11 @@ void main() {
     phone.controller.add(const BackendStateChanged(playing: true));
 
     phone.controller.add(const BackendTrackEnded('9'));
-    await Future<void>.delayed(const Duration(milliseconds: 10));
+    // 유사곡 조회(토큰 발급 → API 요청)가 실패로 끝나야 정지 상태가 된다. 걸리는 시간이 환경마다
+    // 달라(CI 리눅스가 더 느림) 고정 대기 대신 최대 2초까지 상태가 바뀌기를 기다린다.
+    for (var i = 0; i < 200 && player.isPlaying; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
 
     expect(player.isPlaying, isFalse);
   });
