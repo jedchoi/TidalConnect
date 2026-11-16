@@ -51,7 +51,11 @@ class PlayerManager {
   final ValueNotifier<bool> isBufferingNotifier = ValueNotifier(false);
   final ValueNotifier<int> progressSecondsNotifier = ValueNotifier(0);
   final ValueNotifier<int> durationSecondsNotifier = ValueNotifier(0);
+  /// 실제 재생 중인 스트림의 음질 설명. 모르면 빈 문자열.
   final ValueNotifier<String> qualityBadgeNotifier = ValueNotifier('');
+
+  /// 실제 스트림이 Hi-Res(24-bit)인지. 배지 강조에 쓴다.
+  final ValueNotifier<bool> isHiResNotifier = ValueNotifier(false);
   final ValueNotifier<bool> isShuffleNotifier = ValueNotifier(false);
   final ValueNotifier<PlaybackRepeatMode> repeatModeNotifier = ValueNotifier(PlaybackRepeatMode.off);
   final ValueNotifier<bool> canSeekNotifier = ValueNotifier(true);
@@ -205,7 +209,9 @@ class PlayerManager {
     durationSecondsNotifier.value = track.durationSeconds;
     isPlayingNotifier.value = true;
     isBufferingNotifier.value = true;
-    _updateQualityBadge(StreamQuality(audioQuality: track.audioQuality));
+    // 실제 스트림 음질은 출력 기기가 재생을 시작하며 알려준다. 그 전까지는 비워 둔다.
+    qualityBadgeNotifier.value = '';
+    isHiResNotifier.value = false;
 
     AppLogger.log('PLAYER', '재생 요청: "${track.title}" - ${track.artistName} (${track.id})', type: LogType.info);
     if (!_notificationPermissionAsked) {
@@ -352,19 +358,10 @@ class PlayerManager {
     queueIndexNotifier.value = _queue.index;
   }
 
+  /// 출력 기기가 알려준 실제 스트림 음질로 배지를 만든다.
   void _updateQualityBadge(StreamQuality quality) {
-    final q = quality.audioQuality.toUpperCase();
-    if (q.contains('HI_RES') || q.contains('HIRES') || q.contains('MAX')) {
-      qualityBadgeNotifier.value = 'MAX';
-    } else if (q.contains('LOSSLESS')) {
-      qualityBadgeNotifier.value = 'FLAC';
-    } else if (q.contains('HIGH')) {
-      qualityBadgeNotifier.value = 'AAC 320kbps';
-    } else if (q.contains('LOW')) {
-      qualityBadgeNotifier.value = 'AAC 96kbps';
-    } else {
-      qualityBadgeNotifier.value = '';
-    }
+    qualityBadgeNotifier.value = quality.label;
+    isHiResNotifier.value = quality.isHiRes;
   }
 
   // ──────────────────────────────────────────────

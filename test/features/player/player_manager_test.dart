@@ -69,6 +69,18 @@ void main() {
     player = PlayerManager.forTesting()..configure(authRepository: auth, phone: phone, dlna: dlna);
   });
 
+  test('음질 배지는 출력 기기가 알려준 실제 스트림 값으로 바뀐다', () async {
+    await player.playTrack(t('1'), queue: [t('1')], index: 0);
+    expect(player.qualityBadgeNotifier.value, '');
+
+    phone.controller.add(const BackendTrackStarted(
+      '1',
+      quality: StreamQuality(audioQuality: 'HI_RES_LOSSLESS', bitDepth: 24, sampleRate: 192000),
+    ));
+    expect(player.qualityBadgeNotifier.value, 'Hi-Res FLAC · 24-bit / 192kHz');
+    expect(player.isHiResNotifier.value, isTrue);
+  });
+
   test('음질 설정은 폰과 스피커 출력 모두에 전달된다', () async {
     await player.setAudioQuality('HI_RES_LOSSLESS');
     expect(phone.quality, 'HI_RES_LOSSLESS');

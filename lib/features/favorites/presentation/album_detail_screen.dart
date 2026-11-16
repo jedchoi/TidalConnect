@@ -134,16 +134,21 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppColors.surfaceLight,
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: AppColors.cyanAccent.withValues(alpha: 0.5)),
+                            if (widget.album.qualityLabel.isNotEmpty) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceLight,
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: AppColors.cyanAccent.withValues(alpha: 0.5)),
+                                ),
+                                child: Text(
+                                  widget.album.qualityLabel,
+                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.cyanAccent),
+                                ),
                               ),
-                              child: const Text('MASTER • Hi-Res', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.cyanAccent)),
-                            ),
-                            const SizedBox(width: 8),
+                              const SizedBox(width: 8),
+                            ],
                             Text(
                               '총 ${_pager.totalCount}곡',
                               style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),

@@ -133,7 +133,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                         ValueListenableBuilder<String>(
                           valueListenable: _playerManager.qualityBadgeNotifier,
                           builder: (context, badge, _) {
-                            final isMax = badge.contains('MAX') || badge.contains('24-bit');
+                            if (badge.isEmpty) return const SizedBox.shrink();
+                            final isMax = _playerManager.isHiResNotifier.value;
                             return Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(

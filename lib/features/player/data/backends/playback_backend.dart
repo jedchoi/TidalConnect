@@ -54,6 +54,22 @@ class StreamQuality {
     this.codec,
     this.preview = false,
   });
+
+  /// 화면에 보여줄 음질 설명. 예: "Hi-Res FLAC · 24-bit / 96kHz", "AAC 320kbps", "FLAC · 미리 듣기".
+  String get label {
+    final parts = <String>[];
+    final name = audioQualityLabel(audioQuality);
+    if (name.isNotEmpty) parts.add(name);
+    final rate = sampleRate;
+    if (bitDepth != null && rate != null && rate > 0) {
+      final khz = rate % 1000 == 0 ? '${rate ~/ 1000}' : (rate / 1000).toStringAsFixed(1);
+      parts.add('$bitDepth-bit / ${khz}kHz');
+    }
+    if (preview) parts.add('미리 듣기');
+    return parts.join(' · ');
+  }
+
+  bool get isHiRes => audioQuality.toUpperCase().contains('HI_RES') || (bitDepth ?? 0) >= 24;
 }
 
 /// 재생을 시작하는 동안 더 새로운 재생 요청이 들어왔는지 알려주는 함수.

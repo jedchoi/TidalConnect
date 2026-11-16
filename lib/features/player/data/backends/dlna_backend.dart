@@ -119,7 +119,7 @@ class DlnaBackend implements PlaybackBackend {
     _events.add(BackendTrackStarted(
       track.id,
       duration: track.durationSeconds > 0 ? Duration(seconds: track.durationSeconds) : null,
-      quality: StreamQuality(audioQuality: info.audioQuality),
+      quality: StreamQuality(audioQuality: info.audioQuality, bitDepth: info.bitDepth, sampleRate: info.sampleRate),
     ));
 
     AppLogger.log('DLNA_BACKEND', '스피커 재생 요청: "${device.friendlyName}"', type: LogType.network);

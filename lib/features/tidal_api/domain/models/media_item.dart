@@ -67,46 +67,7 @@ class MediaTrack {
 
     final duration = (json['duration'] as num?)?.toInt() ?? 0;
     
-    // Quality tag resolution (TIDAL API는 Hi-Res 24-bit 음원이어도 기본 audioQuality 필드에는 LOSSLESS로 오므로 tags 및 audioModes 우선 분석)
-    String quality = '';
-    
-    // 1. mediaMetadata.tags 분석 (가장 신뢰성 높음: HIRES_LOSSLESS, LOSSLESS, DOLBY_ATMOS)
-    if (json['mediaMetadata'] is Map && json['mediaMetadata']['tags'] is List) {
-      final tags = (json['mediaMetadata']['tags'] as List).map((e) => e.toString().toUpperCase()).toList();
-      if (tags.any((t) => t.contains('HIRES') || t.contains('HI_RES') || t.contains('MQA'))) {
-        quality = 'HI_RES_LOSSLESS';
-      } else if (tags.any((t) => t.contains('DOLBY') || t.contains('ATMOS'))) {
-        quality = 'DOLBY_ATMOS';
-      } else if (tags.contains('LOSSLESS')) {
-        quality = 'LOSSLESS';
-      }
-    }
-
-    // 2. audioModes 분석 (예: ["STEREO", "HIRES_LOSSLESS"])
-    if (quality.isEmpty && json['audioModes'] != null) {
-      final modesStr = json['audioModes'].toString().toUpperCase();
-      if (modesStr.contains('HIRES') || modesStr.contains('HI_RES')) {
-        quality = 'HI_RES_LOSSLESS';
-      } else if (modesStr.contains('DOLBY') || modesStr.contains('ATMOS')) {
-        quality = 'DOLBY_ATMOS';
-      }
-    }
-
-    // 3. audioQuality 필드 분석 (LOSSLESS, HIGH, LOW)
-    if (quality.isEmpty) {
-      final aq = (json['audioQuality'] ?? '').toString().toUpperCase();
-      if (aq.contains('HI_RES') || aq.contains('HIRES') || aq.contains('MAX')) {
-        quality = 'HI_RES_LOSSLESS';
-      } else if (aq.contains('LOSSLESS') || aq.contains('FLAC')) {
-        quality = 'LOSSLESS';
-      } else if (aq.contains('HIGH')) {
-        quality = 'HIGH';
-      } else if (aq.contains('LOW')) {
-        quality = 'LOW';
-      } else {
-        quality = 'LOSSLESS';
-      }
-    }
+    final quality = resolveAudioQuality(json);
 
     return MediaTrack(
       id: id,
@@ -139,13 +100,20 @@ class MediaAlbum {
   final String coverUrl;
   final int numberOfTracks;
 
+  /// 앨범의 최고 음질(resolveAudioQuality 값). 모르면 빈 문자열.
+  final String audioQuality;
+
   MediaAlbum({
     required this.id,
     required this.title,
     required this.artistName,
     required this.coverUrl,
     required this.numberOfTracks,
+    this.audioQuality = '',
   });
+
+  /// 앨범 화면에 보여줄 음질 이름. 모르면 빈 문자열.
+  String get qualityLabel => audioQualityLabel(audioQuality);
 
   factory MediaAlbum.fromJson(Map<String, dynamic> rawJson) {
     final json = (rawJson['item'] is Map<String, dynamic>)
@@ -183,6 +151,9 @@ class MediaAlbum {
       artistName: artist,
       coverUrl: coverPath,
       numberOfTracks: numberOfTracks,
+      audioQuality: json.containsKey('audioQuality') || json.containsKey('mediaMetadata') || json.containsKey('audioModes')
+          ? resolveAudioQuality(json)
+          : '',
     );
   }
 }
@@ -228,6 +199,9 @@ class MediaPlaylist {
       description: description,
       coverUrl: coverPath,
       numberOfTracks: numberOfTracks,
+      audioQuality: json.containsKey('audioQuality') || json.containsKey('mediaMetadata') || json.containsKey('audioModes')
+          ? resolveAudioQuality(json)
+          : '',
     );
   }
 }
@@ -252,4 +226,62 @@ class MediaArtist {
       pictureUrl: picPath,
     );
   }
+}
+
+/// 응답의 음질 정보를 하나의 값(HI_RES_LOSSLESS, DOLBY_ATMOS, LOSSLESS, HIGH, LOW)으로 정한다.
+///
+/// TIDAL API는 Hi-Res 음원이어도 audioQuality 필드에 LOSSLESS를 주는 경우가 있어
+/// mediaMetadata.tags, audioModes, audioQuality 순으로 본다.
+String resolveAudioQuality(Map<String, dynamic> json) {
+  String quality = '';
+  
+  // 1. mediaMetadata.tags 분석 (가장 신뢰성 높음: HIRES_LOSSLESS, LOSSLESS, DOLBY_ATMOS)
+  if (json['mediaMetadata'] is Map && json['mediaMetadata']['tags'] is List) {
+    final tags = (json['mediaMetadata']['tags'] as List).map((e) => e.toString().toUpperCase()).toList();
+    if (tags.any((t) => t.contains('HIRES') || t.contains('HI_RES') || t.contains('MQA'))) {
+      quality = 'HI_RES_LOSSLESS';
+    } else if (tags.any((t) => t.contains('DOLBY') || t.contains('ATMOS'))) {
+      quality = 'DOLBY_ATMOS';
+    } else if (tags.contains('LOSSLESS')) {
+      quality = 'LOSSLESS';
+    }
+  }
+
+  // 2. audioModes 분석 (예: ["STEREO", "HIRES_LOSSLESS"])
+  if (quality.isEmpty && json['audioModes'] != null) {
+    final modesStr = json['audioModes'].toString().toUpperCase();
+    if (modesStr.contains('HIRES') || modesStr.contains('HI_RES')) {
+      quality = 'HI_RES_LOSSLESS';
+    } else if (modesStr.contains('DOLBY') || modesStr.contains('ATMOS')) {
+      quality = 'DOLBY_ATMOS';
+    }
+  }
+
+  // 3. audioQuality 필드 분석 (LOSSLESS, HIGH, LOW)
+  if (quality.isEmpty) {
+    final aq = (json['audioQuality'] ?? '').toString().toUpperCase();
+    if (aq.contains('HI_RES') || aq.contains('HIRES') || aq.contains('MAX')) {
+      quality = 'HI_RES_LOSSLESS';
+    } else if (aq.contains('LOSSLESS') || aq.contains('FLAC')) {
+      quality = 'LOSSLESS';
+    } else if (aq.contains('HIGH')) {
+      quality = 'HIGH';
+    } else if (aq.contains('LOW')) {
+      quality = 'LOW';
+    } else {
+      quality = 'LOSSLESS';
+    }
+  }
+  return quality;
+}
+
+/// 음질 값을 사람이 읽는 이름으로 바꾼다.
+String audioQualityLabel(String quality) {
+  final q = quality.toUpperCase();
+  if (q.contains('HI_RES') || q.contains('HIRES')) return 'Hi-Res FLAC';
+  if (q.contains('DOLBY') || q.contains('ATMOS')) return 'Dolby Atmos';
+  if (q.contains('LOSSLESS')) return 'FLAC';
+  if (q.contains('HIGH')) return 'AAC 320kbps';
+  if (q.contains('LOW')) return 'AAC 96kbps';
+  return '';
 }
