@@ -7,6 +7,7 @@ import okhttp3.Request
 import java.io.InputStream
 import java.io.SequenceInputStream
 import java.net.NetworkInterface
+import java.security.SecureRandom
 import java.util.Collections
 import java.util.Enumeration
 import java.util.concurrent.ConcurrentHashMap
@@ -51,16 +52,6 @@ class TidalStreamProxyServer : NanoHTTPD(PROXY_PORT) {
             }
             return "127.0.0.1"
         }
-
-        /**
-         * 50자 이내의 짧고 표준적인 DLNA 전용 미디어 URL을 생성합니다.
-         * 예: http://192.168.45.63:8765/audio/189569817.mp4
-         */
-        fun buildShortAudioUrl(trackId: String): String {
-            val lanIp = getLanIpAddress()
-            val cleanId = trackId.ifEmpty { "current" }
-            return "http://$lanIp:$PROXY_PORT/audio/$cleanId.mp4"
-        }
     }
 
     private val httpClient = OkHttpClient.Builder()
@@ -69,18 +60,32 @@ class TidalStreamProxyServer : NanoHTTPD(PROXY_PORT) {
         .writeTimeout(20, TimeUnit.SECONDS)
         .build()
 
-    // 트랙별 스트림 정보 캐시 (trackId -> Direct URL or Manifest)
-    data class StreamInfo(val directUrl: String = "", val manifestXml: String = "")
+    /** 등록된 곡 하나. 토큰은 곡마다 새로 만드는 추측 불가능한 경로 조각이다. */
+    data class StreamInfo(
+        val trackId: String,
+        val directUrl: String = "",
+        val manifestXml: String = "",
+    )
+
+    // 토큰 -> 곡 정보
     private val streamRegistry = ConcurrentHashMap<String, StreamInfo>()
+    private val secureRandom = SecureRandom()
 
-    @Volatile
-    private var lastTrackId: String = "current"
+    /**
+     * 곡을 등록하고 스피커가 접근할 주소를 돌려준다.
+     * 예: http://192.168.0.10:8765/audio/3f9c0a1b2d4e5f60.mp4
+     */
+    fun registerTrackStream(trackId: String, directUrl: String, manifestXml: String = ""): String {
+        val token = newToken()
+        streamRegistry[token] = StreamInfo(trackId, directUrl, manifestXml)
+        Log.i(TAG, "트랙 스트림 등록: TrackID=$trackId, direct=${directUrl.isNotEmpty()}, manifestLen=${manifestXml.length}")
+        return "http://${getLanIpAddress()}:$PROXY_PORT/audio/$token.mp4"
+    }
 
-    fun registerTrackStream(trackId: String, directUrl: String, manifestXml: String = "") {
-        val id = trackId.ifEmpty { "current" }
-        lastTrackId = id
-        streamRegistry[id] = StreamInfo(directUrl, manifestXml)
-        Log.i(TAG, "🎵 트랙 스트림 등록 완료: ID=$id, directUrl=${directUrl.take(40)}..., manifestLen=${manifestXml.length}")
+    private fun newToken(): String {
+        val bytes = ByteArray(8)
+        secureRandom.nextBytes(bytes)
+        return bytes.joinToString("") { "%02x".format(it) }
     }
 
     override fun serve(session: IHTTPSession): Response {
@@ -97,16 +102,17 @@ class TidalStreamProxyServer : NanoHTTPD(PROXY_PORT) {
     }
 
     /**
-     * 표준 DLNA 엔드포인트: /audio/<trackId>.mp4
+     * DLNA 엔드포인트: /audio/<토큰>.<확장자>
      */
     private fun handleAudioRequest(session: IHTTPSession, uri: String): Response {
-        val trackId = uri.removePrefix("/audio/").removeSuffix(".mp4").ifEmpty { lastTrackId }
-        val info = streamRegistry[trackId] ?: streamRegistry[lastTrackId]
+        val token = uri.removePrefix("/audio/").substringBefore('.')
+        val info = streamRegistry[token]
 
         if (info == null || (info.directUrl.isEmpty() && info.manifestXml.isEmpty())) {
-            Log.e(TAG, "등록된 트랙 음원 정보 없음: ID=$trackId")
-            return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Track media not ready")
+            Log.w(TAG, "등록되지 않은 경로 요청 거부")
+            return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Not Found")
         }
+        val trackId = info.trackId
 
         return if (info.directUrl.isNotEmpty()) {
             Log.i(TAG, "🚀 Direct CDN 스트림 중계 시작: TrackID=$trackId")

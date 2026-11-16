@@ -127,10 +127,9 @@ class MainActivity : FlutterActivity() {
                     val directUrl = call.argument<String>("directUrl") ?: ""
                     val manifestXml = call.argument<String>("manifestXml") ?: ""
 
-                    proxyServer?.registerTrackStream(trackId, directUrl, manifestXml)
-                    val shortUrl = TidalStreamProxyServer.buildShortAudioUrl(trackId)
+                    val shortUrl = proxyServer?.registerTrackStream(trackId, directUrl, manifestXml) ?: ""
                     TidalPlaybackService.startService(applicationContext, "DLNA 스트리밍", "Track ID: $trackId")
-                    Log.i("PROXY", "✅ registerTrackStream: TrackID=$trackId → Short URL: $shortUrl")
+                    Log.i("PROXY", "registerTrackStream: TrackID=$trackId")
                     result.success(mapOf("proxyUrl" to shortUrl))
                 }
                 "getProxyServerStatus" -> {
