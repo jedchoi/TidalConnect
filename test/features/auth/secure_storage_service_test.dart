@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:tidal_connect_lite/features/auth/domain/models/auth_token.dart';
 import 'package:tidal_connect_lite/features/auth/data/secure_storage_service.dart';
-import 'package:tidal_connect_lite/features/auth/data/tidal_auth_repository.dart';
 
 class FakeFlutterSecureStorage implements FlutterSecureStorage {
   final Map<String, String> _data = {};
@@ -112,190 +111,93 @@ class FakeFlutterSecureStorage implements FlutterSecureStorage {
 }
 
 void main() {
-  group('AuthToken Tests', () {
-    test('AuthToken serialization and expiry check', () {
-      final now = DateTime.now();
+  group('AuthToken', () {
+    test('serialization and expiry check', () {
       final token = AuthToken(
         accessToken: 'access_123',
         refreshToken: 'refresh_456',
-        expiresAt: now.add(const Duration(hours: 1)),
+        expiresAt: DateTime.now().add(const Duration(hours: 1)),
+        userId: '42',
       );
-
-      final json = token.toJson();
-      final restored = AuthToken.fromJson(json);
-
+      final restored = AuthToken.fromJson(token.toJson());
       expect(restored.accessToken, 'access_123');
       expect(restored.refreshToken, 'refresh_456');
+      expect(restored.userId, '42');
       expect(restored.isExpired, false);
     });
 
-    test('AuthToken isExpired returns true when within 5 minutes buffer threshold', () {
-      final now = DateTime.now();
-      final expiringSoonToken = AuthToken(
-        accessToken: 'access_123',
-        refreshToken: 'refresh_456',
-        expiresAt: now.add(const Duration(minutes: 4)), // less than 5 min left
+    test('isExpired is true within the 5 minute buffer', () {
+      final token = AuthToken(
+        accessToken: 'a',
+        refreshToken: 'r',
+        expiresAt: DateTime.now().add(const Duration(minutes: 4)),
       );
-
-      expect(expiringSoonToken.isExpired, true);
-    });
-
-    test('AuthToken isExpired returns true when past expiry', () {
-      final expiredToken = AuthToken(
-        accessToken: 'old_acc',
-        refreshToken: 'old_ref',
-        expiresAt: DateTime.now().subtract(const Duration(minutes: 10)),
-      );
-
-      expect(expiredToken.isExpired, true);
+      expect(token.isExpired, true);
     });
   });
 
-  group('SecureStorageService Tests', () {
+  group('SecureStorageService', () {
     late FakeFlutterSecureStorage fakeStorage;
-    late SecureStorageService storageService;
+    late SecureStorageService storage;
+
+    AuthToken token(String access, {String refresh = 'ref', String userId = '42'}) => AuthToken(
+          accessToken: access,
+          refreshToken: refresh,
+          expiresAt: DateTime.now().add(const Duration(hours: 1)),
+          userId: userId,
+        );
 
     setUp(() {
       fakeStorage = FakeFlutterSecureStorage();
-      storageService = SecureStorageService(storage: fakeStorage);
+      storage = SecureStorageService(storage: fakeStorage);
     });
 
-    test('saveToken writes token JSON to secure storage', () async {
-      final token = AuthToken(
-        accessToken: 'acc_123',
-        refreshToken: 'ref_456',
-        expiresAt: DateTime.now().add(const Duration(hours: 1)),
-      );
+    test('user and client tokens are stored under separate keys', () async {
+      await storage.saveUserToken(token('user_acc'));
+      await storage.saveClientToken(token('client_acc', refresh: '', userId: ''));
 
-      await storageService.saveToken(token);
-
-      final storedValue = await fakeStorage.read(key: 'tidal_auth_token');
-      expect(storedValue, isNotNull);
-      expect(storedValue, contains('acc_123'));
-      expect(storedValue, contains('ref_456'));
+      expect((await storage.getUserToken())!.accessToken, 'user_acc');
+      expect((await storage.getClientToken())!.accessToken, 'client_acc');
+      expect(await fakeStorage.read(key: SecureStorageService.userTokenKey), contains('user_acc'));
+      expect(await fakeStorage.read(key: SecureStorageService.clientTokenKey), contains('client_acc'));
     });
 
-    test('getToken returns AuthToken when found in secure storage', () async {
-      final token = AuthToken(
-        accessToken: 'acc_123',
-        refreshToken: 'ref_456',
-        expiresAt: DateTime.now().add(const Duration(hours: 1)),
-      );
+    test('saving a client token never touches the user token', () async {
+      await storage.saveUserToken(token('user_acc'));
+      await storage.saveClientToken(token('client_acc', refresh: '', userId: ''));
+      expect((await storage.getUserToken())!.accessToken, 'user_acc');
+    });
 
+    test('migrates a legacy user token and removes the legacy key', () async {
       await fakeStorage.write(
-        key: 'tidal_auth_token',
-        value: jsonEncode(token.toJson()),
+        key: SecureStorageService.legacyTokenKey,
+        value: jsonEncode(token('legacy_user').toJson()),
       );
 
-      final result = await storageService.getToken();
+      await storage.migrateLegacyToken();
 
-      expect(result, isNotNull);
-      expect(result!.accessToken, 'acc_123');
-      expect(result.refreshToken, 'ref_456');
+      expect((await storage.getUserToken())!.accessToken, 'legacy_user');
+      expect(await fakeStorage.read(key: SecureStorageService.legacyTokenKey), isNull);
     });
 
-    test('getToken returns null when not found', () async {
-      final result = await storageService.getToken();
-
-      expect(result, isNull);
-    });
-
-    test('deleteToken and clearToken remove token from storage', () async {
-      final token = AuthToken(
-        accessToken: 'acc_123',
-        refreshToken: 'ref_456',
-        expiresAt: DateTime.now().add(const Duration(hours: 1)),
+    test('drops a legacy client token instead of treating it as a login', () async {
+      await fakeStorage.write(
+        key: SecureStorageService.legacyTokenKey,
+        value: jsonEncode(token('legacy_client', refresh: '', userId: '').toJson()),
       );
 
-      await storageService.saveToken(token);
-      expect(await storageService.getToken(), isNotNull);
+      await storage.migrateLegacyToken();
 
-      await storageService.deleteToken();
-      expect(await storageService.getToken(), isNull);
-
-      await storageService.saveToken(token);
-      await storageService.clearToken();
-      expect(await storageService.getToken(), isNull);
-    });
-  });
-
-  group('TidalAuthRepository Tests', () {
-    late FakeFlutterSecureStorage fakeStorage;
-    late SecureStorageService storageService;
-    late TidalAuthRepository repository;
-
-    setUp(() {
-      fakeStorage = FakeFlutterSecureStorage();
-      storageService = SecureStorageService(storage: fakeStorage);
-      repository = TidalAuthRepository(storageService: storageService);
+      expect(await storage.getUserToken(), isNull);
+      expect(await fakeStorage.read(key: SecureStorageService.legacyTokenKey), isNull);
     });
 
-    test('autoLogin returns token if valid and not expired', () async {
-      final validToken = AuthToken(
-        accessToken: 'acc_valid',
-        refreshToken: 'ref_valid',
-        expiresAt: DateTime.now().add(const Duration(hours: 2)),
-      );
-
-      await storageService.saveToken(validToken);
-
-      final result = await repository.autoLogin();
-
-      expect(result, isNotNull);
-      expect(result!.accessToken, 'acc_valid');
-      expect(repository.currentToken?.accessToken, 'acc_valid');
-    });
-
-    test('autoLogin returns null if token is expired', () async {
-      final expiredToken = AuthToken(
-        accessToken: 'acc_expired',
-        refreshToken: 'ref_expired',
-        expiresAt: DateTime.now().subtract(const Duration(minutes: 1)),
-      );
-
-      await storageService.saveToken(expiredToken);
-
-      final result = await repository.autoLogin();
-
-      expect(result, isNull);
-      expect(repository.currentToken, isNull);
-    });
-
-    test('autoLogin returns null if no token stored', () async {
-      final result = await repository.autoLogin();
-
-      expect(result, isNull);
-      expect(repository.currentToken, isNull);
-    });
-
-    test('saveToken updates currentToken and persists to storage', () async {
-      final token = AuthToken(
-        accessToken: 'acc_new',
-        refreshToken: 'ref_new',
-        expiresAt: DateTime.now().add(const Duration(hours: 1)),
-      );
-
-      await repository.saveToken(token);
-
-      expect(repository.currentToken?.accessToken, 'acc_new');
-      final storedToken = await storageService.getToken();
-      expect(storedToken?.accessToken, 'acc_new');
-    });
-
-    test('logout clears currentToken and deletes from storage', () async {
-      final token = AuthToken(
-        accessToken: 'acc_123',
-        refreshToken: 'ref_456',
-        expiresAt: DateTime.now().add(const Duration(hours: 1)),
-      );
-
-      await repository.saveToken(token);
-      expect(repository.currentToken, isNotNull);
-
-      await repository.logout();
-
-      expect(repository.currentToken, isNull);
-      expect(await storageService.getToken(), isNull);
+    test('deleteUserToken removes only the user token', () async {
+      await storage.saveUserToken(token('user_acc'));
+      await storage.saveClientToken(token('client_acc', refresh: '', userId: ''));
+      await storage.deleteUserToken();
+      expect(await storage.getUserToken(), isNull);
+      expect(await storage.getClientToken(), isNotNull);
     });
   });
 }

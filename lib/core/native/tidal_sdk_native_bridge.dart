@@ -29,7 +29,7 @@ class TidalSdkNativeBridge {
   static Future<bool> updateUserCredentials({
     required String userId,
     required String accessToken,
-    int expiresInSeconds = 86400 * 30,
+    required int expiresInSeconds,
   }) async {
     try {
       final result = await _channel.invokeMethod<Map>('updateUserCredentials', {
@@ -43,6 +43,42 @@ class TidalSdkNativeBridge {
       AppLogger.log('TIDAL_NATIVE_SDK', '네이티브 사용자 인증 동기화 실패: $e', type: LogType.error);
       return false;
     }
+  }
+
+  /// 네이티브에 남은 사용자 자격 증명을 지운다(로그아웃).
+  static Future<void> clearUserCredentials() async {
+    try {
+      await _channel.invokeMethod('clearUserCredentials');
+    } catch (e) {
+      AppLogger.log('TIDAL_NATIVE_SDK', '네이티브 자격 증명 삭제 실패: $e', type: LogType.error);
+    }
+  }
+
+  static Future<Map<String, Object>?> Function()? _tokenRefresher;
+  static bool _handlerInstalled = false;
+
+  /// 네이티브 SDK가 토큰 만료·오류로 새 토큰을 요청할 때 호출할 함수를 등록한다.
+  ///
+  /// 네이티브는 `refreshUserToken`을 호출하고, 반환된 맵(userId, accessToken, expiresInSeconds)이나
+  /// null(갱신 불가)을 받는다.
+  static void setTokenRefresher(Future<Map<String, Object>?> Function() refresher) {
+    _tokenRefresher = refresher;
+    _installHandler();
+  }
+
+  static void _installHandler() {
+    if (_handlerInstalled) return;
+    _handlerInstalled = true;
+    _channel.setMethodCallHandler((call) async {
+      switch (call.method) {
+        case 'refreshUserToken':
+          final refresher = _tokenRefresher;
+          if (refresher == null) return null;
+          return refresher();
+        default:
+          throw MissingPluginException('Unknown method ${call.method}');
+      }
+    });
   }
 
   /// Triggers authentication via native CredentialsProvider

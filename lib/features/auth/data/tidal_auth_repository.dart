@@ -1,111 +1,191 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../../../core/config/tidal_config.dart';
+import '../../../core/native/tidal_sdk_native_bridge.dart';
 import '../../../core/utils/app_logger.dart';
 import '../domain/models/auth_token.dart';
 import 'secure_storage_service.dart';
 
-import '../../../core/native/tidal_sdk_native_bridge.dart';
+/// 네이티브 TIDAL SDK로 사용자 자격 증명을 전달하는 통로.
+///
+/// 테스트에서는 가짜 구현으로 바꿔 끼울 수 있도록 분리했다.
+abstract class NativeCredentialsSink {
+  Future<bool> initialize();
+  Future<void> setUserCredentials({required String userId, required String accessToken, required int expiresInSeconds});
+  Future<void> clearUserCredentials();
+  void setTokenRefresher(Future<Map<String, Object>?> Function() refresher);
+}
 
+class _BridgeCredentialsSink implements NativeCredentialsSink {
+  const _BridgeCredentialsSink();
+
+  @override
+  Future<bool> initialize() => TidalSdkNativeBridge.initTidalAuth(
+        clientId: TidalConfig.clientId,
+        clientSecret: TidalConfig.clientSecret,
+      );
+
+  @override
+  Future<void> setUserCredentials({required String userId, required String accessToken, required int expiresInSeconds}) =>
+      TidalSdkNativeBridge.updateUserCredentials(
+        userId: userId,
+        accessToken: accessToken,
+        expiresInSeconds: expiresInSeconds,
+      );
+
+  @override
+  Future<void> clearUserCredentials() => TidalSdkNativeBridge.clearUserCredentials();
+
+  @override
+  void setTokenRefresher(Future<Map<String, Object>?> Function() refresher) =>
+      TidalSdkNativeBridge.setTokenRefresher(refresher);
+}
+
+/// 사용자 토큰 갱신 결과.
+enum RefreshOutcome { success, rejected, temporaryFailure }
+
+/// TIDAL 인증 상태의 단일 출처.
+///
+/// 앱 전체에서 하나의 인스턴스만 쓴다(`authRepositoryProvider`).
+/// - 사용자 토큰: 로그인한 계정의 토큰. 네이티브 플레이어에도 전달된다.
+/// - 앱 토큰: 비로그인 상태에서 목록·검색에 쓰는 client credentials 토큰. 네이티브로 보내지 않는다.
 class TidalAuthRepository {
   final SecureStorageService _storageService;
   final Dio _dio;
-  AuthToken? _currentToken;
+  final NativeCredentialsSink _native;
 
-  TidalAuthRepository({SecureStorageService? storageService, Dio? dio})
+  /// 현재 로그인한 사용자 토큰. null이면 로그아웃 상태.
+  final ValueNotifier<AuthToken?> userToken = ValueNotifier<AuthToken?>(null);
+
+  AuthToken? _clientToken;
+  bool _loaded = false;
+  bool _nativeInitialized = false;
+  Future<RefreshOutcome>? _refreshInFlight;
+  Future<AuthToken?>? _clientTokenInFlight;
+
+  TidalAuthRepository({SecureStorageService? storageService, Dio? dio, NativeCredentialsSink? nativeSink})
       : _storageService = storageService ?? SecureStorageService(),
+        _native = nativeSink ?? const _BridgeCredentialsSink(),
         _dio = dio ??
             Dio(
               BaseOptions(
-                connectTimeout: const Duration(seconds: 5),
-                receiveTimeout: const Duration(seconds: 5),
+                connectTimeout: const Duration(seconds: 15),
+                receiveTimeout: const Duration(seconds: 15),
               ),
-            ) {
-    initNativeSdk();
-  }
+            );
 
+  AuthToken? get currentToken => userToken.value;
+  bool get isLoggedIn => userToken.value != null;
+
+  /// 네이티브 SDK를 초기화한다. 앱 시작 시 `main()`에서 한 번만 호출한다.
   Future<void> initNativeSdk() async {
-    await TidalSdkNativeBridge.initTidalAuth(
-      clientId: TidalConfig.clientId,
-      clientSecret: TidalConfig.clientSecret,
-    );
+    if (_nativeInitialized) return;
+    _nativeInitialized = true;
+    _native.setTokenRefresher(_provideTokenToNative);
+    await _native.initialize();
   }
 
-  AuthToken? get currentToken => _currentToken;
+  /// 저장된 사용자 토큰을 복원하고, 만료되었으면 갱신한다.
+  ///
+  /// 사용할 수 있는 사용자 토큰을 반환한다. 네트워크 오류로 갱신하지 못하면 null을 반환하지만
+  /// 로그인 상태([userToken])는 유지한다.
+  Future<AuthToken?> autoLogin() => getValidUserToken();
 
-  Future<AuthToken?> autoLogin() async {
-    final token = await _storageService.getToken();
-    if (token == null) {
-      _currentToken = null;
-      AppLogger.log('TIDAL_AUTH', '저장된 기존 OAuth 토큰 없음 (로그인 필요)', type: LogType.warning);
-      return null;
-    }
-    if (token.isExpired) {
-      AppLogger.log('TIDAL_AUTH', '저장된 토큰 만료됨 -> 토큰 갱신 시도', type: LogType.warning);
-      final refreshed = await refreshToken(token.refreshToken);
-      _currentToken = refreshed;
-      return refreshed;
-    }
-    _currentToken = token;
-    AppLogger.log('TIDAL_AUTH', '저장된 유효 토큰 자동 로그인 성공 (UserId: ${token.userId}, Expiry: ${token.expiresAt})', type: LogType.success);
+  Future<AuthToken?> getValidUserToken() async {
+    await _ensureLoaded();
+    final token = userToken.value;
+    if (token == null) return null;
+    if (!token.isExpired) return token;
 
-    // 네이티브 SDK에 유료 사용자 인증 정보 동기화 (30초 제한 해제)
-    await TidalSdkNativeBridge.updateUserCredentials(
-      userId: token.userId.isNotEmpty ? token.userId : '200801171',
-      accessToken: token.accessToken,
-    );
-
-    return token;
+    AppLogger.log('TIDAL_AUTH', '사용자 토큰 만료 임박 -> 갱신 시도', type: LogType.warning);
+    final outcome = await _refreshUserToken();
+    if (outcome == RefreshOutcome.success) return userToken.value;
+    return null;
   }
 
-  /// Obtains App-level access token via Client Credentials Grant
+  /// 목록·검색 같은 공개 카탈로그 API용 토큰.
+  /// 사용자 토큰이 있으면 그것을, 없으면 앱 토큰을 쓴다.
+  Future<String?> getCatalogToken() async {
+    final user = await getValidUserToken();
+    if (user != null) return user.accessToken;
+    if (isLoggedIn) {
+      AppLogger.log('TIDAL_AUTH', '사용자 토큰 일시 사용 불가 -> 앱 토큰으로 조회', type: LogType.warning);
+    }
+    final client = await _getClientToken();
+    return client?.accessToken;
+  }
+
+  Future<void> _ensureLoaded() async {
+    if (_loaded) return;
+    _loaded = true;
+    await _storageService.migrateLegacyToken();
+    _clientToken = await _storageService.getClientToken();
+    final stored = await _storageService.getUserToken();
+    if (stored == null) {
+      AppLogger.log('TIDAL_AUTH', '저장된 사용자 토큰 없음 (로그인 필요)', type: LogType.warning);
+      return;
+    }
+    userToken.value = stored;
+    if (!stored.isExpired) {
+      AppLogger.log('TIDAL_AUTH', '저장된 사용자 토큰 복원 (UserId: ${stored.userId})', type: LogType.success);
+      await _pushToNative(stored);
+    }
+  }
+
+  // ──────────────────────────────────────────────
+  // 앱 토큰 (client credentials)
+  // ──────────────────────────────────────────────
+
+  Future<AuthToken?> _getClientToken() async {
+    final cached = _clientToken;
+    if (cached != null && !cached.isExpired) return cached;
+    return _clientTokenInFlight ??= authenticateClientCredentials().whenComplete(() => _clientTokenInFlight = null);
+  }
+
+  /// 앱 단위 토큰을 발급받는다. 사용자 토큰과 별도로 저장하며 네이티브로 보내지 않는다.
   Future<AuthToken?> authenticateClientCredentials() async {
     final url = '${TidalConfig.authBaseUrl}/token';
-    AppLogger.log('TIDAL_AUTH', 'POST $url (grant_type=client_credentials, ClientID=${TidalConfig.clientId})', type: LogType.network);
+    AppLogger.log('TIDAL_AUTH', 'POST $url (grant_type=client_credentials)', type: LogType.network);
     try {
-      final basicAuth = base64Encode(utf8.encode('${TidalConfig.clientId}:${TidalConfig.clientSecret}'));
       final response = await _dio.post(
         url,
         data: {'grant_type': 'client_credentials'},
         options: Options(
           contentType: Headers.formUrlEncodedContentType,
-          headers: {'Authorization': 'Basic $basicAuth'},
+          headers: {'Authorization': 'Basic ${_basicAuth()}'},
         ),
       );
-
       final data = response.data;
-      final accessToken = data['access_token'] as String;
-      final expiresIn = data['expires_in'] as int? ?? 604800;
       final token = AuthToken(
-        accessToken: accessToken,
+        accessToken: data['access_token'] as String,
         refreshToken: '',
-        expiresAt: DateTime.now().add(Duration(seconds: expiresIn)),
-        userId: '',
+        expiresAt: DateTime.now().add(Duration(seconds: (data['expires_in'] as num?)?.toInt() ?? 604800)),
       );
-
-      await saveToken(token);
-      AppLogger.log('TIDAL_AUTH', 'OAuth Client Credentials 인증 성공 [HTTP ${response.statusCode}] Access Token 발급됨', type: LogType.success);
+      _clientToken = token;
+      await _storageService.saveClientToken(token);
+      AppLogger.log('TIDAL_AUTH', '앱 토큰 발급 성공 [HTTP ${response.statusCode}]', type: LogType.success);
       return token;
     } catch (e) {
-      if (e is DioException) {
-        AppLogger.log('TIDAL_AUTH', 'OAuth 인증 실패 [HTTP ${e.response?.statusCode ?? "CONNECT_ERROR"}]: ${e.response?.data ?? e.message}', type: LogType.error);
-      } else {
-        AppLogger.log('TIDAL_AUTH', 'OAuth 인증 예외 발생: $e', type: LogType.error);
-      }
+      _logError('앱 토큰 발급 실패', e);
       return null;
     }
   }
 
-  /// Exchanges PKCE Authorization Code for User Access Token & Refresh Token & UserId
+  // ──────────────────────────────────────────────
+  // 사용자 로그인 (PKCE)
+  // ──────────────────────────────────────────────
+
+  /// PKCE 인증 코드를 사용자 토큰으로 교환한다. userId를 얻지 못하면 로그인 실패로 처리한다.
   Future<AuthToken?> exchangeAuthorizationCode({
     required String code,
     required String codeVerifier,
     required String redirectUri,
   }) async {
     final url = '${TidalConfig.authBaseUrl}/token';
-    AppLogger.log('TIDAL_AUTH', 'POST $url (PKCE Authorization Code 교환 시도, RedirectURI=$redirectUri)', type: LogType.network);
+    AppLogger.log('TIDAL_AUTH', 'POST $url (authorization_code 교환)', type: LogType.network);
     try {
-      final basicAuth = base64Encode(utf8.encode('${TidalConfig.clientId}:${TidalConfig.clientSecret}'));
       final response = await _dio.post(
         url,
         data: {
@@ -117,124 +197,173 @@ class TidalAuthRepository {
         },
         options: Options(
           contentType: Headers.formUrlEncodedContentType,
-          headers: {'Authorization': 'Basic $basicAuth'},
+          headers: {'Authorization': 'Basic ${_basicAuth()}'},
         ),
       );
 
       final data = response.data;
       final accessToken = data['access_token'] as String;
-      final refreshToken = data['refresh_token'] as String? ?? '';
-      final expiresIn = data['expires_in'] as int? ?? 86400;
-
-      // Extract numeric userId from data['user']['userId'] or data['user_id']
-      String userId = '';
-      if (data['user'] != null && data['user']['userId'] != null) {
+      var userId = '';
+      if (data['user'] is Map && data['user']['userId'] != null) {
         userId = data['user']['userId'].toString();
       } else if (data['user_id'] != null) {
         userId = data['user_id'].toString();
       }
-
-      // Fallback: If userId is empty, fetch session user info
       if (userId.isEmpty) {
         userId = await _fetchUserIdFromSession(accessToken);
+      }
+      if (userId.isEmpty) {
+        AppLogger.log('TIDAL_AUTH', '사용자 ID를 확인할 수 없어 로그인 실패 처리', type: LogType.error);
+        return null;
       }
 
       final token = AuthToken(
         accessToken: accessToken,
-        refreshToken: refreshToken,
-        expiresAt: DateTime.now().add(Duration(seconds: expiresIn)),
+        refreshToken: data['refresh_token'] as String? ?? '',
+        expiresAt: DateTime.now().add(Duration(seconds: (data['expires_in'] as num?)?.toInt() ?? 86400)),
         userId: userId,
       );
-
-      await saveToken(token);
-      AppLogger.log('TIDAL_AUTH', 'Tidal 사용자 PKCE OAuth 로그인 성공! [HTTP ${response.statusCode}] UserId=$userId, Access Token 저장됨', type: LogType.success);
+      await _setUserToken(token);
+      AppLogger.log('TIDAL_AUTH', '사용자 로그인 성공 (UserId: $userId)', type: LogType.success);
       return token;
     } catch (e) {
-      if (e is DioException) {
-        AppLogger.log('TIDAL_AUTH', 'PKCE 토큰 교환 실패 [HTTP ${e.response?.statusCode}]: ${e.response?.data ?? e.message}', type: LogType.error);
-      } else {
-        AppLogger.log('TIDAL_AUTH', 'PKCE 토큰 교환 예외: $e', type: LogType.error);
-      }
+      _logError('인증 코드 교환 실패', e);
       return null;
     }
   }
 
-  /// Helper to fetch numeric userId from GET https://api.tidal.com/v1/sessions
   Future<String> _fetchUserIdFromSession(String accessToken) async {
     try {
       final response = await _dio.get(
-        'https://api.tidal.com/v1/sessions',
+        '${TidalConfig.apiBaseUrl}/sessions',
         options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
       );
-      final userId = response.data['userId']?.toString() ?? response.data['user']?['userId']?.toString() ?? '';
-      AppLogger.log('TIDAL_AUTH', '세션 API 조회를 통해 UserId($userId) 획득', type: LogType.info);
-      return userId;
+      final data = response.data;
+      return data['userId']?.toString() ?? data['user']?['userId']?.toString() ?? '';
     } catch (e) {
-      AppLogger.log('TIDAL_AUTH', '세션 UserId 조회 예외: $e', type: LogType.warning);
+      _logError('세션 조회 실패', e);
       return '';
     }
   }
 
-  /// Refreshes user access token using refresh_token
-  Future<AuthToken?> refreshToken(String refreshToken) async {
-    if (refreshToken.isEmpty) {
-      return null;
+  // ──────────────────────────────────────────────
+  // 갱신
+  // ──────────────────────────────────────────────
+
+  /// 사용자 토큰을 갱신한다. 동시에 여러 곳에서 호출해도 요청은 한 번만 나간다.
+  Future<RefreshOutcome> _refreshUserToken() {
+    return _refreshInFlight ??= _doRefresh().whenComplete(() => _refreshInFlight = null);
+  }
+
+  Future<RefreshOutcome> _doRefresh() async {
+    final current = userToken.value;
+    if (current == null) return RefreshOutcome.rejected;
+    if (current.refreshToken.isEmpty) {
+      await _clearUserToken(reason: 'refresh token 없음');
+      return RefreshOutcome.rejected;
     }
+
     final url = '${TidalConfig.authBaseUrl}/token';
     AppLogger.log('TIDAL_AUTH', 'POST $url (grant_type=refresh_token)', type: LogType.network);
     try {
-      final basicAuth = base64Encode(utf8.encode('${TidalConfig.clientId}:${TidalConfig.clientSecret}'));
       final response = await _dio.post(
         url,
         data: {
           'client_id': TidalConfig.clientId,
           'grant_type': 'refresh_token',
-          'refresh_token': refreshToken,
+          'refresh_token': current.refreshToken,
         },
         options: Options(
           contentType: Headers.formUrlEncodedContentType,
-          headers: {'Authorization': 'Basic $basicAuth'},
+          headers: {'Authorization': 'Basic ${_basicAuth()}'},
         ),
       );
-
       final data = response.data;
-      final accessToken = data['access_token'] as String;
-      final newRefreshToken = data['refresh_token'] as String? ?? refreshToken;
-      final expiresIn = data['expires_in'] as int? ?? 86400;
-
-      String userId = _currentToken?.userId ?? '';
-      if (userId.isEmpty) {
-        userId = await _fetchUserIdFromSession(accessToken);
-      }
-
       final token = AuthToken(
-        accessToken: accessToken,
-        refreshToken: newRefreshToken,
-        expiresAt: DateTime.now().add(Duration(seconds: expiresIn)),
-        userId: userId,
+        accessToken: data['access_token'] as String,
+        refreshToken: data['refresh_token'] as String? ?? current.refreshToken,
+        expiresAt: DateTime.now().add(Duration(seconds: (data['expires_in'] as num?)?.toInt() ?? 86400)),
+        userId: current.userId,
       );
-
-      await saveToken(token);
-      AppLogger.log('TIDAL_AUTH', 'OAuth 사용자 토큰 갱신 성공 [HTTP ${response.statusCode}] UserId=$userId', type: LogType.success);
-      return token;
+      await _setUserToken(token);
+      AppLogger.log('TIDAL_AUTH', '사용자 토큰 갱신 성공', type: LogType.success);
+      return RefreshOutcome.success;
+    } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      if (status == 400 || status == 401) {
+        _logError('refresh token 거부됨, 재로그인 필요', e);
+        await _clearUserToken(reason: 'refresh 거부');
+        return RefreshOutcome.rejected;
+      }
+      _logError('토큰 갱신 일시 실패 (토큰 유지)', e);
+      return RefreshOutcome.temporaryFailure;
     } catch (e) {
-      AppLogger.log('TIDAL_AUTH', 'OAuth 사용자 토큰 갱신 실패: $e', type: LogType.error);
-      return null;
+      _logError('토큰 갱신 예외 (토큰 유지)', e);
+      return RefreshOutcome.temporaryFailure;
     }
   }
 
-  Future<void> saveToken(AuthToken token) async {
-    _currentToken = token;
-    await _storageService.saveToken(token);
-    await TidalSdkNativeBridge.updateUserCredentials(
-      userId: token.userId.isNotEmpty ? token.userId : '200801171',
-      accessToken: token.accessToken,
-    );
+  /// 네이티브 SDK가 토큰 오류를 보고했을 때 호출된다. 새 자격 증명을 돌려준다.
+  Future<Map<String, Object>?> _provideTokenToNative() async {
+    await _ensureLoaded();
+    if (userToken.value == null) return null;
+    final outcome = await _refreshUserToken();
+    final token = userToken.value;
+    if (outcome != RefreshOutcome.success || token == null) return null;
+    return {
+      'userId': token.userId,
+      'accessToken': token.accessToken,
+      'expiresInSeconds': _remainingSeconds(token),
+    };
   }
 
+  // ──────────────────────────────────────────────
+  // 상태 변경
+  // ──────────────────────────────────────────────
+
+  /// 사용자 토큰을 저장하고 네이티브와 화면에 알린다.
+  Future<void> saveToken(AuthToken token) => _setUserToken(token);
+
+  Future<void> _setUserToken(AuthToken token) async {
+    _loaded = true;
+    userToken.value = token;
+    await _storageService.saveUserToken(token);
+    await _pushToNative(token);
+  }
+
+  Future<void> _pushToNative(AuthToken token) => _native.setUserCredentials(
+        userId: token.userId,
+        accessToken: token.accessToken,
+        expiresInSeconds: _remainingSeconds(token),
+      );
+
+  Future<void> _clearUserToken({required String reason}) async {
+    AppLogger.log('TIDAL_AUTH', '사용자 토큰 삭제 ($reason)', type: LogType.warning);
+    userToken.value = null;
+    await _storageService.deleteUserToken();
+    await _native.clearUserCredentials();
+  }
+
+  /// 로그아웃. 재생 정지는 호출하는 쪽에서 먼저 처리한다.
   Future<void> logout() async {
-    _currentToken = null;
-    await _storageService.deleteToken();
-    AppLogger.log('TIDAL_AUTH', '로그아웃 완료 (저장된 토큰 삭제됨)', type: LogType.info);
+    _loaded = true;
+    await _clearUserToken(reason: '로그아웃');
+    AppLogger.log('TIDAL_AUTH', '로그아웃 완료', type: LogType.info);
+  }
+
+  // ──────────────────────────────────────────────
+  // 유틸
+  // ──────────────────────────────────────────────
+
+  static int _remainingSeconds(AuthToken token) {
+    final seconds = token.expiresAt.difference(DateTime.now()).inSeconds;
+    return seconds < 60 ? 60 : seconds;
+  }
+
+  static String _basicAuth() => base64Encode(utf8.encode('${TidalConfig.clientId}:${TidalConfig.clientSecret}'));
+
+  static void _logError(String message, Object e) {
+    final detail = e is DioException ? 'HTTP ${e.response?.statusCode ?? e.type.name}' : e.toString();
+    AppLogger.log('TIDAL_AUTH', '$message: $detail', type: LogType.error);
   }
 }
