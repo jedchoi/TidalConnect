@@ -30,6 +30,10 @@ class PlayerManager {
   static final PlayerManager instance = PlayerManager._internal();
   PlayerManager._internal();
 
+  /// 테스트에서 싱글턴과 무관한 새 인스턴스를 만든다.
+  @visibleForTesting
+  PlayerManager.forTesting();
+
   late TidalAuthRepository _authRepo;
   final TidalApiClient _apiClient = TidalApiClient();
   final DlnaManager _dlnaManager = DlnaManager.instance;
