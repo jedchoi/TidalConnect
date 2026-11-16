@@ -51,6 +51,11 @@ class DlnaBackend implements PlaybackBackend {
   String preferredQuality = 'LOSSLESS';
 
   @override
+  Future<void> setAudioQuality(String quality) async {
+    preferredQuality = quality;
+  }
+
+  @override
   Stream<BackendEvent> get events => _events.stream;
 
   /// DASH 중계는 세그먼트를 이어 붙인 스트림이라 탐색할 수 없다.

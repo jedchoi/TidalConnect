@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
+import '../data/playback_settings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/data/tidal_auth_repository.dart';
 import '../../auth/presentation/tidal_webview_login_modal.dart';
@@ -151,6 +152,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           const SizedBox(height: 24),
           const Text(
+            '스트리밍 음질',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.cyanAccent),
+          ),
+          const SizedBox(height: 8),
+          const _AudioQualityCard(),
+          const SizedBox(height: 24),
+          const Text(
             'DLNA / UPnP 네트워크 스피커 목록',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.cyanAccent),
           ),
@@ -242,6 +250,52 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 음질 선택. 고른 값은 저장되고 다음 곡부터 폰·스피커 재생에 모두 적용된다.
+class _AudioQualityCard extends ConsumerWidget {
+  const _AudioQualityCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.read(playbackSettingsProvider);
+    return Card(
+      color: AppColors.surfaceCard,
+      child: ValueListenableBuilder<AudioQualityOption>(
+        valueListenable: settings.audioQuality,
+        builder: (context, selected, _) => RadioGroup<AudioQualityOption>(
+          groupValue: selected,
+          onChanged: (value) {
+            if (value != null) settings.setAudioQuality(value);
+          },
+          child: Column(
+          children: [
+            for (final option in AudioQualityOption.values)
+              RadioListTile<AudioQualityOption>(
+                value: option,
+                activeColor: AppColors.cyanAccent,
+                title: Text(option.label, style: const TextStyle(color: Colors.white)),
+                subtitle: Text(option.detail, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Text(
+                selected == AudioQualityOption.hiRes
+                    ? 'DLNA 스피커에서 Hi-Res는 DASH 스트림을 이어 붙여 보내므로 재생 위치를 옮길 수 없습니다. '
+                        '변경한 음질은 다음 곡부터 적용됩니다.'
+                    : '변경한 음질은 다음 곡부터 적용됩니다.',
+                style: TextStyle(
+                  color: selected == AudioQualityOption.hiRes ? Colors.amberAccent : AppColors.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+          ),
+        ),
       ),
     );
   }

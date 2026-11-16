@@ -106,6 +106,11 @@ class PlayerManager {
     syncVolumeFromDevice();
   }
 
+  /// 스트리밍 음질을 두 출력 기기에 모두 알린다. 다음 곡부터 적용된다.
+  Future<void> setAudioQuality(String quality) async {
+    await Future.wait([_phone.setAudioQuality(quality), _dlna.setAudioQuality(quality)]);
+  }
+
   // ──────────────────────────────────────────────
   // 백엔드 이벤트
   // ──────────────────────────────────────────────

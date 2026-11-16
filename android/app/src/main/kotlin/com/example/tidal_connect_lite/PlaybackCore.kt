@@ -188,6 +188,11 @@ object PlaybackCore {
                 requirePlayerManager().setNextTrack(nextTrackId)
                 mapOf("status" to "next_track_set", "trackId" to nextTrackId)
             }
+            "setAudioQuality" -> runPlayerAction(result) {
+                val quality = call.argument<String>("quality") ?: "LOSSLESS"
+                requirePlayerManager().setAudioQuality(quality)
+                mapOf("status" to "quality_set", "quality" to quality)
+            }
             "getPhoneVolume" -> result.success(phoneVolumePercent())
             "setPhoneVolume" -> {
                 setPhoneVolumePercent(call.argument<Int>("percent") ?: 0)

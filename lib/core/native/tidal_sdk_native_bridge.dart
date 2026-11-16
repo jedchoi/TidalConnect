@@ -179,6 +179,19 @@ class TidalSdkNativeBridge {
     }
   }
 
+  /// 폰 재생(SDK)의 스트리밍 음질을 바꾼다. 다음 곡부터 적용된다.
+  /// [quality]: LOW, HIGH, LOSSLESS, HI_RES_LOSSLESS
+  static Future<bool> setAudioQuality(String quality) async {
+    try {
+      await _channel.invokeMethod('setAudioQuality', {'quality': quality});
+      AppLogger.log('TIDAL_NATIVE_SDK', '스트리밍 음질 설정: $quality', type: LogType.info);
+      return true;
+    } catch (e) {
+      AppLogger.log('TIDAL_NATIVE_SDK', '스트리밍 음질 설정 실패: $e', type: LogType.error);
+      return false;
+    }
+  }
+
   /// Stops playback via native Tidal SDK player
   static Future<bool> stopTrack() async {
     try {

@@ -27,6 +27,13 @@ Future<void> main() async {
       apiClient: container.read(apiClientProvider),
     );
 
+  // 저장된 음질을 적용하고, 설정에서 바꾸면 다음 곡부터 반영한다.
+  final settings = container.read(playbackSettingsProvider);
+  await settings.load();
+  void applyQuality() => playerManager.setAudioQuality(settings.audioQuality.value.apiValue);
+  applyQuality();
+  settings.audioQuality.addListener(applyQuality);
+
   // 잠금화면·알림·블루투스 버튼 제어와 백그라운드 재생 유지(포그라운드 서비스)
   await AudioService.init(
     builder: () => WaveAudioHandler(playerManager, dlnaManager: dlnaManager),

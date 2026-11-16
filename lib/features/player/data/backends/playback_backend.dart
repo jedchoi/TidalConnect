@@ -74,6 +74,9 @@ abstract class PlaybackBackend {
   Future<void> resume();
   Future<void> seek(Duration position);
   Future<void> stop();
+
+  /// 스트리밍 음질(LOW, HIGH, LOSSLESS, HI_RES_LOSSLESS). 다음에 재생하는 곡부터 적용된다.
+  Future<void> setAudioQuality(String quality);
 }
 
 /// 실패를 화면에 보여줄 수 있는 메시지와 함께 전달하는 예외.

@@ -4,6 +4,7 @@ import '../features/auth/data/tidal_auth_repository.dart';
 import '../features/auth/domain/models/auth_token.dart';
 import '../features/dlna/data/dlna_manager.dart';
 import '../features/player/data/player_manager.dart';
+import '../features/settings/data/playback_settings.dart';
 import '../features/tidal_api/data/tidal_api_client.dart';
 
 /// 앱 전체에서 하나만 쓰는 인증 저장소.
@@ -28,3 +29,6 @@ final dlnaManagerProvider = Provider<DlnaManager>((ref) => DlnaManager.instance)
 
 /// 재생 상태의 단일 출처. main()에서 configure된 인스턴스를 쓴다.
 final playerManagerProvider = Provider<PlayerManager>((ref) => PlayerManager.instance);
+
+/// 재생 설정(음질 등). main()에서 load한 뒤 쓴다.
+final playbackSettingsProvider = Provider<PlaybackSettings>((ref) => PlaybackSettings());

@@ -43,12 +43,19 @@ class FakeBackend implements PlaybackBackend {
   Future<void> seek(Duration position) async {}
   @override
   Future<void> stop() async {}
+
+  String? quality;
+  @override
+  Future<void> setAudioQuality(String quality) async {
+    this.quality = quality;
+  }
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late FakeBackend phone;
+  late FakeBackend dlna;
   late PlayerManager player;
 
   setUp(() {
@@ -58,7 +65,14 @@ void main() {
       dio: Dio()..httpClientAdapter = FakeAdapter((o) async => throw DioException.connectionError(requestOptions: o, reason: 'offline')),
       nativeSink: FakeNativeSink(),
     );
-    player = PlayerManager.forTesting()..configure(authRepository: auth, phone: phone, dlna: FakeBackend());
+    dlna = FakeBackend();
+    player = PlayerManager.forTesting()..configure(authRepository: auth, phone: phone, dlna: dlna);
+  });
+
+  test('음질 설정은 폰과 스피커 출력 모두에 전달된다', () async {
+    await player.setAudioQuality('HI_RES_LOSSLESS');
+    expect(phone.quality, 'HI_RES_LOSSLESS');
+    expect(dlna.quality, 'HI_RES_LOSSLESS');
   });
 
   test('an ended event moves to the next track in the queue', () async {

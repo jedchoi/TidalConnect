@@ -68,6 +68,9 @@ class PhoneBackend implements PlaybackBackend {
   }
 
   @override
+  Future<void> setAudioQuality(String quality) => TidalSdkNativeBridge.setAudioQuality(quality);
+
+  @override
   Future<void> play(MediaTrack track, {Duration startPosition = Duration.zero, required IsCancelled isCancelled}) async {
     _currentTrackId = track.id;
     _duration = track.durationSeconds > 0 ? Duration(seconds: track.durationSeconds) : null;

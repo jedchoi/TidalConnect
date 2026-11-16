@@ -11,6 +11,7 @@ import com.tidal.sdk.player.Player
 import com.tidal.sdk.player.common.model.MediaProduct
 import com.tidal.sdk.player.common.model.ProductType
 import com.tidal.sdk.player.common.model.AssetPresentation
+import com.tidal.sdk.player.common.model.AudioQuality
 import com.tidal.sdk.player.playbackengine.model.Event
 import com.tidal.sdk.player.playbackengine.model.PlaybackContext
 import com.tidal.sdk.player.playbackengine.model.PlaybackState
@@ -81,6 +82,7 @@ class TidalPlayerManager(
             )
 
             Log.i("TidalPlayerManager", "TIDAL Official Player SDK initialized successfully")
+            applyAudioQuality()
             collectEvents()
         } catch (e: Exception) {
             Log.e("TidalPlayerManager", "Failed to initialize TIDAL Player: ${e.message}", e)
@@ -174,6 +176,23 @@ class TidalPlayerManager(
         player.playbackEngine.setNext(
             if (trackId.isEmpty()) null else MediaProduct(productType = ProductType.TRACK, productId = trackId)
         )
+    }
+
+    /** 사용자가 고른 스트리밍 음질. 플레이어 생성 전에 정해지면 생성 직후 적용한다. */
+    private var audioQuality: AudioQuality? = null
+
+    /** Wi-Fi·모바일 데이터 스트리밍 음질을 바꾼다. 다음에 불러오는 곡부터 적용된다. */
+    fun setAudioQuality(name: String) {
+        audioQuality = AudioQuality.valueOf(name)
+        applyAudioQuality()
+    }
+
+    private fun applyAudioQuality() {
+        val quality = audioQuality ?: return
+        val engine = tidalPlayer?.playbackEngine ?: return
+        engine.streamingWifiAudioQuality = quality
+        engine.streamingCellularAudioQuality = quality
+        Log.i(TAG, "Streaming audio quality set to $quality")
     }
 
     fun skipToNext() {
