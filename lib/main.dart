@@ -21,7 +21,11 @@ Future<void> main() async {
   await authRepository.initNativeSdk();
   final dlnaManager = container.read(dlnaManagerProvider);
   final playerManager = container.read(playerManagerProvider)
-    ..configure(authRepository: authRepository, dlnaManager: dlnaManager);
+    ..configure(
+      authRepository: authRepository,
+      dlnaManager: dlnaManager,
+      apiClient: container.read(apiClientProvider),
+    );
 
   // 잠금화면·알림·블루투스 버튼 제어와 백그라운드 재생 유지(포그라운드 서비스)
   await AudioService.init(

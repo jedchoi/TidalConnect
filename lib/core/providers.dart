@@ -19,7 +19,9 @@ final authStateProvider = ChangeNotifierProvider<ValueNotifier<AuthToken?>>(
 final loggedInUserIdProvider = Provider<String?>((ref) => ref.watch(authStateProvider).value?.userId);
 
 /// TIDAL REST API 클라이언트.
-final apiClientProvider = Provider<TidalApiClient>((ref) => TidalApiClient());
+final apiClientProvider = Provider<TidalApiClient>(
+  (ref) => TidalApiClient(authRepository: ref.watch(authRepositoryProvider)),
+);
 
 /// DLNA 스피커 탐색과 제어. 테스트에서는 override로 바꿔 끼운다.
 final dlnaManagerProvider = Provider<DlnaManager>((ref) => DlnaManager.instance);

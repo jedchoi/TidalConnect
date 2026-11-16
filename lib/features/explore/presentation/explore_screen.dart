@@ -35,25 +35,19 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
   Future<void> _loadExploreData() async {
     setState(() => _isLoading = true);
     try {
-      final accessToken = await ref.read(authRepositoryProvider).getCatalogToken();
+      final results = await Future.wait([
+        _apiClient.getFeaturedAlbums(),
+        _apiClient.getFeaturedPlaylists(),
+        _apiClient.getFeaturedTracks(),
+      ]);
 
-      if (accessToken != null) {
-        final results = await Future.wait([
-          _apiClient.getFeaturedAlbums(accessToken),
-          _apiClient.getFeaturedPlaylists(accessToken),
-          _apiClient.getFeaturedTracks(accessToken),
-        ]);
-
-        if (mounted) {
-          setState(() {
-            _featuredAlbums = results[0] as List<MediaAlbum>;
-            _featuredPlaylists = results[1] as List<MediaPlaylist>;
-            _featuredTracks = results[2] as List<MediaTrack>;
-            _isLoading = false;
-          });
-        }
-      } else {
-        if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _featuredAlbums = results[0] as List<MediaAlbum>;
+          _featuredPlaylists = results[1] as List<MediaPlaylist>;
+          _featuredTracks = results[2] as List<MediaTrack>;
+          _isLoading = false;
+        });
       }
     } catch (e) {
       AppLogger.log('EXPLORE', '추천 데이터 로딩 오류: $e', type: LogType.error);

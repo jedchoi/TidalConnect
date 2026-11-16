@@ -40,7 +40,7 @@ class DlnaBackend implements PlaybackBackend {
   Future<Map<String, Object>?> _refreshStream(String trackId) async {
     final token = await _auth.getValidUserToken();
     if (token == null) return null;
-    final info = await _api.getPlaybackInfo(trackId, token.accessToken, quality: preferredQuality);
+    final info = await _api.getPlaybackInfo(trackId, quality: preferredQuality);
     if (info == null) return null;
     AppLogger.log('DLNA_BACKEND', '만료된 스트림 주소 재발급 (TrackID: $trackId)', type: LogType.info);
     return {'directUrl': info.streamUrl, 'manifestXml': info.manifest, 'mimeType': info.mimeType};
@@ -71,7 +71,7 @@ class DlnaBackend implements PlaybackBackend {
       throw const PlaybackException('NOT_LOGGED_IN', '스피커로 재생하려면 TIDAL 로그인이 필요합니다.');
     }
 
-    final info = await _api.getPlaybackInfo(track.id, token.accessToken, quality: preferredQuality);
+    final info = await _api.getPlaybackInfo(track.id, quality: preferredQuality);
     if (isCancelled()) return;
     if (info == null) {
       throw const PlaybackException('NO_STREAM', '이 곡의 스트림 정보를 받지 못했습니다.');

@@ -104,13 +104,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     _saveSearchHistory(query);
     setState(() => _isSearching = true);
     try {
-      final accessToken = await ref.read(authRepositoryProvider).getCatalogToken();
-
-      if (accessToken != null) {
-        final tracks = await _apiClient.searchTracks(query, accessToken);
-        if (mounted) {
-          setState(() => _searchTracks = tracks);
-        }
+      final tracks = await _apiClient.searchTracks(query);
+      if (mounted) {
+        setState(() => _searchTracks = tracks);
       }
     } catch (_) {
     } finally {

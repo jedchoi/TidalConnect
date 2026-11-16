@@ -33,18 +33,12 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
   Future<void> _loadAlbumTracks() async {
     setState(() => _isLoading = true);
     try {
-      final accessToken = await ref.read(authRepositoryProvider).getCatalogToken();
-
-      if (accessToken != null) {
-        final tracks = await _apiClient.getAlbumTracks(widget.album.id, accessToken);
-        if (mounted) {
-          setState(() {
-            _tracks = tracks;
-            _isLoading = false;
-          });
-        }
-      } else {
-        if (mounted) setState(() => _isLoading = false);
+      final tracks = await _apiClient.getAlbumTracks(widget.album.id);
+      if (mounted) {
+        setState(() {
+          _tracks = tracks;
+          _isLoading = false;
+        });
       }
     } catch (e) {
       AppLogger.log('ALBUM_DETAIL', '앨범 트랙 로딩 오류: $e', type: LogType.error);

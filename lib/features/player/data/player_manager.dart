@@ -34,7 +34,7 @@ class PlayerManager {
   PlayerManager.forTesting();
 
   late TidalAuthRepository _authRepo;
-  final TidalApiClient _apiClient = TidalApiClient();
+  late TidalApiClient _apiClient;
   DlnaManager _dlnaManager = DlnaManager.instance;
   final PlayQueue _queue = PlayQueue();
 
@@ -86,12 +86,14 @@ class PlayerManager {
   void configure({
     required TidalAuthRepository authRepository,
     DlnaManager? dlnaManager,
+    TidalApiClient? apiClient,
     PlaybackBackend? phone,
     PlaybackBackend? dlna,
   }) {
     if (_configured) return;
     _configured = true;
     if (dlnaManager != null) _dlnaManager = dlnaManager;
+    _apiClient = apiClient ?? TidalApiClient(authRepository: authRepository);
     _authRepo = authRepository;
     _phone = phone ?? PhoneBackend();
     _dlna = dlna ?? DlnaBackend(auth: authRepository, api: _apiClient, dlna: _dlnaManager);
@@ -230,9 +232,7 @@ class PlayerManager {
   /// 유사곡을 대기열 끝에 붙인다. 붙인 곡 수를 돌려준다.
   Future<int> _appendSimilarTracks(String trackId) async {
     try {
-      final accessToken = await _authRepo.getCatalogToken();
-      if (accessToken == null) return 0;
-      final similars = await _apiClient.getSimilarTracks(trackId, accessToken, limit: 30);
+      final similars = await _apiClient.getSimilarTracks(trackId, limit: 30);
       final added = _queue.append(similars);
       if (added > 0) {
         _notifyQueue();

@@ -1,7 +1,12 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import '../../../core/utils/app_logger.dart';
+import '../../auth/data/tidal_auth_repository.dart';
 import '../domain/models/media_item.dart';
+import 'api_failure.dart';
+import 'auth_interceptor.dart';
+
+export 'api_failure.dart';
 
 class TidalPlaybackInfo {
   /// 단일 파일 스트림 주소(BTS). DASH면 빈 문자열.
@@ -41,190 +46,105 @@ String? lowerAudioQuality(String quality) {
 class TidalApiClient {
   final Dio _dio;
   static const String baseUrl = 'https://api.tidal.com/v1';
+  static const String _countryCode = 'US';
 
-  TidalApiClient({Dio? dio})
+  /// [authRepository]가 있으면 [AuthInterceptor]가 모든 요청에 토큰을 붙이고 401이면 한 번 갱신해 재시도한다.
+  TidalApiClient({TidalAuthRepository? authRepository, Dio? dio})
       : _dio = dio ??
             Dio(
               BaseOptions(
                 baseUrl: baseUrl,
                 connectTimeout: const Duration(seconds: 8),
                 receiveTimeout: const Duration(seconds: 8),
+                headers: {'Accept': 'application/json'},
               ),
-            );
-
-  Map<String, String> _buildHeaders(String accessToken) {
-    return {
-      'Authorization': 'Bearer $accessToken',
-      'Accept': 'application/json',
-    };
-  }
-
-  // ──────────────────────────────────────────────
-  // 즐겨찾기 (My Collection) Endpoints (v1)
-  // ──────────────────────────────────────────────
-
-  Future<List<MediaAlbum>> getFavoriteAlbums(String accessToken, {String userId = 'me'}) async {
-    final effectiveUserId = userId.isEmpty ? 'me' : userId;
-    final endpoint = '/users/$effectiveUserId/favorites/albums';
-    AppLogger.log('TIDAL_API', 'GET $baseUrl$endpoint (countryCode=US)', type: LogType.network);
-    try {
-      final response = await _dio.get(
-        endpoint,
-        queryParameters: {'countryCode': 'US', 'limit': 50},
-        options: Options(headers: _buildHeaders(accessToken)),
-      );
-      final items = response.data['items'] as List? ?? [];
-      AppLogger.log('TIDAL_API', '내 즐겨찾기 앨범 수신 성공 [HTTP ${response.statusCode}]: ${items.length}개', type: LogType.success);
-      return items.map((e) => MediaAlbum.fromJson(e is Map<String, dynamic> ? e : {})).toList();
-    } catch (e) {
-      if (e is DioException && e.response != null) {
-        AppLogger.log('TIDAL_API', '내 즐겨찾기 앨범 수신 오류 [HTTP ${e.response?.statusCode}]: ${e.response?.data}', type: LogType.error);
-      } else {
-        AppLogger.log('TIDAL_API', '내 즐겨찾기 앨범 수신 오류: $e', type: LogType.error);
-      }
-      return [];
-    }
-  }
-
-  Future<List<MediaPlaylist>> getFavoritePlaylists(String accessToken, {String userId = 'me'}) async {
-    final effectiveUserId = userId.isEmpty ? 'me' : userId;
-    final endpoint = '/users/$effectiveUserId/favorites/playlists';
-    AppLogger.log('TIDAL_API', 'GET $baseUrl$endpoint (countryCode=US)', type: LogType.network);
-    try {
-      final response = await _dio.get(
-        endpoint,
-        queryParameters: {'countryCode': 'US', 'limit': 50},
-        options: Options(headers: _buildHeaders(accessToken)),
-      );
-      final items = response.data['items'] as List? ?? [];
-      AppLogger.log('TIDAL_API', '내 즐겨찾기 플레이리스트 수신 성공 [HTTP ${response.statusCode}]: ${items.length}개', type: LogType.success);
-      return items.map((e) => MediaPlaylist.fromJson(e is Map<String, dynamic> ? e : {})).toList();
-    } catch (e) {
-      if (e is DioException && e.response != null) {
-        AppLogger.log('TIDAL_API', '내 즐겨찾기 플레이리스트 수신 오류 [HTTP ${e.response?.statusCode}]: ${e.response?.data}', type: LogType.error);
-      } else {
-        AppLogger.log('TIDAL_API', '내 즐겨찾기 플레이리스트 수신 오류: $e', type: LogType.error);
-      }
-      return [];
-    }
-  }
-
-  Future<List<MediaTrack>> getFavoriteTracks(String accessToken, {String userId = 'me'}) async {
-    final effectiveUserId = userId.isEmpty ? 'me' : userId;
-    final endpoint = '/users/$effectiveUserId/favorites/tracks';
-    AppLogger.log('TIDAL_API', 'GET $baseUrl$endpoint (countryCode=US)', type: LogType.network);
-    try {
-      final response = await _dio.get(
-        endpoint,
-        queryParameters: {'countryCode': 'US', 'limit': 50},
-        options: Options(headers: _buildHeaders(accessToken)),
-      );
-      final items = response.data['items'] as List? ?? [];
-      AppLogger.log('TIDAL_API', '내 즐겨찾기 트랙 수신 성공 [HTTP ${response.statusCode}]: ${items.length}개', type: LogType.success);
-      return items.map((e) => MediaTrack.fromJson(e is Map<String, dynamic> ? e : {})).toList();
-    } catch (e) {
-      if (e is DioException && e.response != null) {
-        AppLogger.log('TIDAL_API', '내 즐겨찾기 트랙 수신 오류 [HTTP ${e.response?.statusCode}]: ${e.response?.data}', type: LogType.error);
-      } else {
-        AppLogger.log('TIDAL_API', '내 즐겨찾기 트랙 수신 오류: $e', type: LogType.error);
-      }
-      return [];
+            ) {
+    if (authRepository != null) {
+      _dio.interceptors.add(AuthInterceptor(authRepository, _dio));
     }
   }
 
   // ──────────────────────────────────────────────
-  // 앨범 및 플레이리스트 내부 세부 트랙 조회
+  // 공통
   // ──────────────────────────────────────────────
 
-  Future<List<MediaTrack>> getAlbumTracks(String albumId, String accessToken) async {
-    final endpoint = '/albums/$albumId/tracks';
-    AppLogger.log('TIDAL_API', 'GET $baseUrl$endpoint (countryCode=US)', type: LogType.network);
+  Future<dynamic> _get(String path, Map<String, dynamic> query) async {
+    AppLogger.log('TIDAL_API', 'GET $path', type: LogType.network);
     try {
-      final response = await _dio.get(
-        endpoint,
-        queryParameters: {'countryCode': 'US', 'limit': 100},
-        options: Options(headers: _buildHeaders(accessToken)),
-      );
-      final items = response.data['items'] as List? ?? [];
-      AppLogger.log('TIDAL_API', '앨범 트랙 목록 수신 성공 [HTTP ${response.statusCode}]: ${items.length}개', type: LogType.success);
-      return items.map((e) => MediaTrack.fromJson(e is Map<String, dynamic> ? e : {})).toList();
-    } catch (e) {
-      AppLogger.log('TIDAL_API', '앨범 트랙 수신 오류: $e', type: LogType.error);
-      return [];
+      final response = await _dio.get(path, queryParameters: {'countryCode': _countryCode, ...query});
+      return response.data;
+    } on DioException catch (e) {
+      final failure = ApiFailure.fromDio(e);
+      AppLogger.log('TIDAL_API', 'GET $path 실패: ${failure.kind.name} (HTTP ${failure.statusCode})', type: LogType.error);
+      throw failure;
     }
   }
 
-  Future<List<MediaTrack>> getPlaylistTracks(String playlistId, String accessToken) async {
-    AppLogger.log('TIDAL_API', '플레이리스트($playlistId) 트랙 조회 시작...', type: LogType.network);
-    
-    // 1차: /playlists/$playlistId/tracks 시도
-    try {
-      final response = await _dio.get(
-        '/playlists/$playlistId/tracks',
-        queryParameters: {'countryCode': 'US', 'limit': 100},
-        options: Options(headers: _buildHeaders(accessToken)),
-      );
-      final items = response.data['items'] as List? ?? [];
-      if (items.isNotEmpty) {
-        AppLogger.log('TIDAL_API', '플레이리스트 트랙 목록 수신 성공 (/tracks) [HTTP ${response.statusCode}]: ${items.length}개', type: LogType.success);
-        return items.map((e) => MediaTrack.fromJson(e is Map<String, dynamic> ? e : {})).toList();
-      }
-    } catch (e) {
-      AppLogger.log('TIDAL_API', '/playlists/$playlistId/tracks 조회 예외: $e ➔ /items 엔드포인트 시도', type: LogType.warning);
-    }
-
-    // 2차: /playlists/$playlistId/items 시도
-    try {
-      final response = await _dio.get(
-        '/playlists/$playlistId/items',
-        queryParameters: {'countryCode': 'US', 'limit': 100},
-        options: Options(headers: _buildHeaders(accessToken)),
-      );
-      final items = response.data['items'] as List? ?? [];
-      AppLogger.log('TIDAL_API', '플레이리스트 트랙 목록 수신 성공 (/items) [HTTP ${response.statusCode}]: ${items.length}개', type: LogType.success);
-      return items.map((e) => MediaTrack.fromJson(e is Map<String, dynamic> ? e : {})).toList();
-    } catch (e) {
-      AppLogger.log('TIDAL_API', '/playlists/$playlistId/items 조회 실패: $e', type: LogType.error);
-      return [];
-    }
+  static List<T> _items<T>(dynamic data, T Function(Map<String, dynamic>) parse) {
+    if (data is! Map) throw const ApiFailure(ApiFailureKind.parse, '응답 형식이 올바르지 않습니다.');
+    final items = data['items'];
+    if (items is! List) return const [];
+    return items.whereType<Map>().map((e) => parse(Map<String, dynamic>.from(e))).toList();
   }
 
   // ──────────────────────────────────────────────
-  // 실시간 재생 정보 (MPEG-DASH MPD 및 오디오 스트림 URL) 발급
+  // 즐겨찾기
+  // ──────────────────────────────────────────────
+
+  Future<List<MediaAlbum>> getFavoriteAlbums({required String userId}) async =>
+      _items(await _get('/users/$userId/favorites/albums', {'limit': 50}), MediaAlbum.fromJson);
+
+  Future<List<MediaPlaylist>> getFavoritePlaylists({required String userId}) async =>
+      _items(await _get('/users/$userId/favorites/playlists', {'limit': 50}), MediaPlaylist.fromJson);
+
+  Future<List<MediaTrack>> getFavoriteTracks({required String userId}) async =>
+      _items(await _get('/users/$userId/favorites/tracks', {'limit': 50}), MediaTrack.fromJson);
+
+  // ──────────────────────────────────────────────
+  // 앨범·플레이리스트 트랙
+  // ──────────────────────────────────────────────
+
+  Future<List<MediaTrack>> getAlbumTracks(String albumId) async =>
+      _items(await _get('/albums/$albumId/tracks', {'limit': 100}), MediaTrack.fromJson);
+
+  /// 플레이리스트 트랙. /tracks가 비거나 실패하면 /items를 시도한다.
+  Future<List<MediaTrack>> getPlaylistTracks(String playlistId) async {
+    try {
+      final tracks = _items(await _get('/playlists/$playlistId/tracks', {'limit': 100}), MediaTrack.fromJson);
+      if (tracks.isNotEmpty) return tracks;
+    } on ApiFailure catch (e) {
+      if (e.kind == ApiFailureKind.network) rethrow;
+    }
+    return _items(await _get('/playlists/$playlistId/items', {'limit': 100}), MediaTrack.fromJson);
+  }
+
+  // ──────────────────────────────────────────────
+  // 재생 정보
   // ──────────────────────────────────────────────
 
   /// 재생용 스트림 정보를 받는다. [quality]로 한 번 요청하고, 실패하면 한 단계 낮은 음질로 한 번 더 요청한다.
-  Future<TidalPlaybackInfo?> getPlaybackInfo(String trackId, String accessToken, {String quality = 'LOSSLESS'}) async {
-    final first = await _requestPlaybackInfo(trackId, accessToken, quality);
+  Future<TidalPlaybackInfo?> getPlaybackInfo(String trackId, {String quality = 'LOSSLESS'}) async {
+    final first = await _requestPlaybackInfo(trackId, quality);
     if (first != null) return first;
     final lower = lowerAudioQuality(quality);
     if (lower == null) return null;
     AppLogger.log('TIDAL_API', '$quality 스트림 실패 -> $lower로 재시도', type: LogType.warning);
-    return _requestPlaybackInfo(trackId, accessToken, lower);
+    return _requestPlaybackInfo(trackId, lower);
   }
 
-  Future<TidalPlaybackInfo?> _requestPlaybackInfo(String trackId, String accessToken, String quality) async {
-    AppLogger.log('TIDAL_API', 'GET /tracks/$trackId/playbackinfopostpaywall (audioquality=$quality)', type: LogType.network);
+  Future<TidalPlaybackInfo?> _requestPlaybackInfo(String trackId, String quality) async {
     try {
-      final response = await _dio.get(
-        '/tracks/$trackId/playbackinfopostpaywall',
-        queryParameters: {
-          'audioquality': quality,
-          'playbackmode': 'STREAM',
-          'assetpresentation': 'FULL',
-        },
-        options: Options(headers: _buildHeaders(accessToken)),
-      );
-      final info = parsePlaybackInfo(response.data, fallbackQuality: quality);
-      if (info == null) {
-        AppLogger.log('TIDAL_API', '스트림 정보 해석 실패 ($quality)', type: LogType.warning);
-      } else {
+      final data = await _get('/tracks/$trackId/playbackinfopostpaywall', {
+        'audioquality': quality,
+        'playbackmode': 'STREAM',
+        'assetpresentation': 'FULL',
+      });
+      final info = parsePlaybackInfo(data, fallbackQuality: quality);
+      if (info != null) {
         AppLogger.log('TIDAL_API', '스트림 정보 수신: ${info.audioQuality}, ${info.isDash ? 'DASH' : info.mimeType}', type: LogType.success);
       }
       return info;
-    } catch (e) {
-      final status = e is DioException ? e.response?.statusCode : null;
-      AppLogger.log('TIDAL_API', '스트림 정보 요청 실패 ($quality, HTTP $status)', type: LogType.warning);
+    } on ApiFailure {
       return null;
     }
   }
@@ -280,153 +200,67 @@ class TidalApiClient {
   }
 
   // ──────────────────────────────────────────────
-  // 추천 / 피처드 (Explore / Recommendations) Endpoints
+  // 추천
   // ──────────────────────────────────────────────
 
-  Future<List<MediaAlbum>> getFeaturedAlbums(String accessToken) async {
-    try {
-      final response = await _dio.get(
-        '/featured/new/albums',
-        queryParameters: {'countryCode': 'US', 'limit': 20},
-        options: Options(headers: _buildHeaders(accessToken)),
+  /// 추천 신규 앨범. 비어 있거나 실패하면 검색 결과로 대신한다.
+  Future<List<MediaAlbum>> getFeaturedAlbums() => _withFallback(
+        () async => _items(await _get('/featured/new/albums', {'limit': 20}), MediaAlbum.fromJson),
+        () => searchAlbums('Master', limit: 10),
       );
-      final items = response.data['items'] as List? ?? [];
-      if (items.isNotEmpty) {
-        return items.map((e) => MediaAlbum.fromJson(e is Map<String, dynamic> ? e : {})).toList();
-      }
-    } catch (_) {}
 
-    return searchAlbums('Master', accessToken, limit: 10);
-  }
-
-  Future<List<MediaPlaylist>> getFeaturedPlaylists(String accessToken) async {
-    try {
-      final response = await _dio.get(
-        '/featured/recommended/playlists',
-        queryParameters: {'countryCode': 'US', 'limit': 20},
-        options: Options(headers: _buildHeaders(accessToken)),
+  Future<List<MediaPlaylist>> getFeaturedPlaylists() => _withFallback(
+        () async => _items(await _get('/featured/recommended/playlists', {'limit': 20}), MediaPlaylist.fromJson),
+        () => searchPlaylists('Tidal Master', limit: 10),
       );
-      final items = response.data['items'] as List? ?? [];
-      if (items.isNotEmpty) {
-        return items.map((e) => MediaPlaylist.fromJson(e is Map<String, dynamic> ? e : {})).toList();
-      }
-    } catch (_) {}
 
-    return searchPlaylists('Tidal Master', accessToken, limit: 10);
-  }
-
-  Future<List<MediaTrack>> getFeaturedTracks(String accessToken) async {
-    try {
-      final response = await _dio.get(
-        '/featured/recommended/tracks',
-        queryParameters: {'countryCode': 'US', 'limit': 20},
-        options: Options(headers: _buildHeaders(accessToken)),
+  Future<List<MediaTrack>> getFeaturedTracks() => _withFallback(
+        () async => _items(await _get('/featured/recommended/tracks', {'limit': 20}), MediaTrack.fromJson),
+        () => searchTracks('Top Hits', limit: 15),
       );
-      final items = response.data['items'] as List? ?? [];
-      if (items.isNotEmpty) {
-        return items.map((e) => MediaTrack.fromJson(e is Map<String, dynamic> ? e : {})).toList();
-      }
-    } catch (_) {}
 
-    return searchTracks('Top Hits', accessToken, limit: 15);
-  }
-
-  // ──────────────────────────────────────────────
-  // 검색 (Search) Endpoints
-  // ──────────────────────────────────────────────
-
-  Future<List<MediaTrack>> searchTracks(String query, String accessToken, {int limit = 20}) async {
-    if (query.trim().isEmpty) return [];
-    AppLogger.log('TIDAL_API', 'GET $baseUrl/search/tracks (query=$query, countryCode=US)', type: LogType.network);
+  Future<List<T>> _withFallback<T>(Future<List<T>> Function() primary, Future<List<T>> Function() fallback) async {
     try {
-      final response = await _dio.get(
-        '/search/tracks',
-        queryParameters: {'query': query, 'limit': limit, 'countryCode': 'US'},
-        options: Options(headers: _buildHeaders(accessToken)),
-      );
-      final items = response.data['items'] as List? ?? [];
-      AppLogger.log('TIDAL_API', '트랙 검색 성공 [HTTP ${response.statusCode}]: ${items.length}개 수신', type: LogType.success);
-      return items.map((e) => MediaTrack.fromJson(e is Map<String, dynamic> ? e : {})).toList();
-    } catch (e) {
-      if (e is DioException && e.response != null) {
-        AppLogger.log('TIDAL_API', '트랙 검색 오류 [HTTP ${e.response?.statusCode}]: ${e.response?.data}', type: LogType.error);
-      } else {
-        AppLogger.log('TIDAL_API', '트랙 검색 오류: $e', type: LogType.error);
-      }
-      return [];
+      final items = await primary();
+      if (items.isNotEmpty) return items;
+    } on ApiFailure catch (e) {
+      if (e.kind == ApiFailureKind.network) rethrow;
     }
-  }
-
-  Future<List<MediaAlbum>> searchAlbums(String query, String accessToken, {int limit = 20}) async {
-    if (query.trim().isEmpty) return [];
-    AppLogger.log('TIDAL_API', 'GET $baseUrl/search/albums (query=$query, countryCode=US)', type: LogType.network);
-    try {
-      final response = await _dio.get(
-        '/search/albums',
-        queryParameters: {'query': query, 'limit': limit, 'countryCode': 'US'},
-        options: Options(headers: _buildHeaders(accessToken)),
-      );
-      final items = response.data['items'] as List? ?? [];
-      AppLogger.log('TIDAL_API', '앨범 검색 성공 [HTTP ${response.statusCode}]: ${items.length}개 수신', type: LogType.success);
-      return items.map((e) => MediaAlbum.fromJson(e is Map<String, dynamic> ? e : {})).toList();
-    } catch (e) {
-      return [];
-    }
-  }
-
-  Future<List<MediaPlaylist>> searchPlaylists(String query, String accessToken, {int limit = 20}) async {
-    if (query.trim().isEmpty) return [];
-    AppLogger.log('TIDAL_API', 'GET $baseUrl/search/playlists (query=$query, countryCode=US)', type: LogType.network);
-    try {
-      final response = await _dio.get(
-        '/search/playlists',
-        queryParameters: {'query': query, 'limit': limit, 'countryCode': 'US'},
-        options: Options(headers: _buildHeaders(accessToken)),
-      );
-      final items = response.data['items'] as List? ?? [];
-      AppLogger.log('TIDAL_API', '플레이리스트 검색 성공 [HTTP ${response.statusCode}]: ${items.length}개 수신', type: LogType.success);
-      return items.map((e) => MediaPlaylist.fromJson(e is Map<String, dynamic> ? e : {})).toList();
-    } catch (e) {
-      return [];
-    }
+    return fallback();
   }
 
   // ──────────────────────────────────────────────
-  // 연관 추천곡 / Track Radio (Similar Tracks) Endpoints
+  // 검색
   // ──────────────────────────────────────────────
 
-  Future<List<MediaTrack>> getSimilarTracks(String trackId, String accessToken, {int limit = 30}) async {
-    if (trackId.isEmpty) return [];
-    AppLogger.log('TIDAL_API', 'GET $baseUrl/tracks/$trackId/similarTracks (countryCode=US, limit=$limit)', type: LogType.network);
-    try {
-      final response = await _dio.get(
-        '/tracks/$trackId/similarTracks',
-        queryParameters: {'countryCode': 'US', 'limit': limit},
-        options: Options(headers: _buildHeaders(accessToken)),
-      );
-      final items = response.data['items'] as List? ?? [];
-      if (items.isNotEmpty) {
-        AppLogger.log('TIDAL_API', '연관 추천곡(similarTracks) 수신 성공: ${items.length}개', type: LogType.success);
-        return items.map((e) => MediaTrack.fromJson(e is Map<String, dynamic> ? e : {})).toList();
-      }
-    } catch (e) {
-      AppLogger.log('TIDAL_API', 'similarTracks 조회 실패 ($e) -> 추천곡 폴백 시도', type: LogType.warning);
-    }
+  Future<List<MediaTrack>> searchTracks(String query, {int limit = 20}) async {
+    if (query.trim().isEmpty) return const [];
+    return _items(await _get('/search/tracks', {'query': query, 'limit': limit}), MediaTrack.fromJson);
+  }
 
-    // 폴백: /tracks/$trackId/radio 또는 추천 트랙
-    try {
-      final response = await _dio.get(
-        '/tracks/$trackId/radio',
-        queryParameters: {'countryCode': 'US', 'limit': limit},
-        options: Options(headers: _buildHeaders(accessToken)),
-      );
-      final items = response.data['items'] as List? ?? [];
-      if (items.isNotEmpty) {
-        return items.map((e) => MediaTrack.fromJson(e is Map<String, dynamic> ? e : {})).toList();
-      }
-    } catch (_) {}
+  Future<List<MediaAlbum>> searchAlbums(String query, {int limit = 20}) async {
+    if (query.trim().isEmpty) return const [];
+    return _items(await _get('/search/albums', {'query': query, 'limit': limit}), MediaAlbum.fromJson);
+  }
 
-    return getFeaturedTracks(accessToken);
+  Future<List<MediaPlaylist>> searchPlaylists(String query, {int limit = 20}) async {
+    if (query.trim().isEmpty) return const [];
+    return _items(await _get('/search/playlists', {'query': query, 'limit': limit}), MediaPlaylist.fromJson);
+  }
+
+  // ──────────────────────────────────────────────
+  // 연관 추천곡
+  // ──────────────────────────────────────────────
+
+  /// 유사곡. similarTracks -> radio -> 추천 트랙 순으로 시도한다.
+  Future<List<MediaTrack>> getSimilarTracks(String trackId, {int limit = 30}) async {
+    if (trackId.isEmpty) return const [];
+    return _withFallback(
+      () async => _items(await _get('/tracks/$trackId/similarTracks', {'limit': limit}), MediaTrack.fromJson),
+      () => _withFallback(
+        () async => _items(await _get('/tracks/$trackId/radio', {'limit': limit}), MediaTrack.fromJson),
+        getFeaturedTracks,
+      ),
+    );
   }
 }
-

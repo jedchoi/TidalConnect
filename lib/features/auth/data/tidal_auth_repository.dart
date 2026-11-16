@@ -117,6 +117,19 @@ class TidalAuthRepository {
     return client?.accessToken;
   }
 
+  /// API가 401을 돌려줬을 때 새 토큰을 받는다. 로그인 상태면 사용자 토큰을 갱신하고,
+  /// 아니면 앱 토큰을 새로 발급받는다. 실패하면 null.
+  Future<String?> recoverFromUnauthorized() async {
+    await _ensureLoaded();
+    if (userToken.value != null) {
+      final outcome = await _refreshUserToken();
+      return outcome == RefreshOutcome.success ? userToken.value?.accessToken : null;
+    }
+    _clientToken = null;
+    await _storageService.deleteClientToken();
+    return (await _getClientToken())?.accessToken;
+  }
+
   Future<void> _ensureLoaded() async {
     if (_loaded) return;
     _loaded = true;

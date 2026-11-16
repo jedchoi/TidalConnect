@@ -55,12 +55,11 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
 
       _isLoggedIn = true;
       final userId = userToken.userId;
-      final accessToken = userToken.accessToken;
 
       final results = await Future.wait([
-        _apiClient.getFavoriteAlbums(accessToken, userId: userId),
-        _apiClient.getFavoritePlaylists(accessToken, userId: userId),
-        _apiClient.getFavoriteTracks(accessToken, userId: userId),
+        _apiClient.getFavoriteAlbums(userId: userId),
+        _apiClient.getFavoritePlaylists(userId: userId),
+        _apiClient.getFavoriteTracks(userId: userId),
       ]);
 
       if (mounted) {

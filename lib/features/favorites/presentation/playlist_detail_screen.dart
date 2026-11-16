@@ -34,18 +34,12 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
   Future<void> _loadPlaylistTracks() async {
     setState(() => _isLoading = true);
     try {
-      final accessToken = await ref.read(authRepositoryProvider).getCatalogToken();
-
-      if (accessToken != null) {
-        final tracks = await _apiClient.getPlaylistTracks(widget.playlist.id, accessToken);
-        if (mounted) {
-          setState(() {
-            _tracks = tracks;
-            _isLoading = false;
-          });
-        }
-      } else {
-        if (mounted) setState(() => _isLoading = false);
+      final tracks = await _apiClient.getPlaylistTracks(widget.playlist.id);
+      if (mounted) {
+        setState(() {
+          _tracks = tracks;
+          _isLoading = false;
+        });
       }
     } catch (e) {
       AppLogger.log('PLAYLIST_DETAIL', '플레이리스트 트랙 로딩 오류: $e', type: LogType.error);
