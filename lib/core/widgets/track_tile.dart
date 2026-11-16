@@ -4,6 +4,8 @@ import '../../features/tidal_api/domain/models/media_item.dart';
 import '../providers.dart';
 import '../theme/app_colors.dart';
 import '../utils/format.dart';
+import '../../features/tidal_api/data/tidal_api_client.dart';
+import 'favorite_button.dart';
 import 'quality_badge.dart';
 
 /// 트랙 목록의 한 행. 현재 곡 강조와 재생·일시정지 아이콘을 재생 상태에 맞춰 갱신한다.
@@ -25,6 +27,9 @@ class TrackTile extends ConsumerWidget {
   /// 이 행에서 재생을 시작할 때 함께 호출된다(예: 검색 기록 저장).
   final VoidCallback? onPlay;
 
+  /// 즐겨찾기 하트를 보여줄지. 로그인하지 않았으면 어차피 보이지 않는다.
+  final bool showFavorite;
+
   const TrackTile({
     super.key,
     required this.track,
@@ -35,6 +40,7 @@ class TrackTile extends ConsumerWidget {
     this.showDuration = false,
     this.margin = const EdgeInsets.only(bottom: 8),
     this.onPlay,
+    this.showFavorite = true,
   });
 
   @override
@@ -91,6 +97,7 @@ class TrackTile extends ConsumerWidget {
                     formatDuration(track.durationSeconds),
                     style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                   ),
+                if (showFavorite) FavoriteButton(type: FavoriteType.track, id: track.id, size: 20),
                 IconButton(
                   icon: Icon(
                     isPlayingThis ? Icons.pause_circle_filled : Icons.play_circle_fill,

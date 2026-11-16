@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../core/utils/paginator.dart';
 import '../../../core/widgets/error_retry_view.dart';
+import '../../../core/widgets/favorite_button.dart';
 import '../../../core/widgets/load_more_indicator.dart';
 import '../../../core/widgets/track_tile.dart';
 import '../../favorites/presentation/album_detail_screen.dart';
@@ -173,6 +174,7 @@ class _Header extends StatelessWidget {
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
           ),
+          FavoriteButton(type: FavoriteType.artist, id: artist.id, size: 28),
         ],
       ),
     );

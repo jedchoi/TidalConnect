@@ -84,6 +84,23 @@ class TidalApiClient {
   }
 
   /// 목록 응답 한 페이지를 해석한다. totalNumberOfItems가 없으면 꽉 찬 페이지일 때 다음이 있다고 본다.
+  /// 즐겨찾기 추가(POST)·삭제(DELETE)처럼 결과 본문이 필요 없는 쓰기 요청.
+  Future<void> _write(String method, String path, {Map<String, dynamic>? form}) async {
+    AppLogger.log('TIDAL_API', '$method $path', type: LogType.network);
+    try {
+      await _dio.request(
+        path,
+        data: form,
+        queryParameters: _hasAuth ? null : {'countryCode': TidalAuthRepository.defaultCountryCode},
+        options: Options(method: method, contentType: form == null ? null : Headers.formUrlEncodedContentType),
+      );
+    } on DioException catch (e) {
+      final failure = ApiFailure.fromDio(e);
+      AppLogger.log('TIDAL_API', '$method $path 실패: ${failure.kind.name} (HTTP ${failure.statusCode})', type: LogType.error);
+      throw failure;
+    }
+  }
+
   static PageResult<T> _page<T>(dynamic data, T Function(Map<String, dynamic>) parse,
       {required int offset, required int limit}) {
     final items = _items(data, parse);
@@ -120,6 +137,22 @@ class TidalApiClient {
   Future<PageResult<MediaArtist>> getFavoriteArtists({required String userId, int offset = 0, int limit = pageSize}) async =>
       _page(await _get('/users/$userId/favorites/artists', _paging(offset, limit, newestFirst: true)),
           MediaArtist.fromJson, offset: offset, limit: limit);
+
+  /// 즐겨찾기한 항목의 ID 목록. 하트 표시에 쓴다.
+  Future<Map<FavoriteType, Set<String>>> getFavoriteIds({required String userId}) async {
+    final data = await _get('/users/$userId/favorites/ids', const {});
+    if (data is! Map) throw const ApiFailure(ApiFailureKind.parse, '응답 형식이 올바르지 않습니다.');
+    return {
+      for (final type in FavoriteType.values)
+        type: {for (final id in (data[type.idsKey] as List? ?? const [])) id.toString()},
+    };
+  }
+
+  Future<void> addFavorite({required String userId, required FavoriteType type, required String id}) =>
+      _write('POST', '/users/$userId/favorites/${type.path}', form: {type.formKey: id});
+
+  Future<void> removeFavorite({required String userId, required FavoriteType type, required String id}) =>
+      _write('DELETE', '/users/$userId/favorites/${type.path}/$id');
 
   static Map<String, dynamic> _paging(int offset, int limit, {bool newestFirst = false}) => {
         'offset': offset,
@@ -359,4 +392,23 @@ class SearchResults {
   });
 
   bool get isEmpty => tracks.isEmpty && albums.isEmpty && artists.isEmpty && playlists.isEmpty;
+}
+
+/// 즐겨찾기 종류와 API에서 쓰는 이름.
+enum FavoriteType {
+  track('tracks', 'trackIds', 'TRACK'),
+  album('albums', 'albumIds', 'ALBUM'),
+  artist('artists', 'artistIds', 'ARTIST'),
+  playlist('playlists', 'uuids', 'PLAYLIST');
+
+  const FavoriteType(this.path, this.formKey, this.idsKey);
+
+  /// /users/{id}/favorites/{path}
+  final String path;
+
+  /// 추가 요청 본문의 키.
+  final String formKey;
+
+  /// /favorites/ids 응답의 키.
+  final String idsKey;
 }

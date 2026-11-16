@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/widgets/favorite_button.dart';
+import '../../tidal_api/data/tidal_api_client.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/format.dart';
@@ -130,6 +132,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                             ],
                           ),
                         ),
+                        if (track != null) FavoriteButton(type: FavoriteType.track, id: track.id, size: 26),
                         ValueListenableBuilder<String>(
                           valueListenable: _playerManager.qualityBadgeNotifier,
                           builder: (context, badge, _) {

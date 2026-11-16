@@ -187,4 +187,34 @@ void main() {
     expect(results.playlists, isEmpty);
     expect(results.isEmpty, isFalse);
   });
+
+  test('즐겨찾기 추가는 폼으로 POST, 삭제는 경로에 ID를 붙여 DELETE', () async {
+    final seen = <RequestOptions>[];
+    final dio = Dio(BaseOptions(baseUrl: TidalApiClient.baseUrl))
+      ..httpClientAdapter = FakeAdapter((o) async {
+        seen.add(o);
+        if (o.path.endsWith('/favorites/ids')) {
+          return jsonBody({
+            'TRACK': ['1', 2],
+            'PLAYLIST': ['uuid-1'],
+          });
+        }
+        return jsonBody({});
+      });
+    final api = TidalApiClient(dio: dio);
+
+    await api.addFavorite(userId: 'u', type: FavoriteType.playlist, id: 'uuid-1');
+    expect(seen.last.method, 'POST');
+    expect(seen.last.path, '/users/u/favorites/playlists');
+    expect(seen.last.data, {'uuids': 'uuid-1'});
+
+    await api.removeFavorite(userId: 'u', type: FavoriteType.track, id: '9');
+    expect(seen.last.method, 'DELETE');
+    expect(seen.last.path, '/users/u/favorites/tracks/9');
+
+    final ids = await api.getFavoriteIds(userId: 'u');
+    expect(ids[FavoriteType.track], {'1', '2'});
+    expect(ids[FavoriteType.playlist], {'uuid-1'});
+    expect(ids[FavoriteType.album], isEmpty);
+  });
 }

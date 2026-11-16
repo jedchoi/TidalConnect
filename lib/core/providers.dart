@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/auth/data/tidal_auth_repository.dart';
 import '../features/auth/domain/models/auth_token.dart';
 import '../features/dlna/data/dlna_manager.dart';
+import '../features/favorites/data/favorites_repository.dart';
 import '../features/player/data/player_manager.dart';
 import '../features/settings/data/playback_settings.dart';
 import '../features/tidal_api/data/tidal_api_client.dart';
@@ -32,3 +33,10 @@ final playerManagerProvider = Provider<PlayerManager>((ref) => PlayerManager.ins
 
 /// 재생 설정(음질 등). main()에서 load한 뒤 쓴다.
 final playbackSettingsProvider = Provider<PlaybackSettings>((ref) => PlaybackSettings());
+
+/// 즐겨찾기 ID와 하트 버튼 처리. 로그인 사용자가 바뀌면 ID를 다시 받는다.
+final favoritesProvider = ChangeNotifierProvider<FavoritesRepository>((ref) {
+  final repo = FavoritesRepository(api: ref.watch(apiClientProvider));
+  ref.listen<String?>(loggedInUserIdProvider, (_, userId) => repo.setUser(userId), fireImmediately: true);
+  return repo;
+});

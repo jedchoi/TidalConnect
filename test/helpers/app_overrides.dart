@@ -72,6 +72,29 @@ class FakeApiClient extends TidalApiClient {
     return PageResult(items: artistAlbums, offset: offset, total: artistAlbums.length, hasMore: false);
   }
 
+  final Map<FavoriteType, Set<String>> favoriteIds = {for (final t in FavoriteType.values) t: <String>{}};
+  bool failFavoriteWrites = false;
+
+  @override
+  Future<Map<FavoriteType, Set<String>>> getFavoriteIds({required String userId}) async {
+    calls.add('getFavoriteIds');
+    return {for (final e in favoriteIds.entries) e.key: {...e.value}};
+  }
+
+  @override
+  Future<void> addFavorite({required String userId, required FavoriteType type, required String id}) async {
+    calls.add('addFavorite:${type.name}:$id');
+    if (failFavoriteWrites) throw Exception('offline');
+    favoriteIds[type]!.add(id);
+  }
+
+  @override
+  Future<void> removeFavorite({required String userId, required FavoriteType type, required String id}) async {
+    calls.add('removeFavorite:${type.name}:$id');
+    if (failFavoriteWrites) throw Exception('offline');
+    favoriteIds[type]!.remove(id);
+  }
+
   @override
   Future<SearchResults> searchAll(String query, {int limit = 20}) async {
     calls.add('searchAll:$query');

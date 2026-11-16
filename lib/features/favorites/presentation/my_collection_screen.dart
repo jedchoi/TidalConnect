@@ -91,12 +91,23 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
     }
   }
 
+  Future<void> _reloadQuietly() async {
+    if (!_isLoggedIn || _isLoading) return;
+    try {
+      await Future.wait([_albums.refresh(), _artists.refresh(), _playlists.refresh(), _tracks.refresh()]);
+    } catch (e) {
+      AppLogger.log('FAVORITES', '즐겨찾기 목록 갱신 실패: $e', type: LogType.warning);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // 로그인·로그아웃·계정 변경 시 즐겨찾기를 자동으로 다시 불러온다.
     ref.listen<String?>(loggedInUserIdProvider, (previous, next) {
       if (previous != next) _loadCollectionData();
     });
+    // 다른 화면에서 하트를 눌러 즐겨찾기가 바뀌면 목록을 조용히 다시 받는다.
+    ref.listen<int>(favoritesProvider.select((f) => f.revision), (_, __) => _reloadQuietly());
 
     return Scaffold(
       backgroundColor: AppColors.background,

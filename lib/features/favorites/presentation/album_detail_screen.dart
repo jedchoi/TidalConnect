@@ -4,6 +4,7 @@ import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/paginator.dart';
 import '../../../core/widgets/error_retry_view.dart';
+import '../../../core/widgets/favorite_button.dart';
 import '../../../core/widgets/load_more_indicator.dart';
 import '../../../core/widgets/track_tile.dart';
 import '../../../core/utils/app_logger.dart';
@@ -171,6 +172,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
                                 ),
                               ),
                             ),
+                            FavoriteButton(type: FavoriteType.album, id: widget.album.id, size: 28),
                           ],
                         ),
                         const SizedBox(height: 12),
