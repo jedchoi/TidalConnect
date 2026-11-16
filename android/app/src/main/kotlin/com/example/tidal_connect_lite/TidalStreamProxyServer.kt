@@ -10,7 +10,6 @@ import java.net.NetworkInterface
 import java.security.SecureRandom
 import java.util.Collections
 import java.util.Enumeration
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 
@@ -27,6 +26,7 @@ class TidalStreamProxyServer : NanoHTTPD(PROXY_PORT) {
 
     companion object {
         const val PROXY_PORT = 8765
+        private const val MAX_REGISTERED = 3
         private const val TAG = "TidalStreamProxy"
 
         fun getLanIpAddress(): String {
@@ -65,19 +65,26 @@ class TidalStreamProxyServer : NanoHTTPD(PROXY_PORT) {
         val trackId: String,
         val directUrl: String = "",
         val manifestXml: String = "",
+        /** 이 주소에 접근할 수 있는 스피커 IP. 비어 있으면 제한하지 않는다. */
+        val allowedHost: String = "",
     )
 
-    // 토큰 -> 곡 정보
-    private val streamRegistry = ConcurrentHashMap<String, StreamInfo>()
+    // 토큰 -> 곡 정보. 최근 MAX_REGISTERED곡만 남긴다(삽입 순서 유지).
+    private val streamRegistry = object : LinkedHashMap<String, StreamInfo>() {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, StreamInfo>?): Boolean =
+            size > MAX_REGISTERED
+    }
     private val secureRandom = SecureRandom()
 
     /**
      * 곡을 등록하고 스피커가 접근할 주소를 돌려준다.
      * 예: http://192.168.0.10:8765/audio/3f9c0a1b2d4e5f60.mp4
      */
-    fun registerTrackStream(trackId: String, directUrl: String, manifestXml: String = ""): String {
+    fun registerTrackStream(trackId: String, directUrl: String, manifestXml: String, allowedHost: String): String {
         val token = newToken()
-        streamRegistry[token] = StreamInfo(trackId, directUrl, manifestXml)
+        synchronized(streamRegistry) {
+            streamRegistry[token] = StreamInfo(trackId, directUrl, manifestXml, allowedHost)
+        }
         Log.i(TAG, "트랙 스트림 등록: TrackID=$trackId, direct=${directUrl.isNotEmpty()}, manifestLen=${manifestXml.length}")
         return "http://${getLanIpAddress()}:$PROXY_PORT/audio/$token.mp4"
     }
@@ -106,11 +113,15 @@ class TidalStreamProxyServer : NanoHTTPD(PROXY_PORT) {
      */
     private fun handleAudioRequest(session: IHTTPSession, uri: String): Response {
         val token = uri.removePrefix("/audio/").substringBefore('.')
-        val info = streamRegistry[token]
+        val info = synchronized(streamRegistry) { streamRegistry[token] }
 
         if (info == null || (info.directUrl.isEmpty() && info.manifestXml.isEmpty())) {
             Log.w(TAG, "등록되지 않은 경로 요청 거부")
             return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Not Found")
+        }
+        if (info.allowedHost.isNotEmpty() && info.allowedHost != session.remoteIpAddress) {
+            Log.w(TAG, "허용되지 않은 기기의 요청 거부: ${session.remoteIpAddress}")
+            return newFixedLengthResponse(Response.Status.FORBIDDEN, "text/plain", "Forbidden")
         }
         val trackId = info.trackId
 

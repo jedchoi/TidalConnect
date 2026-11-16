@@ -256,6 +256,7 @@ class PlayerManager {
             trackId: track.id,
             directUrl: playbackInfo.streamUrl,
             manifestXml: playbackInfo.manifest,
+            allowedHost: Uri.tryParse(_dlnaManager.selectedDevice.locationUrl)?.host ?? '',
           );
           AppLogger.log('PLAYER', '🔗 DLNA 전용 단축 프록시 URL 획득 성공 (Quality: ${playbackInfo.audioQuality}): $proxyUrl', type: LogType.success);
         }
