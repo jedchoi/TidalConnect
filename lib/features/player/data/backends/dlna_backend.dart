@@ -1,0 +1,106 @@
+import 'dart:async';
+import '../../../../core/native/tidal_sdk_native_bridge.dart';
+import '../../../../core/utils/app_logger.dart';
+import '../../../auth/data/tidal_auth_repository.dart';
+import '../../../dlna/data/dlna_manager.dart';
+import '../../../tidal_api/data/tidal_api_client.dart';
+import '../../../tidal_api/domain/models/media_item.dart';
+import 'playback_backend.dart';
+
+/// DLNA 스피커 출력. 스트림 정보를 받아 폰의 프록시에 등록하고, 스피커에 SOAP 명령을 보낸다.
+class DlnaBackend implements PlaybackBackend {
+  final TidalAuthRepository _auth;
+  final TidalApiClient _api;
+  final DlnaManager _dlna;
+
+  final _events = StreamController<BackendEvent>.broadcast();
+
+  DlnaBackend({required TidalAuthRepository auth, required TidalApiClient api, required DlnaManager dlna})
+      : _auth = auth,
+        _api = api,
+        _dlna = dlna;
+
+  @override
+  Stream<BackendEvent> get events => _events.stream;
+
+  @override
+  bool get canSeek => true;
+
+  @override
+  Future<void> play(MediaTrack track, {Duration startPosition = Duration.zero, required IsCancelled isCancelled}) async {
+    // 폰 스피커와 동시에 소리가 나지 않게 폰 재생을 멈춘다.
+    await TidalSdkNativeBridge.stopTrack();
+
+    final token = await _auth.getValidUserToken();
+    if (isCancelled()) return;
+    if (token == null) {
+      throw const PlaybackException('NOT_LOGGED_IN', '스피커로 재생하려면 TIDAL 로그인이 필요합니다.');
+    }
+
+    final info = await _api.getPlaybackInfo(track.id, token.accessToken);
+    if (isCancelled()) return;
+    if (info == null) {
+      throw const PlaybackException('NO_STREAM', '이 곡의 스트림 정보를 받지 못했습니다.');
+    }
+
+    final device = _dlna.selectedDevice;
+    final proxyUrl = await TidalSdkNativeBridge.registerTrackStream(
+      trackId: track.id,
+      directUrl: info.streamUrl,
+      manifestXml: info.manifest,
+      allowedHost: Uri.tryParse(device.locationUrl)?.host ?? '',
+    );
+    if (isCancelled()) return;
+    if (proxyUrl.isEmpty) {
+      throw const PlaybackException('PROXY_FAILED', '스피커용 스트림 주소를 만들지 못했습니다. Wi-Fi 연결을 확인하세요.');
+    }
+
+    _events.add(BackendTrackStarted(
+      track.id,
+      duration: track.durationSeconds > 0 ? Duration(seconds: track.durationSeconds) : null,
+      quality: StreamQuality(audioQuality: info.audioQuality),
+    ));
+
+    AppLogger.log('DLNA_BACKEND', '스피커 재생 요청: "${device.friendlyName}"', type: LogType.network);
+    final ok = await _dlna.playOnSelectedDevice(streamUrl: proxyUrl, title: track.title);
+    if (isCancelled()) return;
+    if (!ok) {
+      throw PlaybackException('DLNA_PLAY_FAILED', '"${device.friendlyName}"에 재생 명령을 보내지 못했습니다.');
+    }
+    if (startPosition > Duration.zero) {
+      await _dlna.seek(startPosition.inSeconds);
+    }
+    _events.add(const BackendStateChanged(playing: true));
+  }
+
+  @override
+  Future<void> pause() async {
+    if (!await _dlna.pauseCurrent()) {
+      throw const PlaybackException('DLNA_PAUSE_FAILED', '스피커를 일시정지하지 못했습니다.');
+    }
+    _events.add(const BackendStateChanged(playing: false));
+  }
+
+  @override
+  Future<void> resume() async {
+    if (!await _dlna.resumeCurrent()) {
+      throw const PlaybackException('DLNA_RESUME_FAILED', '스피커 재생을 다시 시작하지 못했습니다.');
+    }
+    _events.add(const BackendStateChanged(playing: true));
+  }
+
+  @override
+  Future<void> seek(Duration position) async {
+    await _dlna.seek(position.inSeconds);
+  }
+
+  @override
+  Future<void> stop() async {
+    await _dlna.stopCurrent();
+    _events.add(const BackendStateChanged(playing: false));
+  }
+
+  void dispose() {
+    _events.close();
+  }
+}
