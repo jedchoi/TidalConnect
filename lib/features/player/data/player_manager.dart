@@ -35,7 +35,7 @@ class PlayerManager {
 
   late TidalAuthRepository _authRepo;
   final TidalApiClient _apiClient = TidalApiClient();
-  final DlnaManager _dlnaManager = DlnaManager.instance;
+  DlnaManager _dlnaManager = DlnaManager.instance;
   final PlayQueue _queue = PlayQueue();
 
   late final PlaybackBackend _phone;
@@ -83,9 +83,15 @@ class PlayerManager {
   PlaybackBackend get _backend => _dlnaManager.selectedDevice.isLocalSpeaker ? _phone : _dlna;
 
   /// 앱 시작 시 공유 인증 저장소를 주입하고 출력 기기 백엔드를 만든다.
-  void configure({required TidalAuthRepository authRepository, PlaybackBackend? phone, PlaybackBackend? dlna}) {
+  void configure({
+    required TidalAuthRepository authRepository,
+    DlnaManager? dlnaManager,
+    PlaybackBackend? phone,
+    PlaybackBackend? dlna,
+  }) {
     if (_configured) return;
     _configured = true;
+    if (dlnaManager != null) _dlnaManager = dlnaManager;
     _authRepo = authRepository;
     _phone = phone ?? PhoneBackend();
     _dlna = dlna ?? DlnaBackend(auth: authRepository, api: _apiClient, dlna: _dlnaManager);

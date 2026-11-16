@@ -7,13 +7,17 @@ import 'upnp_soap_client.dart';
 
 class DlnaManager {
   static final DlnaManager instance = DlnaManager._internal();
-  DlnaManager._internal();
+  DlnaManager._internal() : _ssdpService = SSDPDiscoveryService();
+
+  /// 테스트용. 가짜 탐색 서비스를 넣을 수 있다.
+  @visibleForTesting
+  DlnaManager.forTesting({SSDPDiscoveryService? ssdpService}) : _ssdpService = ssdpService ?? SSDPDiscoveryService();
 
   final ValueNotifier<List<DlnaDevice>> devicesNotifier = ValueNotifier([DlnaDevice.localSpeaker]);
   final ValueNotifier<DlnaDevice> selectedDeviceNotifier = ValueNotifier(DlnaDevice.localSpeaker);
   final ValueNotifier<bool> isSearchingNotifier = ValueNotifier(false);
 
-  final SSDPDiscoveryService _ssdpService = SSDPDiscoveryService();
+  final SSDPDiscoveryService _ssdpService;
   final UPnPSoapClient _soapClient = UPnPSoapClient();
 
   List<DlnaDevice> get devices => devicesNotifier.value;

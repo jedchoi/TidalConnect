@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/providers.dart';
 import '../../favorites/presentation/my_collection_screen.dart';
 import '../../explore/presentation/explore_screen.dart';
 import '../../search/presentation/search_screen.dart';
@@ -9,15 +11,17 @@ import '../../../core/theme/app_colors.dart';
 
 import '../../player/data/player_manager.dart';
 
-class MainScreen extends StatefulWidget {
+class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});
 
   @override
-  State<MainScreen> createState() => _MainScreenState();
+  ConsumerState<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends ConsumerState<MainScreen> {
   int _currentIndex = 0;
+  late final DlnaManager _dlna = ref.read(dlnaManagerProvider);
+  late final PlayerManager _player = ref.read(playerManagerProvider);
 
   final List<Widget> _screens = const [
     MyCollectionScreen(),
@@ -30,21 +34,21 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     // 앱 시작 시 주변 DLNA 스피커 자동 검색 및 목록 구성
-    DlnaManager.instance.discoverDevices();
+    _dlna.discoverDevices();
 
-    PlayerManager.instance.errorNotifier.addListener(_showPlayerError);
-    DlnaManager.instance.messageNotifier.addListener(_showDlnaMessage);
+    _player.errorNotifier.addListener(_showPlayerError);
+    _dlna.messageNotifier.addListener(_showDlnaMessage);
   }
 
   void _showDlnaMessage() {
-    final message = DlnaManager.instance.messageNotifier.value;
+    final message = _dlna.messageNotifier.value;
     if (message == null || !mounted) return;
-    DlnaManager.instance.messageNotifier.value = null;
+    _dlna.messageNotifier.value = null;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showPlayerError() {
-    final error = PlayerManager.instance.errorNotifier.value;
+    final error = _player.errorNotifier.value;
     if (error == null || !mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -57,8 +61,8 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   void dispose() {
-    PlayerManager.instance.errorNotifier.removeListener(_showPlayerError);
-    DlnaManager.instance.messageNotifier.removeListener(_showDlnaMessage);
+    _player.errorNotifier.removeListener(_showPlayerError);
+    _dlna.messageNotifier.removeListener(_showDlnaMessage);
     super.dispose();
   }
 

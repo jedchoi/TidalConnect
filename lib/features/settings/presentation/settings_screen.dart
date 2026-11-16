@@ -5,7 +5,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../auth/data/tidal_auth_repository.dart';
 import '../../auth/presentation/tidal_webview_login_modal.dart';
 import '../../dlna/data/dlna_manager.dart';
-import '../../player/data/player_manager.dart';
 import 'debug_log_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -18,7 +17,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _isAuthenticating = false;
 
-  final DlnaManager _dlnaManager = DlnaManager.instance;
+  DlnaManager get _dlnaManager => ref.read(dlnaManagerProvider);
   TidalAuthRepository get _authRepo => ref.read(authRepositoryProvider);
 
   Future<void> _handleTidalLogin() async {
@@ -57,7 +56,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _handleLogout() async {
     // 순서: 재생 정지 -> 네이티브 자격 증명·저장 토큰 삭제(logout 내부) -> Provider로 상태 전파
-    PlayerManager.instance.stop();
+    ref.read(playerManagerProvider).stop();
     await _authRepo.logout();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -216,7 +215,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                               onPressed: () {
                                 // 재생 중이면 새 기기로 이어서 재생하도록 PlayerManager를 거친다.
-                                PlayerManager.instance.switchPlaybackDevice(device);
+                                ref.read(playerManagerProvider).switchPlaybackDevice(device);
                               },
                               child: const Text('선택'),
                             ),

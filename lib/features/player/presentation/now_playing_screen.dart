@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../dlna/domain/models/dlna_device.dart';
 import '../../dlna/data/dlna_manager.dart';
@@ -6,7 +8,7 @@ import '../../tidal_api/domain/models/media_item.dart';
 import '../data/player_manager.dart';
 import 'speaker_selector_modal.dart';
 
-class NowPlayingScreen extends StatefulWidget {
+class NowPlayingScreen extends ConsumerStatefulWidget {
   final String title;
   final String artist;
   final String album;
@@ -31,12 +33,12 @@ class NowPlayingScreen extends StatefulWidget {
         availableDevices = availableDevices ?? [DlnaDevice.localSpeaker];
 
   @override
-  State<NowPlayingScreen> createState() => _NowPlayingScreenState();
+  ConsumerState<NowPlayingScreen> createState() => _NowPlayingScreenState();
 }
 
-class _NowPlayingScreenState extends State<NowPlayingScreen> {
-  final PlayerManager _playerManager = PlayerManager.instance;
-  final DlnaManager _dlnaManager = DlnaManager.instance;
+class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
+  PlayerManager get _playerManager => ref.read(playerManagerProvider);
+  DlnaManager get _dlnaManager => ref.read(dlnaManagerProvider);
   bool _isUserDraggingSlider = false;
   double _dragSliderValue = 0.0;
 

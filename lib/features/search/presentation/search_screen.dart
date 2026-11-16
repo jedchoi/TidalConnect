@@ -18,8 +18,8 @@ class SearchScreen extends ConsumerStatefulWidget {
 
 class _SearchScreenState extends ConsumerState<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
-  final TidalApiClient _apiClient = TidalApiClient();
-  final PlayerManager _playerManager = PlayerManager.instance;
+  TidalApiClient get _apiClient => ref.read(apiClientProvider);
+  PlayerManager get _playerManager => ref.read(playerManagerProvider);
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
   static const String _historyKey = 'search_history_list';

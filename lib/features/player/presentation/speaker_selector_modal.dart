@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../dlna/data/dlna_manager.dart';
 import '../../dlna/domain/models/dlna_device.dart';
 
-class SpeakerSelectorModal extends StatelessWidget {
+class SpeakerSelectorModal extends ConsumerWidget {
   final Function(DlnaDevice) onSelectDevice;
 
   const SpeakerSelectorModal({
@@ -30,8 +31,8 @@ class SpeakerSelectorModal extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final dlnaManager = DlnaManager.instance;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dlnaManager = ref.read(dlnaManagerProvider);
 
     return SafeArea(
       child: Padding(

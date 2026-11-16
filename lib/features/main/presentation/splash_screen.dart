@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../dlna/data/dlna_manager.dart';
 import 'main_screen.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -48,7 +47,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
     // 2. DLNA 네트워크 스피커 백그라운드 탐색 시작
     setState(() => _statusText = 'Wi-Fi Hi-Fi 스피커 탐색 중...');
     try {
-      DlnaManager.instance.discoverDevices();
+      ref.read(dlnaManagerProvider).discoverDevices();
     } catch (_) {}
 
     await Future.delayed(const Duration(milliseconds: 1200));

@@ -18,8 +18,8 @@ class ExploreScreen extends ConsumerStatefulWidget {
 }
 
 class _ExploreScreenState extends ConsumerState<ExploreScreen> {
-  final _apiClient = TidalApiClient();
-  final _playerManager = PlayerManager.instance;
+  TidalApiClient get _apiClient => ref.read(apiClientProvider);
+  PlayerManager get _playerManager => ref.read(playerManagerProvider);
 
   bool _isLoading = true;
   List<MediaAlbum> _featuredAlbums = [];

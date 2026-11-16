@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../dlna/domain/models/dlna_device.dart';
 import '../../dlna/data/dlna_manager.dart';
@@ -7,7 +9,7 @@ import '../data/player_manager.dart';
 import 'now_playing_screen.dart';
 import 'speaker_selector_modal.dart';
 
-class MiniPlayerWidget extends StatefulWidget {
+class MiniPlayerWidget extends ConsumerStatefulWidget {
   final bool autoStartDiscovery;
   final bool useSafeArea;
 
@@ -18,12 +20,12 @@ class MiniPlayerWidget extends StatefulWidget {
   });
 
   @override
-  State<MiniPlayerWidget> createState() => _MiniPlayerWidgetState();
+  ConsumerState<MiniPlayerWidget> createState() => _MiniPlayerWidgetState();
 }
 
-class _MiniPlayerWidgetState extends State<MiniPlayerWidget> {
-  final DlnaManager _dlnaManager = DlnaManager.instance;
-  final PlayerManager _playerManager = PlayerManager.instance;
+class _MiniPlayerWidgetState extends ConsumerState<MiniPlayerWidget> {
+  DlnaManager get _dlnaManager => ref.read(dlnaManagerProvider);
+  PlayerManager get _playerManager => ref.read(playerManagerProvider);
 
   @override
   void initState() {

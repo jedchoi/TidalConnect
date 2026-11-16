@@ -13,8 +13,9 @@ import 'player_manager.dart';
 /// DLNA 출력은 소리가 스피커에서 나므로 전화나 이어폰 분리에 반응하지 않는다.
 class WaveAudioHandler extends BaseAudioHandler {
   final PlayerManager _player;
+  final DlnaManager _dlna;
 
-  WaveAudioHandler(this._player) {
+  WaveAudioHandler(this._player, {DlnaManager? dlnaManager}) : _dlna = dlnaManager ?? DlnaManager.instance {
     for (final listenable in [
       _player.isPlayingNotifier,
       _player.isBufferingNotifier,
@@ -27,7 +28,7 @@ class WaveAudioHandler extends BaseAudioHandler {
     _player.currentTrackNotifier.addListener(_broadcastMediaItem);
     _player.durationSecondsNotifier.addListener(_broadcastMediaItem);
     _player.queueNotifier.addListener(_broadcastQueue);
-    DlnaManager.instance.selectedDeviceNotifier.addListener(_broadcastPlaybackInfo);
+    _dlna.selectedDeviceNotifier.addListener(_broadcastPlaybackInfo);
     _player.volumeNotifier.addListener(_broadcastPlaybackInfo);
     _broadcastState();
     _broadcastPlaybackInfo();
@@ -36,7 +37,7 @@ class WaveAudioHandler extends BaseAudioHandler {
   /// DLNA 출력이면 세션을 원격 재생으로 알린다. 그러면 화면이 꺼져 있어도 볼륨 키가
   /// 폰 볼륨 대신 [androidAdjustRemoteVolume]·[androidSetRemoteVolume]으로 들어온다.
   void _broadcastPlaybackInfo() {
-    final isLocal = DlnaManager.instance.selectedDevice.isLocalSpeaker;
+    final isLocal = _dlna.selectedDevice.isLocalSpeaker;
     androidPlaybackInfo.add(isLocal
         ? LocalAndroidPlaybackInfo()
         : RemoteAndroidPlaybackInfo(

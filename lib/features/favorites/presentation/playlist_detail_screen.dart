@@ -19,8 +19,8 @@ class PlaylistDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
-  final TidalApiClient _apiClient = TidalApiClient();
-  final PlayerManager _playerManager = PlayerManager.instance;
+  TidalApiClient get _apiClient => ref.read(apiClientProvider);
+  PlayerManager get _playerManager => ref.read(playerManagerProvider);
 
   bool _isLoading = true;
   List<MediaTrack> _tracks = [];

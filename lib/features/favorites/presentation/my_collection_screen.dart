@@ -18,8 +18,8 @@ class MyCollectionScreen extends ConsumerStatefulWidget {
 }
 
 class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
-  final _apiClient = TidalApiClient();
-  final _playerManager = PlayerManager.instance;
+  TidalApiClient get _apiClient => ref.read(apiClientProvider);
+  PlayerManager get _playerManager => ref.read(playerManagerProvider);
 
   bool _isLoading = true;
   bool _isLoggedIn = false;
