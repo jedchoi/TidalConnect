@@ -133,4 +133,8 @@ class WaveAudioHandler extends BaseAudioHandler {
 
   @override
   Future<void> skipToQueueItem(int index) async => _player.playQueueIndex(index);
+
+  /// 최근 앱 목록에서 앱을 밀어내면 재생을 멈추고 서비스를 끝낸다.
+  @override
+  Future<void> onTaskRemoved() => stop();
 }
