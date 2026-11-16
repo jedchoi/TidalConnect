@@ -6,6 +6,7 @@ import '../../../core/widgets/error_retry_view.dart';
 import '../../../core/widgets/track_tile.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../favorites/presentation/album_detail_screen.dart';
+import 'recently_played_section.dart';
 import '../../favorites/presentation/playlist_artwork_widget.dart';
 import '../../favorites/presentation/playlist_detail_screen.dart';
 import '../../tidal_api/data/tidal_api_client.dart';
@@ -90,6 +91,8 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
+                  // 0. 최근 재생
+                  const RecentlyPlayedSection(),
                   // 1. 추천 앨범 (Master / Hi-Res)
                   if (_featuredAlbums.isNotEmpty) ...[
                     Row(

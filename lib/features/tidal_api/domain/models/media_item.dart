@@ -24,6 +24,19 @@ class MediaTrack {
     this.audioQuality = 'LOSSLESS',
   });
 
+  /// 기기에 저장할 때 쓰는 형태. [MediaTrack.fromJson]으로 그대로 되읽을 수 있다.
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'artistName': artistName,
+        'album': {'title': albumTitle, 'cover': coverUrl},
+        'duration': durationSeconds,
+        'audioQuality': audioQuality,
+        'mediaMetadata': {
+          'tags': [audioQuality],
+        },
+      };
+
   factory MediaTrack.fromJson(Map<String, dynamic> rawJson) {
     final json = (rawJson['item'] is Map<String, dynamic>)
         ? rawJson['item'] as Map<String, dynamic>

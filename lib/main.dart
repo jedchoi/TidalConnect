@@ -34,6 +34,14 @@ Future<void> main() async {
   applyQuality();
   settings.audioQuality.addListener(applyQuality);
 
+  // 재생을 시작한 곡을 최근 재생 목록에 남긴다.
+  final recent = container.read(recentlyPlayedProvider);
+  await recent.load();
+  playerManager.currentTrackNotifier.addListener(() {
+    final track = playerManager.currentTrack;
+    if (track != null) recent.add(track);
+  });
+
   // 잠금화면·알림·블루투스 버튼 제어와 백그라운드 재생 유지(포그라운드 서비스)
   await AudioService.init(
     builder: () => WaveAudioHandler(playerManager, dlnaManager: dlnaManager),

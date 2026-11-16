@@ -5,6 +5,7 @@ import '../features/auth/domain/models/auth_token.dart';
 import '../features/dlna/data/dlna_manager.dart';
 import '../features/favorites/data/favorites_repository.dart';
 import '../features/player/data/player_manager.dart';
+import '../features/player/data/recently_played_store.dart';
 import '../features/settings/data/playback_settings.dart';
 import '../features/tidal_api/data/tidal_api_client.dart';
 
@@ -40,3 +41,6 @@ final favoritesProvider = ChangeNotifierProvider<FavoritesRepository>((ref) {
   ref.listen<String?>(loggedInUserIdProvider, (_, userId) => repo.setUser(userId), fireImmediately: true);
   return repo;
 });
+
+/// 최근 재생 목록. main()에서 load하고 재생할 때마다 추가한다.
+final recentlyPlayedProvider = Provider<RecentlyPlayedStore>((ref) => RecentlyPlayedStore());
