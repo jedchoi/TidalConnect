@@ -46,7 +46,7 @@ class MediaTrack {
 
     final id = json['id']?.toString() ?? '';
     final title = json['title'] as String? ?? json['name'] as String? ?? '';
-    
+
     // Artist name parsing
     String artist = '';
     if (json['artist'] is Map && json['artist']['name'] != null) {
@@ -79,7 +79,7 @@ class MediaTrack {
     final coverPath = tidalImageUrl(coverUuid);
 
     final duration = (json['duration'] as num?)?.toInt() ?? 0;
-    
+
     final quality = resolveAudioQuality(json);
 
     return MediaTrack(
@@ -93,10 +93,18 @@ class MediaTrack {
     );
   }
 
-  bool get isMax => audioQuality.toUpperCase().contains('HI_RES') || audioQuality.toUpperCase().contains('HIRES') || audioQuality.toUpperCase().contains('MAX') || audioQuality.toUpperCase().contains('MQA');
+  bool get isMax =>
+      audioQuality.toUpperCase().contains('HI_RES') ||
+      audioQuality.toUpperCase().contains('HIRES') ||
+      audioQuality.toUpperCase().contains('MAX') ||
+      audioQuality.toUpperCase().contains('MQA');
   bool get isAtmos => audioQuality.toUpperCase().contains('DOLBY') || audioQuality.toUpperCase().contains('ATMOS');
-  bool get isLossless => isMax || isAtmos || audioQuality.toUpperCase().contains('LOSSLESS') || audioQuality.toUpperCase().contains('FLAC');
-  
+  bool get isLossless =>
+      isMax ||
+      isAtmos ||
+      audioQuality.toUpperCase().contains('LOSSLESS') ||
+      audioQuality.toUpperCase().contains('FLAC');
+
   String get qualityBadgeText {
     if (isMax) return 'MAX';
     if (isAtmos) return 'ATMOS';
@@ -137,7 +145,7 @@ class MediaAlbum {
 
     final id = json['id']?.toString() ?? '';
     final title = json['title'] as String? ?? json['name'] as String? ?? '';
-    
+
     String artist = '';
     if (json['artist'] is Map && json['artist']['name'] != null) {
       artist = json['artist']['name'].toString();
@@ -164,9 +172,10 @@ class MediaAlbum {
       artistName: artist,
       coverUrl: coverPath,
       numberOfTracks: numberOfTracks,
-      audioQuality: json.containsKey('audioQuality') || json.containsKey('mediaMetadata') || json.containsKey('audioModes')
-          ? resolveAudioQuality(json)
-          : '',
+      audioQuality:
+          json.containsKey('audioQuality') || json.containsKey('mediaMetadata') || json.containsKey('audioModes')
+              ? resolveAudioQuality(json)
+              : '',
     );
   }
 }
@@ -212,9 +221,10 @@ class MediaPlaylist {
       description: description,
       coverUrl: coverPath,
       numberOfTracks: numberOfTracks,
-      audioQuality: json.containsKey('audioQuality') || json.containsKey('mediaMetadata') || json.containsKey('audioModes')
-          ? resolveAudioQuality(json)
-          : '',
+      audioQuality:
+          json.containsKey('audioQuality') || json.containsKey('mediaMetadata') || json.containsKey('audioModes')
+              ? resolveAudioQuality(json)
+              : '',
     );
   }
 }
@@ -249,7 +259,7 @@ class MediaArtist {
 /// mediaMetadata.tags, audioModes, audioQuality 순으로 본다.
 String resolveAudioQuality(Map<String, dynamic> json) {
   String quality = '';
-  
+
   // 1. mediaMetadata.tags 분석 (가장 신뢰성 높음: HIRES_LOSSLESS, LOSSLESS, DOLBY_ATMOS)
   if (json['mediaMetadata'] is Map && json['mediaMetadata']['tags'] is List) {
     final tags = (json['mediaMetadata']['tags'] as List).map((e) => e.toString().toUpperCase()).toList();

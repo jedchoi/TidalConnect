@@ -67,7 +67,8 @@ class _TidalWebViewLoginModalState extends State<TidalWebViewLoginModal> {
     AppLogger.log('TIDAL_AUTH', 'In-App WebView Tidal PKCE 로그인 시작', type: LogType.network);
 
     _controller = WebViewController()
-      ..setUserAgent("Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36")
+      ..setUserAgent(
+          "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36")
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(

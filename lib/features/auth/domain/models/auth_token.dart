@@ -15,8 +15,7 @@ class AuthToken {
     this.countryCode = '',
   });
 
-  bool get isExpired =>
-      DateTime.now().isAfter(expiresAt.subtract(const Duration(minutes: 5)));
+  bool get isExpired => DateTime.now().isAfter(expiresAt.subtract(const Duration(minutes: 5)));
 
   Map<String, dynamic> toJson() => {
         'accessToken': accessToken,

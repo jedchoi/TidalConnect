@@ -78,7 +78,9 @@ class FakeApiClient extends TidalApiClient {
   @override
   Future<Map<FavoriteType, Set<String>>> getFavoriteIds({required String userId}) async {
     calls.add('getFavoriteIds');
-    return {for (final e in favoriteIds.entries) e.key: {...e.value}};
+    return {
+      for (final e in favoriteIds.entries) e.key: {...e.value}
+    };
   }
 
   @override

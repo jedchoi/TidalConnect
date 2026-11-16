@@ -30,7 +30,8 @@ class FakeBackend implements PlaybackBackend {
   bool get canSeek => true;
 
   @override
-  Future<void> play(MediaTrack track, {Duration startPosition = Duration.zero, required IsCancelled isCancelled}) async {
+  Future<void> play(MediaTrack track,
+      {Duration startPosition = Duration.zero, required IsCancelled isCancelled}) async {
     played.add(track.id);
     await onPlay?.call(track);
   }
@@ -66,7 +67,9 @@ void main() {
     phone = FakeBackend();
     final auth = TidalAuthRepository(
       storageService: SecureStorageService(storage: FakeFlutterSecureStorage()),
-      dio: Dio()..httpClientAdapter = FakeAdapter((o) async => throw DioException.connectionError(requestOptions: o, reason: 'offline')),
+      dio: Dio()
+        ..httpClientAdapter =
+            FakeAdapter((o) async => throw DioException.connectionError(requestOptions: o, reason: 'offline')),
       nativeSink: FakeNativeSink(),
     );
     dlna = FakeBackend();

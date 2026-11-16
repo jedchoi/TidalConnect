@@ -72,7 +72,8 @@ class DlnaBackend implements PlaybackBackend {
   bool get canSeek => _canSeek;
 
   @override
-  Future<void> play(MediaTrack track, {Duration startPosition = Duration.zero, required IsCancelled isCancelled}) async {
+  Future<void> play(MediaTrack track,
+      {Duration startPosition = Duration.zero, required IsCancelled isCancelled}) async {
     _stopPolling();
     _next = null; // SetAVTransportURI가 스피커의 다음 곡 등록도 지운다
     // 폰 스피커와 동시에 소리가 나지 않게 폰 재생을 멈춘다.

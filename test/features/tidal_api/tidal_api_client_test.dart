@@ -76,7 +76,11 @@ void main() {
       final info = TidalApiClient.parsePlaybackInfo({
         'audioQuality': 'LOSSLESS',
         'manifestMimeType': 'application/vnd.tidal.bts',
-        'manifest': b64(jsonEncode({'mimeType': 'audio/flac', 'codecs': 'flac', 'urls': ['https://cdn.example/a.flac?sig=1']})),
+        'manifest': b64(jsonEncode({
+          'mimeType': 'audio/flac',
+          'codecs': 'flac',
+          'urls': ['https://cdn.example/a.flac?sig=1']
+        })),
       }, fallbackQuality: 'LOSSLESS')!;
       expect(info.isDash, isFalse);
       expect(info.streamUrl, 'https://cdn.example/a.flac?sig=1');
@@ -147,7 +151,11 @@ void main() {
     });
 
     test('전체 개수가 없으면 꽉 찬 페이지일 때만 다음이 있다고 본다', () async {
-      final api = client((o) => {'items': [for (var i = 0; i < 2; i++) trackJson(i)]}, []);
+      final api = client(
+          (o) => {
+                'items': [for (var i = 0; i < 2; i++) trackJson(i)]
+              },
+          []);
       expect((await api.getAlbumTracks('a', limit: 2)).hasMore, isTrue);
       expect((await api.getAlbumTracks('a', limit: 3)).hasMore, isFalse);
     });
@@ -161,12 +169,23 @@ void main() {
         return jsonBody({
           'tracks': {
             'items': [
-              {'id': 1, 'title': 'Song', 'duration': 10, 'artist': {'name': 'A'}, 'album': {'title': 'B'}},
+              {
+                'id': 1,
+                'title': 'Song',
+                'duration': 10,
+                'artist': {'name': 'A'},
+                'album': {'title': 'B'}
+              },
             ],
           },
           'albums': {
             'items': [
-              {'id': 2, 'title': 'Album', 'artist': {'name': 'A'}, 'cover': ''},
+              {
+                'id': 2,
+                'title': 'Album',
+                'artist': {'name': 'A'},
+                'cover': ''
+              },
             ],
           },
           'artists': {

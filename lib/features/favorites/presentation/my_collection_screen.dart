@@ -212,196 +212,200 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
         // 세로 목록 끝에 닿으면 트랙 다음 페이지를 받는다.
         onNotification: _tracks.onScroll,
         child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // 1. 내 앨범 섹션
-          if (albums.isNotEmpty) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  '내 앨범',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+          padding: const EdgeInsets.all(16),
+          children: [
+            // 1. 내 앨범 섹션
+            if (albums.isNotEmpty) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    '내 앨범',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                  ),
+                  Text('${_albums.totalCount}개', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 175,
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: (n) => _albums.onScroll(n, axis: Axis.horizontal),
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: albums.length + (_albums.hasMore ? 1 : 0),
+                    separatorBuilder: (_, __) => const SizedBox(width: 12),
+                    itemBuilder: (context, index) {
+                      if (index == albums.length) return LoadMoreIndicator(paginator: _albums, width: 60);
+                      final album = albums[index];
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => AlbumDetailScreen(album: album)),
+                          );
+                        },
+                        child: Container(
+                          width: 130,
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceCard,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.surfaceLight),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: album.coverUrl.isNotEmpty
+                                    ? Image.network(
+                                        album.coverUrl,
+                                        width: 114,
+                                        height: 90,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => Container(
+                                          height: 90,
+                                          color: Colors.white10,
+                                          child: const Center(
+                                              child: Icon(Icons.album, size: 40, color: AppColors.cyanAccent)),
+                                        ),
+                                      )
+                                    : Container(
+                                        height: 90,
+                                        color: Colors.white10,
+                                        child: const Center(
+                                            child: Icon(Icons.album, size: 40, color: AppColors.cyanAccent)),
+                                      ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                album.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                              ),
+                              Text(
+                                album.artistName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
-                Text('${_albums.totalCount}개', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-              ],
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 175,
-              child: NotificationListener<ScrollNotification>(
-                onNotification: (n) => _albums.onScroll(n, axis: Axis.horizontal),
-                child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: albums.length + (_albums.hasMore ? 1 : 0),
-                separatorBuilder: (_, __) => const SizedBox(width: 12),
-                itemBuilder: (context, index) {
-                  if (index == albums.length) return LoadMoreIndicator(paginator: _albums, width: 60);
-                  final album = albums[index];
-                  return GestureDetector(
+              ),
+              const SizedBox(height: 24),
+            ],
+
+            // 2. 내 아티스트 섹션
+            if (artists.isNotEmpty) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    '내 아티스트',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                  ),
+                  Text('${_artists.totalCount}명', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 120,
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: (n) => _artists.onScroll(n, axis: Axis.horizontal),
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: artists.length + (_artists.hasMore ? 1 : 0),
+                    separatorBuilder: (_, __) => const SizedBox(width: 12),
+                    itemBuilder: (context, index) {
+                      if (index == artists.length) return LoadMoreIndicator(paginator: _artists, width: 60);
+                      return _ArtistAvatar(artist: artists[index]);
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+
+            // 3. 내 플레이리스트 섹션
+            if (playlists.isNotEmpty) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    '내 플레이리스트',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                  ),
+                  Text('${_playlists.totalCount}개',
+                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ...List.generate(playlists.length, (index) {
+                final playlist = playlists[index];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    tileColor: AppColors.surfaceCard,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: const BorderSide(color: AppColors.surfaceLight),
+                    ),
+                    leading: PlaylistArtworkWidget(
+                      coverUrl: playlist.coverUrl,
+                      size: 48,
+                      borderRadius: 8,
+                    ),
+                    title:
+                        Text(playlist.title, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                    subtitle: Text(
+                      playlist.numberOfTracks > 0 ? '${playlist.numberOfTracks}곡' : playlist.description,
+                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: const Icon(Icons.chevron_right, color: AppColors.textSecondary),
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => AlbumDetailScreen(album: album)),
+                        MaterialPageRoute(builder: (_) => PlaylistDetailScreen(playlist: playlist)),
                       );
                     },
-                    child: Container(
-                      width: 130,
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceCard,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.surfaceLight),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: album.coverUrl.isNotEmpty
-                                ? Image.network(
-                                    album.coverUrl,
-                                    width: 114,
-                                    height: 90,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(
-                                      height: 90,
-                                      color: Colors.white10,
-                                      child: const Center(child: Icon(Icons.album, size: 40, color: AppColors.cyanAccent)),
-                                    ),
-                                  )
-                                : Container(
-                                    height: 90,
-                                    color: Colors.white10,
-                                    child: const Center(child: Icon(Icons.album, size: 40, color: AppColors.cyanAccent)),
-                                  ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            album.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
-                          ),
-                          Text(
-                            album.artistName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-              ),
-            ),
-            const SizedBox(height: 24),
-          ],
-
-          // 2. 내 아티스트 섹션
-          if (artists.isNotEmpty) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  '내 아티스트',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                ),
-                Text('${_artists.totalCount}명', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-              ],
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 120,
-              child: NotificationListener<ScrollNotification>(
-                onNotification: (n) => _artists.onScroll(n, axis: Axis.horizontal),
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: artists.length + (_artists.hasMore ? 1 : 0),
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (context, index) {
-                    if (index == artists.length) return LoadMoreIndicator(paginator: _artists, width: 60);
-                    return _ArtistAvatar(artist: artists[index]);
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-          ],
-
-          // 3. 내 플레이리스트 섹션
-          if (playlists.isNotEmpty) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  '내 플레이리스트',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                ),
-                Text('${_playlists.totalCount}개', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ...List.generate(playlists.length, (index) {
-              final playlist = playlists[index];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  tileColor: AppColors.surfaceCard,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    side: const BorderSide(color: AppColors.surfaceLight),
                   ),
-                  leading: PlaylistArtworkWidget(
-                    coverUrl: playlist.coverUrl,
-                    size: 48,
-                    borderRadius: 8,
-                  ),
-                  title: Text(playlist.title, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                  subtitle: Text(
-                    playlist.numberOfTracks > 0 ? '${playlist.numberOfTracks}곡' : playlist.description,
-                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: const Icon(Icons.chevron_right, color: AppColors.textSecondary),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => PlaylistDetailScreen(playlist: playlist)),
-                    );
-                  },
-                ),
-              );
-            }),
-            if (_playlists.hasMore) LoadMoreIndicator(paginator: _playlists, asButton: true),
-            const SizedBox(height: 24),
-          ],
+                );
+              }),
+              if (_playlists.hasMore) LoadMoreIndicator(paginator: _playlists, asButton: true),
+              const SizedBox(height: 24),
+            ],
 
-          // 4. 내 트랙 섹션
-          if (tracks.isNotEmpty) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  '내 트랙',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                ),
-                Text('${_tracks.totalCount}곡', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ...List.generate(tracks.length, (index) {
-              final track = tracks[index];
-              return TrackTile(track: track, queue: tracks, index: index);
-            }),
-            if (_tracks.hasMore) LoadMoreIndicator(paginator: _tracks),
+            // 4. 내 트랙 섹션
+            if (tracks.isNotEmpty) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    '내 트랙',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                  ),
+                  Text('${_tracks.totalCount}곡', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ...List.generate(tracks.length, (index) {
+                final track = tracks[index];
+                return TrackTile(track: track, queue: tracks, index: index);
+              }),
+              if (_tracks.hasMore) LoadMoreIndicator(paginator: _tracks),
+            ],
+            const SizedBox(height: 80),
           ],
-          const SizedBox(height: 80),
-        ],
-      ),
+        ),
       ),
     );
   }

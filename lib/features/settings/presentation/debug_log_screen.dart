@@ -86,7 +86,8 @@ class DebugLogScreen extends StatelessWidget {
                           ),
                           child: Text(
                             entry.tag,
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _getLogColor(entry.type)),
+                            style:
+                                TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _getLogColor(entry.type)),
                           ),
                         ),
                       ],

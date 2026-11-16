@@ -426,8 +426,6 @@ class _Thumb extends StatelessWidget {
     final image = url.isEmpty
         ? fallback
         : Image.network(url, width: 48, height: 48, fit: BoxFit.cover, errorBuilder: (_, __, ___) => fallback);
-    return circle
-        ? ClipOval(child: image)
-        : ClipRRect(borderRadius: BorderRadius.circular(6), child: image);
+    return circle ? ClipOval(child: image) : ClipRRect(borderRadius: BorderRadius.circular(6), child: image);
   }
 }

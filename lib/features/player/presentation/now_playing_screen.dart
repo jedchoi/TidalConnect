@@ -183,31 +183,39 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                   activeColor: AppColors.cyanAccent,
                                   inactiveColor: AppColors.surfaceLight,
                                   // DASH(Hi-Res) 스피커 재생처럼 탐색이 안 되는 경우 슬라이더를 비활성화한다.
-                                  onChangeStart: !canSeek ? null : (val) {
-                                    setState(() {
-                                      _isUserDraggingSlider = true;
-                                      _dragSliderValue = val;
-                                    });
-                                  },
-                                  onChanged: !canSeek ? null : (val) {
-                                    setState(() {
-                                      _dragSliderValue = val;
-                                    });
-                                  },
-                                  onChangeEnd: !canSeek ? null : (val) {
-                                    setState(() {
-                                      _isUserDraggingSlider = false;
-                                    });
-                                    _playerManager.seekTo(val.toInt());
-                                  },
+                                  onChangeStart: !canSeek
+                                      ? null
+                                      : (val) {
+                                          setState(() {
+                                            _isUserDraggingSlider = true;
+                                            _dragSliderValue = val;
+                                          });
+                                        },
+                                  onChanged: !canSeek
+                                      ? null
+                                      : (val) {
+                                          setState(() {
+                                            _dragSliderValue = val;
+                                          });
+                                        },
+                                  onChangeEnd: !canSeek
+                                      ? null
+                                      : (val) {
+                                          setState(() {
+                                            _isUserDraggingSlider = false;
+                                          });
+                                          _playerManager.seekTo(val.toInt());
+                                        },
                                 ),
                                 Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 8.0),
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text(formatDuration(currentVal.toInt()), style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                                      Text(formatDuration(maxDuration.toInt()), style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                      Text(formatDuration(currentVal.toInt()),
+                                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                      Text(formatDuration(maxDuration.toInt()),
+                                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                                     ],
                                   ),
                                 ),
@@ -396,7 +404,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                               return Container(
                                 margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: isPlayingThis ? AppColors.surfaceLight.withValues(alpha: 0.6) : Colors.transparent,
+                                  color: isPlayingThis
+                                      ? AppColors.surfaceLight.withValues(alpha: 0.6)
+                                      : Colors.transparent,
                                   borderRadius: BorderRadius.circular(8),
                                   border: isPlayingThis
                                       ? Border.all(color: AppColors.cyanAccent.withValues(alpha: 0.8), width: 1.2)
@@ -444,7 +454,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: track.isMax ? Colors.amber.withValues(alpha: 0.2) : AppColors.surfaceLight,
+                                          color: track.isMax
+                                              ? Colors.amber.withValues(alpha: 0.2)
+                                              : AppColors.surfaceLight,
                                           borderRadius: BorderRadius.circular(4),
                                         ),
                                         child: Text(
@@ -490,5 +502,4 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       },
     );
   }
-
 }

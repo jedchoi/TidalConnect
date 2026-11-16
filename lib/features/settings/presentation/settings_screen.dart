@@ -106,7 +106,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 children: [
                   ListTile(
                     leading: const Icon(Icons.account_circle, color: AppColors.cyanAccent, size: 36),
-                    title: Text(authStatusText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    title:
+                        Text(authStatusText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     subtitle: Text(
                       isLoggedIn ? '사용자 OAuth 인증 토큰 활성화됨' : '앱 내부에서 ID/PW만 입력하여 바로 로그인',
                       style: const TextStyle(color: AppColors.textSecondary),
@@ -243,8 +244,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             color: AppColors.surfaceCard,
             child: ListTile(
               leading: const Icon(Icons.terminal, color: AppColors.cyanAccent),
-              title: const Text('실시간 네트워크 / OAuth 로그 콘솔 열기', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              subtitle: const Text('Tidal HTTP 응답 코드 및 SSDP UDP 패킷 로그를 눈으로 확인', style: TextStyle(color: AppColors.textSecondary)),
+              title: const Text('실시간 네트워크 / OAuth 로그 콘솔 열기',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              subtitle: const Text('Tidal HTTP 응답 코드 및 SSDP UDP 패킷 로그를 눈으로 확인',
+                  style: TextStyle(color: AppColors.textSecondary)),
               trailing: const Icon(Icons.chevron_right, color: Colors.white70),
               onTap: () => DebugLogScreen.show(context),
             ),
@@ -272,28 +275,28 @@ class _AudioQualityCard extends ConsumerWidget {
             if (value != null) settings.setAudioQuality(value);
           },
           child: Column(
-          children: [
-            for (final option in AudioQualityOption.values)
-              RadioListTile<AudioQualityOption>(
-                value: option,
-                activeColor: AppColors.cyanAccent,
-                title: Text(option.label, style: const TextStyle(color: Colors.white)),
-                subtitle: Text(option.detail, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-              ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Text(
-                selected == AudioQualityOption.hiRes
-                    ? 'DLNA 스피커에서 Hi-Res는 DASH 스트림을 이어 붙여 보내므로 재생 위치를 옮길 수 없습니다. '
-                        '변경한 음질은 다음 곡부터 적용됩니다.'
-                    : '변경한 음질은 다음 곡부터 적용됩니다.',
-                style: TextStyle(
-                  color: selected == AudioQualityOption.hiRes ? Colors.amberAccent : AppColors.textSecondary,
-                  fontSize: 12,
+            children: [
+              for (final option in AudioQualityOption.values)
+                RadioListTile<AudioQualityOption>(
+                  value: option,
+                  activeColor: AppColors.cyanAccent,
+                  title: Text(option.label, style: const TextStyle(color: Colors.white)),
+                  subtitle: Text(option.detail, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Text(
+                  selected == AudioQualityOption.hiRes
+                      ? 'DLNA 스피커에서 Hi-Res는 DASH 스트림을 이어 붙여 보내므로 재생 위치를 옮길 수 없습니다. '
+                          '변경한 음질은 다음 곡부터 적용됩니다.'
+                      : '변경한 음질은 다음 곡부터 적용됩니다.',
+                  style: TextStyle(
+                    color: selected == AudioQualityOption.hiRes ? Colors.amberAccent : AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
           ),
         ),
       ),

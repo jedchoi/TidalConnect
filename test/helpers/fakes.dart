@@ -146,7 +146,8 @@ class FakeNativeSink implements NativeCredentialsSink {
   Future<bool> initialize() async => true;
 
   @override
-  Future<void> setUserCredentials({required String userId, required String accessToken, required int expiresInSeconds}) async {
+  Future<void> setUserCredentials(
+      {required String userId, required String accessToken, required int expiresInSeconds}) async {
     pushedTokens.add(accessToken);
   }
 

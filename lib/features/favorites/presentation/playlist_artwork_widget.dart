@@ -47,16 +47,24 @@ class PlaylistArtworkWidget extends StatelessWidget {
               Expanded(
                 child: Row(
                   children: [
-                    Expanded(child: Image.network(validCovers[0], fit: BoxFit.cover, errorBuilder: (_, __, ___) => _defaultTile())),
-                    Expanded(child: Image.network(validCovers[1], fit: BoxFit.cover, errorBuilder: (_, __, ___) => _defaultTile())),
+                    Expanded(
+                        child: Image.network(validCovers[0],
+                            fit: BoxFit.cover, errorBuilder: (_, __, ___) => _defaultTile())),
+                    Expanded(
+                        child: Image.network(validCovers[1],
+                            fit: BoxFit.cover, errorBuilder: (_, __, ___) => _defaultTile())),
                   ],
                 ),
               ),
               Expanded(
                 child: Row(
                   children: [
-                    Expanded(child: Image.network(validCovers[2], fit: BoxFit.cover, errorBuilder: (_, __, ___) => _defaultTile())),
-                    Expanded(child: Image.network(validCovers[3], fit: BoxFit.cover, errorBuilder: (_, __, ___) => _defaultTile())),
+                    Expanded(
+                        child: Image.network(validCovers[2],
+                            fit: BoxFit.cover, errorBuilder: (_, __, ___) => _defaultTile())),
+                    Expanded(
+                        child: Image.network(validCovers[3],
+                            fit: BoxFit.cover, errorBuilder: (_, __, ___) => _defaultTile())),
                   ],
                 ),
               ),

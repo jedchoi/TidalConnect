@@ -51,6 +51,7 @@ class PlayerManager {
   final ValueNotifier<bool> isBufferingNotifier = ValueNotifier(false);
   final ValueNotifier<int> progressSecondsNotifier = ValueNotifier(0);
   final ValueNotifier<int> durationSecondsNotifier = ValueNotifier(0);
+
   /// 실제 재생 중인 스트림의 음질 설명. 모르면 빈 문자열.
   final ValueNotifier<String> qualityBadgeNotifier = ValueNotifier('');
 
@@ -430,7 +431,8 @@ class PlayerManager {
   Future<void> switchPlaybackDevice(DlnaDevice newDevice) async {
     final currentDevice = _dlnaManager.selectedDevice;
     if (currentDevice.udn == newDevice.udn) return;
-    AppLogger.log('PLAYER', '출력 기기 전환: "${currentDevice.friendlyName}" → "${newDevice.friendlyName}"', type: LogType.info);
+    AppLogger.log('PLAYER', '출력 기기 전환: "${currentDevice.friendlyName}" → "${newDevice.friendlyName}"',
+        type: LogType.info);
 
     final track = currentTrack;
     final wasPlaying = isPlaying;

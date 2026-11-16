@@ -75,7 +75,8 @@ class UPnPSoapClient {
         ..write('<upnp:artist>$artist</upnp:artist>');
     }
     if (meta.album.isNotEmpty) didlLite.write('<upnp:album>${_escapeXml(meta.album)}</upnp:album>');
-    if (meta.albumArtUri.isNotEmpty) didlLite.write('<upnp:albumArtURI>${_escapeXml(meta.albumArtUri)}</upnp:albumArtURI>');
+    if (meta.albumArtUri.isNotEmpty)
+      didlLite.write('<upnp:albumArtURI>${_escapeXml(meta.albumArtUri)}</upnp:albumArtURI>');
     didlLite
       ..write('<upnp:class>object.item.audioItem.musicTrack</upnp:class>')
       ..write('<res protocolInfo="http-get:*:$mime:*"$duration>$escapedStreamUrl</res>')
@@ -356,7 +357,8 @@ class UPnPSoapClient {
         ),
       );
       final isOk = response.statusCode == 200;
-      AppLogger.log('UPNP_SOAP', 'SOAP 응답 코드 [HTTP ${response.statusCode}]: $isOk', type: isOk ? LogType.success : LogType.warning);
+      AppLogger.log('UPNP_SOAP', 'SOAP 응답 코드 [HTTP ${response.statusCode}]: $isOk',
+          type: isOk ? LogType.success : LogType.warning);
       return isOk;
     } catch (e) {
       AppLogger.log('UPNP_SOAP', 'SOAP 요청 실패 [URL: $controlUrl, Action: $soapAction]: $e', type: LogType.error);

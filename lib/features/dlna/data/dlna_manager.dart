@@ -44,13 +44,15 @@ class DlnaManager {
       return true;
     }
 
-    final targetControlUrl = device.avTransportControlUrl.isNotEmpty ? device.avTransportControlUrl : device.locationUrl;
+    final targetControlUrl =
+        device.avTransportControlUrl.isNotEmpty ? device.avTransportControlUrl : device.locationUrl;
     if (targetControlUrl.isEmpty) {
       AppLogger.log('DLNA_PLAY', '원격 스피커 controlUrl 없음: ${device.friendlyName}', type: LogType.warning);
       return false;
     }
 
-    AppLogger.log('DLNA_PLAY', 'DLNA 스피커 전송 시작: "${device.friendlyName}" ➔ ${maskUrl(streamUrl)}', type: LogType.network);
+    AppLogger.log('DLNA_PLAY', 'DLNA 스피커 전송 시작: "${device.friendlyName}" ➔ ${maskUrl(streamUrl)}',
+        type: LogType.network);
     try {
       // ① Stop 먼저: PAUSED 상태의 DLNA 렌더러는 SetAVTransportURI를 무시하는 경우가 있음
       //   Stop → STOPPED 상태로 전환 후 새 URI 설정
@@ -76,7 +78,8 @@ class DlnaManager {
   Future<bool> pauseCurrent() async {
     final device = selectedDevice;
     if (device.isLocalSpeaker) return true;
-    final targetControlUrl = device.avTransportControlUrl.isNotEmpty ? device.avTransportControlUrl : device.locationUrl;
+    final targetControlUrl =
+        device.avTransportControlUrl.isNotEmpty ? device.avTransportControlUrl : device.locationUrl;
     if (targetControlUrl.isEmpty) return false;
     return await _soapClient.pause(targetControlUrl);
   }
@@ -84,7 +87,8 @@ class DlnaManager {
   Future<bool> resumeCurrent() async {
     final device = selectedDevice;
     if (device.isLocalSpeaker) return true;
-    final targetControlUrl = device.avTransportControlUrl.isNotEmpty ? device.avTransportControlUrl : device.locationUrl;
+    final targetControlUrl =
+        device.avTransportControlUrl.isNotEmpty ? device.avTransportControlUrl : device.locationUrl;
     if (targetControlUrl.isEmpty) return false;
     return await _soapClient.play(targetControlUrl);
   }
@@ -92,7 +96,8 @@ class DlnaManager {
   Future<bool> seek(int seconds) async {
     final device = selectedDevice;
     if (device.isLocalSpeaker) return true;
-    final targetControlUrl = device.avTransportControlUrl.isNotEmpty ? device.avTransportControlUrl : device.locationUrl;
+    final targetControlUrl =
+        device.avTransportControlUrl.isNotEmpty ? device.avTransportControlUrl : device.locationUrl;
     if (targetControlUrl.isEmpty) return false;
 
     final h = (seconds ~/ 3600).toString().padLeft(2, '0');
@@ -132,7 +137,8 @@ class DlnaManager {
     final device = selectedDevice;
     if (device.isLocalSpeaker) return null;
 
-    final targetControlUrl = device.avTransportControlUrl.isNotEmpty ? device.avTransportControlUrl : device.locationUrl;
+    final targetControlUrl =
+        device.avTransportControlUrl.isNotEmpty ? device.avTransportControlUrl : device.locationUrl;
     if (targetControlUrl.isEmpty) return null;
 
     final info = await _soapClient.getPositionInfo(targetControlUrl);
@@ -149,7 +155,8 @@ class DlnaManager {
   Future<bool> setNextOnSelectedDevice({required String streamUrl, DidlMetadata? metadata}) async {
     final device = selectedDevice;
     if (device.isLocalSpeaker) return false;
-    final targetControlUrl = device.avTransportControlUrl.isNotEmpty ? device.avTransportControlUrl : device.locationUrl;
+    final targetControlUrl =
+        device.avTransportControlUrl.isNotEmpty ? device.avTransportControlUrl : device.locationUrl;
     if (targetControlUrl.isEmpty) return false;
     return _soapClient.setNextAVTransportURI(targetControlUrl, streamUrl, metadata);
   }
@@ -158,7 +165,8 @@ class DlnaManager {
   Future<String?> getTransportState() async {
     final device = selectedDevice;
     if (device.isLocalSpeaker) return null;
-    final targetControlUrl = device.avTransportControlUrl.isNotEmpty ? device.avTransportControlUrl : device.locationUrl;
+    final targetControlUrl =
+        device.avTransportControlUrl.isNotEmpty ? device.avTransportControlUrl : device.locationUrl;
     if (targetControlUrl.isEmpty) return null;
     return _soapClient.getTransportInfo(targetControlUrl);
   }
@@ -178,7 +186,8 @@ class DlnaManager {
   Future<bool> stopCurrent() async {
     final device = selectedDevice;
     if (device.isLocalSpeaker) return true;
-    final targetControlUrl = device.avTransportControlUrl.isNotEmpty ? device.avTransportControlUrl : device.locationUrl;
+    final targetControlUrl =
+        device.avTransportControlUrl.isNotEmpty ? device.avTransportControlUrl : device.locationUrl;
     if (targetControlUrl.isEmpty) return false;
     return await _soapClient.stop(targetControlUrl);
   }
@@ -195,10 +204,11 @@ class DlnaManager {
         onDeviceFound: (device) => devicesNotifier.value = List.unmodifiable([...devicesNotifier.value, device]),
       );
       devicesNotifier.value = List.unmodifiable(newDevices);
-      
+
       await _reconcileSelection(newDevices);
       final remoteCount = newDevices.where((d) => !d.isLocalSpeaker).length;
-      AppLogger.log('DLNA_UI', '전역 DLNA 탐색 완료. 총 ${newDevices.length}개 기기 (원격 스피커: $remoteCount개)', type: LogType.success);
+      AppLogger.log('DLNA_UI', '전역 DLNA 탐색 완료. 총 ${newDevices.length}개 기기 (원격 스피커: $remoteCount개)',
+          type: LogType.success);
       return newDevices;
     } catch (e) {
       AppLogger.log('DLNA_UI', '전역 DLNA 탐색 중 예외 발생: $e', type: LogType.error);

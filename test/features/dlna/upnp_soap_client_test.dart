@@ -40,7 +40,8 @@ void main() {
   test('SetNextAVTransportURI는 NextURI와 메타데이터를 담고, 빈 주소면 등록을 지운다', () {
     final xml = UPnPSoapClient.buildSetNextAVTransportURIXml(
       'http://192.168.0.10:8765/audio/next.flac?t=a&b=c',
-      DidlMetadata(title: 'Next', artist: 'A', album: 'B', albumArtUri: '', durationSeconds: 60, mimeType: 'audio/flac'),
+      DidlMetadata(
+          title: 'Next', artist: 'A', album: 'B', albumArtUri: '', durationSeconds: 60, mimeType: 'audio/flac'),
     );
     expect(xml, contains('u:SetNextAVTransportURI'));
     expect(xml, contains('<NextURI>http://192.168.0.10:8765/audio/next.flac?t=a&amp;b=c</NextURI>'));

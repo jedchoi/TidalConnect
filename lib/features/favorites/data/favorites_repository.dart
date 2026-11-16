@@ -37,7 +37,9 @@ class FavoritesRepository extends ChangeNotifier {
     try {
       final ids = await _api.getFavoriteIds(userId: userId);
       if (seq != _loadSeq) return;
-      _ids = {for (final t in FavoriteType.values) t: {...?ids[t]}};
+      _ids = {
+        for (final t in FavoriteType.values) t: {...?ids[t]}
+      };
       notifyListeners();
     } catch (e) {
       AppLogger.log('FAVORITES', '즐겨찾기 ID 조회 실패: $e', type: LogType.warning);

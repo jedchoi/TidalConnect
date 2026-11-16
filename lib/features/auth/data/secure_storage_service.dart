@@ -15,8 +15,7 @@ class SecureStorageService {
   /// 1단계 이전 버전이 사용자·앱 토큰을 구분 없이 저장하던 키.
   static const legacyTokenKey = 'tidal_auth_token';
 
-  SecureStorageService({FlutterSecureStorage? storage})
-      : _storage = storage ?? const FlutterSecureStorage();
+  SecureStorageService({FlutterSecureStorage? storage}) : _storage = storage ?? const FlutterSecureStorage();
 
   Future<void> saveUserToken(AuthToken token) => _write(userTokenKey, token);
   Future<AuthToken?> getUserToken() => _read(userTokenKey);
@@ -45,8 +44,7 @@ class SecureStorageService {
     await _storage.delete(key: legacyTokenKey);
   }
 
-  Future<void> _write(String key, AuthToken token) =>
-      _storage.write(key: key, value: jsonEncode(token.toJson()));
+  Future<void> _write(String key, AuthToken token) => _storage.write(key: key, value: jsonEncode(token.toJson()));
 
   Future<AuthToken?> _read(String key) async {
     final jsonStr = await _storage.read(key: key);

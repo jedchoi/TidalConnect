@@ -78,7 +78,8 @@ class TidalApiClient {
       return response.data;
     } on DioException catch (e) {
       final failure = ApiFailure.fromDio(e);
-      AppLogger.log('TIDAL_API', 'GET $path 실패: ${failure.kind.name} (HTTP ${failure.statusCode})', type: LogType.error);
+      AppLogger.log('TIDAL_API', 'GET $path 실패: ${failure.kind.name} (HTTP ${failure.statusCode})',
+          type: LogType.error);
       throw failure;
     }
   }
@@ -96,7 +97,8 @@ class TidalApiClient {
       );
     } on DioException catch (e) {
       final failure = ApiFailure.fromDio(e);
-      AppLogger.log('TIDAL_API', '$method $path 실패: ${failure.kind.name} (HTTP ${failure.statusCode})', type: LogType.error);
+      AppLogger.log('TIDAL_API', '$method $path 실패: ${failure.kind.name} (HTTP ${failure.statusCode})',
+          type: LogType.error);
       throw failure;
     }
   }
@@ -122,21 +124,29 @@ class TidalApiClient {
 
   static const int pageSize = 50;
 
-  Future<PageResult<MediaAlbum>> getFavoriteAlbums({required String userId, int offset = 0, int limit = pageSize}) async =>
-      _page(await _get('/users/$userId/favorites/albums', _paging(offset, limit, newestFirst: true)), MediaAlbum.fromJson,
+  Future<PageResult<MediaAlbum>> getFavoriteAlbums(
+          {required String userId, int offset = 0, int limit = pageSize}) async =>
+      _page(
+          await _get('/users/$userId/favorites/albums', _paging(offset, limit, newestFirst: true)), MediaAlbum.fromJson,
           offset: offset, limit: limit);
 
-  Future<PageResult<MediaPlaylist>> getFavoritePlaylists({required String userId, int offset = 0, int limit = pageSize}) async =>
+  Future<PageResult<MediaPlaylist>> getFavoritePlaylists(
+          {required String userId, int offset = 0, int limit = pageSize}) async =>
       _page(await _get('/users/$userId/favorites/playlists', _paging(offset, limit, newestFirst: true)),
-          MediaPlaylist.fromJson, offset: offset, limit: limit);
-
-  Future<PageResult<MediaTrack>> getFavoriteTracks({required String userId, int offset = 0, int limit = pageSize}) async =>
-      _page(await _get('/users/$userId/favorites/tracks', _paging(offset, limit, newestFirst: true)), MediaTrack.fromJson,
+          MediaPlaylist.fromJson,
           offset: offset, limit: limit);
 
-  Future<PageResult<MediaArtist>> getFavoriteArtists({required String userId, int offset = 0, int limit = pageSize}) async =>
+  Future<PageResult<MediaTrack>> getFavoriteTracks(
+          {required String userId, int offset = 0, int limit = pageSize}) async =>
+      _page(
+          await _get('/users/$userId/favorites/tracks', _paging(offset, limit, newestFirst: true)), MediaTrack.fromJson,
+          offset: offset, limit: limit);
+
+  Future<PageResult<MediaArtist>> getFavoriteArtists(
+          {required String userId, int offset = 0, int limit = pageSize}) async =>
       _page(await _get('/users/$userId/favorites/artists', _paging(offset, limit, newestFirst: true)),
-          MediaArtist.fromJson, offset: offset, limit: limit);
+          MediaArtist.fromJson,
+          offset: offset, limit: limit);
 
   /// 즐겨찾기한 항목의 ID 목록. 하트 표시에 쓴다.
   Future<Map<FavoriteType, Set<String>>> getFavoriteIds({required String userId}) async {
@@ -217,7 +227,8 @@ class TidalApiClient {
       });
       final info = parsePlaybackInfo(data, fallbackQuality: quality);
       if (info != null) {
-        AppLogger.log('TIDAL_API', '스트림 정보 수신: ${info.audioQuality}, ${info.isDash ? 'DASH' : info.mimeType}', type: LogType.success);
+        AppLogger.log('TIDAL_API', '스트림 정보 수신: ${info.audioQuality}, ${info.isDash ? 'DASH' : info.mimeType}',
+            type: LogType.success);
       }
       return info;
     } on ApiFailure {

@@ -102,9 +102,7 @@ class SpeakerSelectorModal extends ConsumerWidget {
                               ? const Text('스마트폰 직출력', style: TextStyle(color: AppColors.textSecondary))
                               : Text('DLNA Renderer (${device.locationUrl})',
                                   style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                          trailing: isSelected
-                              ? const Icon(Icons.check_circle, color: AppColors.cyanAccent)
-                              : null,
+                          trailing: isSelected ? const Icon(Icons.check_circle, color: AppColors.cyanAccent) : null,
                           onTap: () {
                             onSelectDevice(device);
                             Navigator.pop(context);

@@ -22,7 +22,8 @@ class TidalSdkNativeBridge {
   }) async {
     try {
       WidgetsFlutterBinding.ensureInitialized();
-      AppLogger.log('TIDAL_NATIVE_SDK', '안드로이드 네이티브 KeepCreatedCredentialsProvider 초기화 (ClientID: $clientId)', type: LogType.network);
+      AppLogger.log('TIDAL_NATIVE_SDK', '안드로이드 네이티브 KeepCreatedCredentialsProvider 초기화 (ClientID: $clientId)',
+          type: LogType.network);
       final result = await _channel.invokeMethod<Map>('initTidalAuth', {
         'clientId': clientId,
         'clientSecret': clientSecret,
@@ -73,6 +74,7 @@ class TidalSdkNativeBridge {
     _streamRefresher = refresher;
     _installHandler();
   }
+
   static bool _handlerInstalled = false;
 
   /// 네이티브 SDK가 토큰 만료·오류로 새 토큰을 요청할 때 호출할 함수를 등록한다.
@@ -204,9 +206,8 @@ class TidalSdkNativeBridge {
   }
 
   /// 폰 미디어 볼륨(0~100) 변화. 볼륨 키로 바뀐 경우도 포함한다.
-  static Stream<int> get phoneVolumeChanges => playerEvents
-      .where((e) => e['type'] == 'phoneVolume')
-      .map((e) => (e['percent'] as num).toInt());
+  static Stream<int> get phoneVolumeChanges =>
+      playerEvents.where((e) => e['type'] == 'phoneVolume').map((e) => (e['percent'] as num).toInt());
 
   static Future<int?> getPhoneVolume() async {
     try {

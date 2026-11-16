@@ -75,7 +75,8 @@ class PhoneBackend implements PlaybackBackend {
   Future<void> setNext(MediaTrack? track) => TidalSdkNativeBridge.setNextTrack(track?.id ?? '');
 
   @override
-  Future<void> play(MediaTrack track, {Duration startPosition = Duration.zero, required IsCancelled isCancelled}) async {
+  Future<void> play(MediaTrack track,
+      {Duration startPosition = Duration.zero, required IsCancelled isCancelled}) async {
     _currentTrackId = track.id;
     _duration = track.durationSeconds > 0 ? Duration(seconds: track.durationSeconds) : null;
     // SDK는 IDLE 상태에서 seek를 받지 않으므로 재생이 시작된 뒤에 적용한다.

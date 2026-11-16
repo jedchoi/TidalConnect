@@ -28,7 +28,8 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
 
   bool _isLoading = true;
   String? _errorMessage;
-  late final Paginator<MediaTrack> _pager = Paginator((offset) => _apiClient.getAlbumTracks(widget.album.id, offset: offset));
+  late final Paginator<MediaTrack> _pager =
+      Paginator((offset) => _apiClient.getAlbumTracks(widget.album.id, offset: offset));
   List<MediaTrack> get _tracks => _pager.items;
 
   @override
@@ -95,120 +96,126 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
                   builder: (context, _) => NotificationListener<ScrollNotification>(
                     onNotification: _pager.onScroll,
                     child: CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Column(
-                      children: [
-                        // Album Cover Art
-                        Center(
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: widget.album.coverUrl.isNotEmpty
-                                ? Image.network(
-                                    widget.album.coverUrl,
-                                    width: 200,
-                                    height: 200,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => _buildFallbackCover(),
-                                  )
-                                : _buildFallbackCover(),
+                      slivers: [
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.all(20.0),
+                            child: Column(
+                              children: [
+                                // Album Cover Art
+                                Center(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: widget.album.coverUrl.isNotEmpty
+                                        ? Image.network(
+                                            widget.album.coverUrl,
+                                            width: 200,
+                                            height: 200,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => _buildFallbackCover(),
+                                          )
+                                        : _buildFallbackCover(),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                // Album Title
+                                Text(
+                                  widget.album.title,
+                                  textAlign: TextAlign.center,
+                                  style:
+                                      const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
+                                const SizedBox(height: 6),
+                                // Artist Name
+                                Text(
+                                  widget.album.artistName,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                      fontSize: 15, color: AppColors.cyanAccent, fontWeight: FontWeight.w600),
+                                ),
+                                const SizedBox(height: 8),
+                                // Badge / Track count
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    if (widget.album.qualityLabel.isNotEmpty) ...[
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.surfaceLight,
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: AppColors.cyanAccent.withValues(alpha: 0.5)),
+                                        ),
+                                        child: Text(
+                                          widget.album.qualityLabel,
+                                          style: const TextStyle(
+                                              fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.cyanAccent),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                    ],
+                                    Text(
+                                      '총 ${_pager.totalCount}곡',
+                                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 20),
+                                // Play All Button
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed: _playAll,
+                                        icon: const Icon(Icons.play_arrow, color: Colors.black),
+                                        label: const Text('전체 재생',
+                                            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: AppColors.cyanAccent,
+                                          padding: const EdgeInsets.symmetric(vertical: 12),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                        ),
+                                      ),
+                                    ),
+                                    FavoriteButton(type: FavoriteType.album, id: widget.album.id, size: 28),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                              ],
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        // Album Title
-                        Text(
-                          widget.album.title,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-                        ),
-                        const SizedBox(height: 6),
-                        // Artist Name
-                        Text(
-                          widget.album.artistName,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 15, color: AppColors.cyanAccent, fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 8),
-                        // Badge / Track count
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            if (widget.album.qualityLabel.isNotEmpty) ...[
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppColors.surfaceLight,
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: AppColors.cyanAccent.withValues(alpha: 0.5)),
+                        // Track list
+                        SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final track = _tracks[index];
+                              return TrackTile(
+                                track: track,
+                                queue: _tracks,
+                                index: index,
+                                subtitle: track.artistName,
+                                showDuration: true,
+                                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                leadingBuilder: (isCurrent) => SizedBox(
+                                  width: 28,
+                                  child: Center(
+                                    child: isCurrent
+                                        ? const Icon(Icons.equalizer, color: AppColors.cyanAccent, size: 20)
+                                        : Text('${index + 1}',
+                                            style: const TextStyle(
+                                                color: AppColors.textSecondary, fontWeight: FontWeight.bold)),
+                                  ),
                                 ),
-                                child: Text(
-                                  widget.album.qualityLabel,
-                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.cyanAccent),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                            ],
-                            Text(
-                              '총 ${_pager.totalCount}곡',
-                              style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                            ),
-                          ],
+                              );
+                            },
+                            childCount: _tracks.length,
+                          ),
                         ),
-                        const SizedBox(height: 20),
-                        // Play All Button
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: _playAll,
-                                icon: const Icon(Icons.play_arrow, color: Colors.black),
-                                label: const Text('전체 재생', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.cyanAccent,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                                ),
-                              ),
-                            ),
-                            FavoriteButton(type: FavoriteType.album, id: widget.album.id, size: 28),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
+                        if (_pager.hasMore) SliverToBoxAdapter(child: LoadMoreIndicator(paginator: _pager)),
+                        const SliverToBoxAdapter(child: SizedBox(height: 80)),
                       ],
                     ),
-                  ),
-                ),
-                // Track list
-                SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final track = _tracks[index];
-                      return TrackTile(
-                        track: track,
-                        queue: _tracks,
-                        index: index,
-                        subtitle: track.artistName,
-                        showDuration: true,
-                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        leadingBuilder: (isCurrent) => SizedBox(
-                          width: 28,
-                          child: Center(
-                            child: isCurrent
-                                ? const Icon(Icons.equalizer, color: AppColors.cyanAccent, size: 20)
-                                : Text('${index + 1}', style: const TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                      );
-                    },
-                    childCount: _tracks.length,
-                  ),
-                ),
-                if (_pager.hasMore) SliverToBoxAdapter(child: LoadMoreIndicator(paginator: _pager)),
-                const SliverToBoxAdapter(child: SizedBox(height: 80)),
-              ],
-            ),
                   ),
                 ),
     );
@@ -222,5 +229,4 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
       child: const Center(child: Icon(Icons.album, size: 80, color: AppColors.cyanAccent)),
     );
   }
-
 }

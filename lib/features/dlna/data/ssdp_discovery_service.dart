@@ -34,7 +34,8 @@ class SSDPDiscoveryService {
       socket.multicastHops = 4;
       socket.broadcastEnabled = true;
 
-      AppLogger.log('SSDP_NET', 'UDP Multicast 소켓 바인딩 성공 (${socket.address.address}:${socket.port})', type: LogType.network);
+      AppLogger.log('SSDP_NET', 'UDP Multicast 소켓 바인딩 성공 (${socket.address.address}:${socket.port})',
+          type: LogType.network);
 
       final targets = [
         'urn:schemas-upnp-org:device:MediaRenderer:1',
@@ -45,8 +46,7 @@ class SSDPDiscoveryService {
 
       void sendMSearchBursts() {
         for (final target in targets) {
-          final mSearch =
-              'M-SEARCH * HTTP/1.1\r\n'
+          final mSearch = 'M-SEARCH * HTTP/1.1\r\n'
               'HOST: 239.255.255.250:1900\r\n'
               'MAN: "ssdp:discover"\r\n'
               'MX: 3\r\n'
@@ -68,7 +68,8 @@ class SSDPDiscoveryService {
         // 응답은 받았지만 설명 XML을 아직 받는 중인 기기를 버리지 않는다(요청마다 3초 타임아웃).
         await Future.wait(pending);
         if (!completer.isCompleted) {
-          AppLogger.log('SSDP_NET', 'SSDP 탐색 종료. 발견 기기: ${devices.length}개', type: devices.length > 1 ? LogType.success : LogType.warning);
+          AppLogger.log('SSDP_NET', 'SSDP 탐색 종료. 발견 기기: ${devices.length}개',
+              type: devices.length > 1 ? LogType.success : LogType.warning);
           completer.complete(devices);
         }
       });
@@ -95,13 +96,14 @@ class SSDPDiscoveryService {
             seenLocations.add(location);
             seenUdns.add(baseUdn);
 
-            AppLogger.log('SSDP_NET', 'UDP 중복 없음 확인 ➔ XML 수신 시작 [from ${datagram.address.address}] LOCATION: $location', type: LogType.info);
+            AppLogger.log('SSDP_NET', 'UDP 중복 없음 확인 ➔ XML 수신 시작 [from ${datagram.address.address}] LOCATION: $location',
+                type: LogType.info);
 
             pending.add(_fetchDeviceDescription(location, baseUdn).then((device) {
               if (device == null || completer.isCompleted) return;
               // 같은 기기가 여러 인터페이스로 응답한 경우만 걸러낸다(이름이 같은 다른 스피커는 유지).
-              final isDuplicate = devices.any((d) =>
-                  d.locationUrl == device.locationUrl || (d.udn.isNotEmpty && d.udn == device.udn));
+              final isDuplicate =
+                  devices.any((d) => d.locationUrl == device.locationUrl || (d.udn.isNotEmpty && d.udn == device.udn));
               if (isDuplicate) return;
               devices.add(device);
               onDeviceFound?.call(device);

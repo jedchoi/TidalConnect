@@ -28,7 +28,8 @@ class _BridgeCredentialsSink implements NativeCredentialsSink {
       );
 
   @override
-  Future<void> setUserCredentials({required String userId, required String accessToken, required int expiresInSeconds}) =>
+  Future<void> setUserCredentials(
+          {required String userId, required String accessToken, required int expiresInSeconds}) =>
       TidalSdkNativeBridge.updateUserCredentials(
         userId: userId,
         accessToken: accessToken,
@@ -86,6 +87,7 @@ class TidalAuthRepository {
     final code = userToken.value?.countryCode ?? '';
     return code.isEmpty ? defaultCountryCode : code;
   }
+
   bool get isLoggedIn => userToken.value != null;
 
   /// 네이티브 SDK를 초기화한다. 앱 시작 시 `main()`에서 한 번만 호출한다.
