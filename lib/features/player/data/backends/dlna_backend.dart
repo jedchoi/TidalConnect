@@ -77,6 +77,26 @@ class DlnaBackend implements PlaybackBackend {
       throw const PlaybackException('NO_STREAM', '이 곡의 스트림 정보를 받지 못했습니다.');
     }
 
+    // 스피커에 보내는 명령(등록·Stop·SetURI·Play)은 한 번에 하나씩 보낸다.
+    // 곡을 빠르게 바꿔도 이전 요청의 SetAVTransportURI가 나중 요청 뒤에 도착하지 않는다.
+    await _serialize(() => _sendToSpeaker(track, info, startPosition, isCancelled));
+  }
+
+  Future<void> _commandChain = Future<void>.value();
+
+  Future<void> _serialize(Future<void> Function() action) {
+    final next = _commandChain.then((_) => action());
+    _commandChain = next.catchError((_) {});
+    return next;
+  }
+
+  Future<void> _sendToSpeaker(
+    MediaTrack track,
+    TidalPlaybackInfo info,
+    Duration startPosition,
+    IsCancelled isCancelled,
+  ) async {
+    if (isCancelled()) return;
     _canSeek = !info.isDash;
     final device = _dlna.selectedDevice;
     final proxyUrl = await TidalSdkNativeBridge.registerTrackStream(
