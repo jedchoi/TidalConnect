@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/foundation.dart';
 import '../../../core/native/tidal_sdk_native_bridge.dart';
 import '../../../core/utils/app_logger.dart';
@@ -9,25 +8,355 @@ import '../../dlna/domain/models/dlna_device.dart';
 import '../../tidal_api/data/tidal_api_client.dart';
 import '../../tidal_api/domain/models/media_item.dart';
 import '../../volume/data/hardware_volume_service.dart';
+import '../domain/play_queue.dart';
+import 'backends/dlna_backend.dart';
+import 'backends/phone_backend.dart';
+import 'backends/playback_backend.dart';
 
-enum PlaybackRepeatMode { off, all, one }
+export '../domain/play_queue.dart' show PlaybackRepeatMode;
 
+/// 재생 상태의 단일 출처.
+///
+/// 화면은 아래 notifier만 구독한다. 재생 상태·위치·곡 종료는 출력 기기(백엔드)가 보낸 이벤트로만 갱신하며,
+/// 타이머로 추정하지 않는다.
 class PlayerManager {
   static final PlayerManager instance = PlayerManager._internal();
   PlayerManager._internal();
 
   late TidalAuthRepository _authRepo;
+  final TidalApiClient _apiClient = TidalApiClient();
+  final DlnaManager _dlnaManager = DlnaManager.instance;
+  final PlayQueue _queue = PlayQueue();
 
-  /// 앱 시작 시 공유 인증 저장소를 주입한다.
-  void configure({required TidalAuthRepository authRepository}) {
+  late final PlaybackBackend _phone;
+  late final PlaybackBackend _dlna;
+  bool _configured = false;
+
+  final ValueNotifier<MediaTrack?> currentTrackNotifier = ValueNotifier(null);
+
+  /// 재생 중(또는 재생하려고 버퍼링 중)인지.
+  final ValueNotifier<bool> isPlayingNotifier = ValueNotifier(false);
+
+  /// 데이터를 기다리는 중인지.
+  final ValueNotifier<bool> isBufferingNotifier = ValueNotifier(false);
+  final ValueNotifier<int> progressSecondsNotifier = ValueNotifier(0);
+  final ValueNotifier<int> durationSecondsNotifier = ValueNotifier(0);
+  final ValueNotifier<String> qualityBadgeNotifier = ValueNotifier('');
+  final ValueNotifier<bool> isShuffleNotifier = ValueNotifier(false);
+  final ValueNotifier<PlaybackRepeatMode> repeatModeNotifier = ValueNotifier(PlaybackRepeatMode.off);
+  final ValueNotifier<bool> canSeekNotifier = ValueNotifier(true);
+
+  final ValueNotifier<List<MediaTrack>> queueNotifier = ValueNotifier(const []);
+  final ValueNotifier<int> queueIndexNotifier = ValueNotifier(-1);
+
+  /// 통합 볼륨 (0~100)
+  final ValueNotifier<int> volumeNotifier = ValueNotifier(50);
+
+  /// 가장 최근 재생 요청의 순번. 오래된 요청의 비동기 결과를 버리는 데 쓴다.
+  int _requestSeq = 0;
+
+  MediaTrack? get currentTrack => currentTrackNotifier.value;
+  bool get isPlaying => isPlayingNotifier.value;
+  int get progressSeconds => progressSecondsNotifier.value;
+  int get durationSeconds => durationSecondsNotifier.value;
+  bool get isShuffle => isShuffleNotifier.value;
+  PlaybackRepeatMode get repeatMode => repeatModeNotifier.value;
+  List<MediaTrack> get queue => _queue.tracks;
+  int get queueIndex => _queue.index;
+
+  PlaybackBackend get _backend => _dlnaManager.selectedDevice.isLocalSpeaker ? _phone : _dlna;
+
+  /// 앱 시작 시 공유 인증 저장소를 주입하고 출력 기기 백엔드를 만든다.
+  void configure({required TidalAuthRepository authRepository, PlaybackBackend? phone, PlaybackBackend? dlna}) {
+    if (_configured) return;
+    _configured = true;
     _authRepo = authRepository;
+    _phone = phone ?? PhoneBackend();
+    _dlna = dlna ?? DlnaBackend(auth: authRepository, api: _apiClient, dlna: _dlnaManager);
+    _phone.events.listen((e) => _onBackendEvent(_phone, e));
+    _dlna.events.listen((e) => _onBackendEvent(_dlna, e));
+
     _dlnaManager.selectedDeviceNotifier.addListener(_onOutputDeviceChanged);
     HardwareVolumeService.setShowSystemUI(_dlnaManager.selectedDevice.isLocalSpeaker);
     syncVolumeFromDevice();
   }
 
+  // ──────────────────────────────────────────────
+  // 백엔드 이벤트
+  // ──────────────────────────────────────────────
+
+  void _onBackendEvent(PlaybackBackend source, BackendEvent event) {
+    if (!identical(source, _backend)) return; // 현재 출력 기기가 아닌 쪽의 늦은 이벤트
+    switch (event) {
+      case BackendStateChanged(:final playing, :final buffering):
+        isPlayingNotifier.value = playing;
+        isBufferingNotifier.value = buffering;
+      case BackendPositionChanged(:final position, :final duration):
+        progressSecondsNotifier.value = position.inSeconds;
+        if (duration != null && duration > Duration.zero) {
+          durationSecondsNotifier.value = duration.inSeconds;
+        }
+      case BackendTrackStarted(:final duration, :final quality):
+        if (duration != null && duration > Duration.zero) {
+          durationSecondsNotifier.value = duration.inSeconds;
+        }
+        if (quality != null) _updateQualityBadge(quality);
+      case BackendTrackEnded(:final trackId):
+        if (trackId.isEmpty || trackId == currentTrack?.id) _onTrackEnded();
+      case BackendError(:final code, :final message):
+        AppLogger.log('PLAYER', '출력 기기 오류 [$code]: $message', type: LogType.error);
+        isPlayingNotifier.value = false;
+        isBufferingNotifier.value = false;
+    }
+  }
+
+  Future<void> _onTrackEnded() async {
+    AppLogger.log('PLAYER', '곡 재생 완료 -> 다음 곡', type: LogType.info);
+    final next = _queue.next(auto: true);
+    if (next != null) {
+      _notifyQueue();
+      await _start(next);
+      return;
+    }
+    // 대기열 끝: 유사곡을 붙여 이어서 재생하고, 붙일 곡이 없으면 정지 상태로 둔다.
+    final current = currentTrack;
+    if (current != null && await _appendSimilarTracks(current.id) > 0) {
+      final appended = _queue.next();
+      if (appended != null) {
+        _notifyQueue();
+        await _start(appended);
+        return;
+      }
+    }
+    isPlayingNotifier.value = false;
+    isBufferingNotifier.value = false;
+    progressSecondsNotifier.value = 0;
+    TidalSdkNativeBridge.stopForegroundService();
+  }
+
+  // ──────────────────────────────────────────────
+  // 재생
+  // ──────────────────────────────────────────────
+
+  /// 곡 재생. [queue]가 주어지면 대기열을 그 목록으로 바꾼다.
+  /// 주어지지 않으면 현재 대기열에서 곡을 찾고, 없으면 그 곡 하나로 대기열을 만들고 유사곡을 붙인다.
+  Future<bool> playTrack(MediaTrack track, {List<MediaTrack>? queue, int? index}) async {
+    if (queue != null) {
+      _queue.setTracks(queue, startIndex: index ?? queue.indexWhere((t) => t.id == track.id).clamp(0, queue.length));
+    } else if (_queue.jumpToTrack(track.id) == null) {
+      _queue.setSingle(track);
+      _appendSimilarTracks(track.id);
+    }
+    _notifyQueue();
+    return _start(_queue.current ?? track);
+  }
+
+  /// 대기열(플레이리스트/앨범 트랙 목록)을 설정한다. 재생은 [playTrack]으로 시작한다.
+  void setQueue(List<MediaTrack> tracks, {int startIndex = 0}) {
+    _queue.setTracks(tracks, startIndex: startIndex);
+    _notifyQueue();
+  }
+
+  /// 대기열의 [index]번째 곡(재생 순서 기준)을 재생한다.
+  void playQueueIndex(int index) {
+    final track = _queue.jumpTo(index);
+    if (track == null) return;
+    _notifyQueue();
+    _start(track);
+  }
+
+  Future<bool> _start(MediaTrack track, {Duration startPosition = Duration.zero}) async {
+    final seq = ++_requestSeq;
+    bool isCancelled() => seq != _requestSeq;
+
+    currentTrackNotifier.value = track;
+    progressSecondsNotifier.value = startPosition.inSeconds;
+    durationSecondsNotifier.value = track.durationSeconds;
+    isPlayingNotifier.value = true;
+    isBufferingNotifier.value = true;
+    _updateQualityBadge(StreamQuality(audioQuality: track.audioQuality));
+
+    AppLogger.log('PLAYER', '재생 요청: "${track.title}" - ${track.artistName} (${track.id})', type: LogType.info);
+    try {
+      await _backend.play(track, startPosition: startPosition, isCancelled: isCancelled);
+      if (isCancelled()) return false;
+      // 백그라운드 재생 유지(알림 + WakeLock/WifiLock)
+      TidalSdkNativeBridge.startForegroundService(title: track.title, artist: track.artistName);
+      return true;
+    } catch (e) {
+      if (isCancelled()) return false;
+      final message = e is PlaybackException ? e.message : '재생을 시작하지 못했습니다.';
+      AppLogger.log('PLAYER', '재생 실패: $e', type: LogType.error);
+      isPlayingNotifier.value = false;
+      isBufferingNotifier.value = false;
+      _reportError(message);
+      return false;
+    }
+  }
+
+  void _reportError(String message) {
+    AppLogger.log('PLAYER', message, type: LogType.error);
+  }
+
+  /// 유사곡을 대기열 끝에 붙인다. 붙인 곡 수를 돌려준다.
+  Future<int> _appendSimilarTracks(String trackId) async {
+    try {
+      final accessToken = await _authRepo.getCatalogToken();
+      if (accessToken == null) return 0;
+      final similars = await _apiClient.getSimilarTracks(trackId, accessToken, limit: 30);
+      final added = _queue.append(similars);
+      if (added > 0) {
+        _notifyQueue();
+        AppLogger.log('PLAYER', '연관 추천곡 $added개 대기열에 추가', type: LogType.success);
+      }
+      return added;
+    } catch (e) {
+      AppLogger.log('PLAYER', '연관 추천곡 조회 실패: $e', type: LogType.warning);
+      return 0;
+    }
+  }
+
+  void togglePlayPause() {
+    if (currentTrack == null) return;
+    if (isPlaying) {
+      pause();
+    } else {
+      resume();
+    }
+  }
+
+  Future<void> pause() async {
+    if (currentTrack == null) return;
+    try {
+      await _backend.pause();
+      isPlayingNotifier.value = false;
+      isBufferingNotifier.value = false;
+    } catch (e) {
+      _reportError(e is PlaybackException ? e.message : '일시정지하지 못했습니다.');
+    }
+  }
+
+  Future<void> resume() async {
+    final track = currentTrack;
+    if (track == null) return;
+    try {
+      await _backend.resume();
+      isPlayingNotifier.value = true;
+    } catch (e) {
+      _reportError(e is PlaybackException ? e.message : '재생을 다시 시작하지 못했습니다.');
+    }
+  }
+
+  /// 재생 위치 탐색(초).
+  void seekTo(int seconds) {
+    if (!canSeekNotifier.value) return;
+    final max = durationSecondsNotifier.value;
+    final clamped = max > 0 ? seconds.clamp(0, max) : (seconds < 0 ? 0 : seconds);
+    progressSecondsNotifier.value = clamped;
+    _backend.seek(Duration(seconds: clamped));
+  }
+
+  Future<void> stop() async {
+    _requestSeq++; // 진행 중인 재생 요청 취소
+    isPlayingNotifier.value = false;
+    isBufferingNotifier.value = false;
+    progressSecondsNotifier.value = 0;
+    TidalSdkNativeBridge.stopForegroundService();
+    await _backend.stop();
+  }
+
+  void skipToNext() {
+    final next = _queue.next();
+    if (next != null) {
+      _notifyQueue();
+      _start(next);
+      return;
+    }
+    // 대기열 끝에서 다음 곡: 유사곡을 붙여 이어간다.
+    final current = currentTrack;
+    if (current == null) return;
+    _appendSimilarTracks(current.id).then((added) {
+      final appended = added > 0 ? _queue.next() : null;
+      if (appended != null) {
+        _notifyQueue();
+        _start(appended);
+      }
+    });
+  }
+
+  void skipToPrevious() {
+    if (progressSecondsNotifier.value > 3) {
+      seekTo(0);
+      return;
+    }
+    final previous = _queue.previous();
+    if (previous != null) {
+      _notifyQueue();
+      _start(previous);
+    } else {
+      seekTo(0);
+    }
+  }
+
+  void toggleShuffle() {
+    _queue.setShuffle(!_queue.shuffle);
+    isShuffleNotifier.value = _queue.shuffle;
+    _notifyQueue();
+  }
+
+  void toggleRepeat() {
+    repeatModeNotifier.value = _queue.cycleRepeat();
+  }
+
+  void _notifyQueue() {
+    queueNotifier.value = _queue.tracks;
+    queueIndexNotifier.value = _queue.index;
+  }
+
+  void _updateQualityBadge(StreamQuality quality) {
+    final q = quality.audioQuality.toUpperCase();
+    if (q.contains('HI_RES') || q.contains('HIRES') || q.contains('MAX')) {
+      qualityBadgeNotifier.value = 'MAX';
+    } else if (q.contains('LOSSLESS')) {
+      qualityBadgeNotifier.value = 'FLAC';
+    } else if (q.contains('HIGH')) {
+      qualityBadgeNotifier.value = 'AAC 320kbps';
+    } else if (q.contains('LOW')) {
+      qualityBadgeNotifier.value = 'AAC 96kbps';
+    } else {
+      qualityBadgeNotifier.value = '';
+    }
+  }
+
+  // ──────────────────────────────────────────────
+  // 출력 기기
+  // ──────────────────────────────────────────────
+
+  /// 출력 기기 전환.
+  Future<void> switchPlaybackDevice(DlnaDevice newDevice) async {
+    final currentDevice = _dlnaManager.selectedDevice;
+    if (currentDevice.udn == newDevice.udn) return;
+    AppLogger.log('PLAYER', '출력 기기 전환: "${currentDevice.friendlyName}" → "${newDevice.friendlyName}"', type: LogType.info);
+
+    final track = currentTrack;
+    final wasPlaying = isPlaying;
+    await _backend.stop();
+    _dlnaManager.selectDevice(newDevice);
+    if (wasPlaying && track != null) {
+      await _start(track);
+    }
+  }
+
+  // ──────────────────────────────────────────────
+  // 볼륨
+  // ──────────────────────────────────────────────
+
   /// 원격 스피커의 실제 볼륨을 읽기 전에는 SetVolume을 보내지 않는다(볼륨 급변 방지).
   bool _remoteVolumeKnown = false;
+  int? _lastPhoneVolume;
+  DateTime _lastRemoteVolumeSentAt = DateTime.fromMillisecondsSinceEpoch(0);
+  static const _remoteVolumeInterval = Duration(milliseconds: 200);
+  static const int remoteVolumeStep = 2;
 
   void _onOutputDeviceChanged() {
     _remoteVolumeKnown = false;
@@ -53,123 +382,6 @@ class PlayerManager {
       AppLogger.log('PLAYER', '스피커 볼륨을 읽지 못해 볼륨 제어를 보류', type: LogType.warning);
     }
   }
-  final TidalApiClient _apiClient = TidalApiClient();
-  final DlnaManager _dlnaManager = DlnaManager.instance;
-
-  final ValueNotifier<MediaTrack?> currentTrackNotifier = ValueNotifier(null);
-  final ValueNotifier<bool> isPlayingNotifier = ValueNotifier(false);
-  final ValueNotifier<int> progressSecondsNotifier = ValueNotifier(0);
-  final ValueNotifier<int> durationSecondsNotifier = ValueNotifier(210);
-  final ValueNotifier<String> qualityBadgeNotifier = ValueNotifier('FLAC 16-bit');
-  final ValueNotifier<bool> isShuffleNotifier = ValueNotifier(false);
-  final ValueNotifier<PlaybackRepeatMode> repeatModeNotifier = ValueNotifier(PlaybackRepeatMode.off);
-
-  /// 실시간 재생 대기열 (Queue List) Notifiers
-  final ValueNotifier<List<MediaTrack>> queueNotifier = ValueNotifier([]);
-  final ValueNotifier<int> queueIndexNotifier = ValueNotifier(-1);
-
-  /// 통합 볼륨 (0~100)
-  final ValueNotifier<int> volumeNotifier = ValueNotifier(50);
-
-  Timer? _progressTimer;
-  int _syncCounter = 0;
-
-  /// 현재 재생 큐 및 원본(셔플 해제용) 큐
-  List<MediaTrack> _queue = [];
-  List<MediaTrack> _originalQueue = [];
-  int _queueIndex = -1;
-
-  MediaTrack? get currentTrack => currentTrackNotifier.value;
-  bool get isPlaying => isPlayingNotifier.value;
-  int get progressSeconds => progressSecondsNotifier.value;
-  int get durationSeconds => durationSecondsNotifier.value;
-  bool get isShuffle => isShuffleNotifier.value;
-  PlaybackRepeatMode get repeatMode => repeatModeNotifier.value;
-  List<MediaTrack> get queue => _queue;
-  int get queueIndex => _queueIndex;
-
-  /// 큐(플레이리스트/앨범 트랙 목록)를 명시적으로 설정합니다.
-  void setQueue(List<MediaTrack> tracks, {int startIndex = 0}) {
-    _originalQueue = List.of(tracks);
-    if (isShuffleNotifier.value) {
-      _applyShuffleQueue(startIndex);
-    } else {
-      _queue = List.of(tracks);
-      _queueIndex = startIndex.clamp(0, tracks.isEmpty ? 0 : tracks.length - 1);
-    }
-    _notifyQueue();
-  }
-
-  void _notifyQueue() {
-    queueNotifier.value = List.unmodifiable(_queue);
-    queueIndexNotifier.value = _queueIndex;
-  }
-
-  /// 셔플 모드 토글
-  void toggleShuffle() {
-    isShuffleNotifier.value = !isShuffleNotifier.value;
-    final current = currentTrack;
-    if (isShuffleNotifier.value) {
-      if (_originalQueue.isEmpty && _queue.isNotEmpty) {
-        _originalQueue = List.of(_queue);
-      }
-      _applyShuffleQueue(_queueIndex);
-      AppLogger.log('PLAYER', '🔀 셔플 모드 활성화 (큐 ${_queue.length}곡 셔플)', type: LogType.info);
-    } else {
-      // 셔플 해제: 원본 순서로 복원
-      _queue = List.of(_originalQueue);
-      if (current != null) {
-        final idx = _queue.indexWhere((t) => t.id == current.id);
-        _queueIndex = idx != -1 ? idx : 0;
-      }
-      AppLogger.log('PLAYER', '➡️ 셔플 모드 해제 (원본 순서 복원)', type: LogType.info);
-    }
-    _notifyQueue();
-  }
-
-  void _applyShuffleQueue(int currentIdx) {
-    if (_originalQueue.isEmpty) return;
-    final current = (currentIdx >= 0 && currentIdx < _originalQueue.length)
-        ? _originalQueue[currentIdx]
-        : currentTrack;
-
-    final remaining = _originalQueue.where((t) => current == null || t.id != current.id).toList();
-    remaining.shuffle(Random());
-
-    _queue = current != null ? [current, ...remaining] : remaining;
-    _queueIndex = 0;
-    _notifyQueue();
-  }
-
-  /// 반복 모드 토글: off -> all -> one -> off
-  void toggleRepeat() {
-    switch (repeatModeNotifier.value) {
-      case PlaybackRepeatMode.off:
-        repeatModeNotifier.value = PlaybackRepeatMode.all;
-        AppLogger.log('PLAYER', '🔁 전체 반복(All) 활성화', type: LogType.info);
-        break;
-      case PlaybackRepeatMode.all:
-        repeatModeNotifier.value = PlaybackRepeatMode.one;
-        AppLogger.log('PLAYER', '🔂 한 곡 반복(One) 활성화', type: LogType.info);
-        break;
-      case PlaybackRepeatMode.one:
-        repeatModeNotifier.value = PlaybackRepeatMode.off;
-        AppLogger.log('PLAYER', '⏹ 반복 모드 해제', type: LogType.info);
-        break;
-    }
-  }
-
-  /// 대기열에서 특정 인덱스의 곡을 바로 재생
-  void playQueueIndex(int index) {
-    if (index >= 0 && index < _queue.length) {
-      _queueIndex = index;
-      _notifyQueue();
-      playTrack(_queue[index], queue: _queue, index: index);
-    }
-  }
-
-  /// 볼륨 설정 (스마트폰 또는 DLNA 스피커)
-  int? _lastPhoneVolume;
 
   /// 폰 미디어 볼륨이 바뀌었을 때(볼륨 키) 호출된다.
   ///
@@ -187,11 +399,6 @@ class PlayerManager {
     final direction = phonePercent > previous ? 1 : -1;
     setVolume(volumeNotifier.value + direction * remoteVolumeStep);
   }
-
-  static const int remoteVolumeStep = 2;
-
-  DateTime _lastRemoteVolumeSentAt = DateTime.fromMillisecondsSinceEpoch(0);
-  static const _remoteVolumeInterval = Duration(milliseconds: 200);
 
   /// 볼륨 설정 (0~100).
   ///
@@ -213,308 +420,5 @@ class PlayerManager {
     if (!isFinal && now.difference(_lastRemoteVolumeSentAt) < _remoteVolumeInterval) return;
     _lastRemoteVolumeSentAt = now;
     _dlnaManager.setVolume(clamped);
-  }
-
-  /// 곡 재생. 현재 선택된 출력 기기에 따라 TIDAL SDK(폰) 또는 DLNA로 라우팅.
-  Future<bool> playTrack(MediaTrack track, {List<MediaTrack>? queue, int? index}) async {
-    _stopProgressTimer();
-
-    currentTrackNotifier.value = track;
-    isPlayingNotifier.value = true;
-    progressSecondsNotifier.value = 0;
-    
-    // 정확한 곡 재생 시간 설정
-    if (track.durationSeconds > 0) {
-      durationSecondsNotifier.value = track.durationSeconds;
-    }
-
-    // 음원 품질 배지 동적 매핑
-    _updateQualityBadge(track.audioQuality);
-
-    AppLogger.log('PLAYER', '음원 재생 요청: "${track.title}" - ${track.artistName} (Track ID: ${track.id}, Duration: ${track.durationSeconds}s, Quality: ${track.audioQuality})', type: LogType.success);
-
-    // 큐 관리: 명시적 큐가 주어지면 적용
-    if (queue != null) {
-      setQueue(queue, startIndex: index ?? 0);
-    } else {
-      // 큐가 없거나 현재 트랙이 기존 큐에 포함되지 않은 경우 -> 새 트랙 기준으로 초기화 및 similarTracks 자동 로드
-      final idx = _queue.indexWhere((t) => t.id == track.id);
-      if (idx != -1) {
-        _queueIndex = idx;
-        _notifyQueue();
-      } else {
-        _queue = [track];
-        _originalQueue = [track];
-        _queueIndex = 0;
-        _notifyQueue();
-        // TIDAL similarTracks 자동 추천 큐 구성 (비동기)
-        _autoFetchSimilarTracks(track.id);
-      }
-    }
-
-    final selectedDevice = _dlnaManager.selectedDevice;
-
-    if (!selectedDevice.isLocalSpeaker) {
-      await _playViaDlna(track);
-    } else {
-      await _playViaPhone(track);
-    }
-
-    // 백그라운드 재생 유지를 위한 Foreground Service 활성화 (알림바 + WakeLock/WifiLock)
-    TidalSdkNativeBridge.startForegroundService(title: track.title, artist: track.artistName);
-
-    _startProgressTimer();
-    return true;
-  }
-
-  void _updateQualityBadge(String? quality) {
-    final q = (quality ?? '').toUpperCase();
-    if (q.contains('HI_RES') || q.contains('HIRES') || q.contains('MAX') || q.contains('MQA')) {
-      qualityBadgeNotifier.value = 'MAX 24-bit / 192kHz';
-    } else if (q.contains('LOSSLESS') || q.contains('FLAC')) {
-      qualityBadgeNotifier.value = 'FLAC 16-bit / 44.1kHz';
-    } else if (q.contains('HIGH')) {
-      qualityBadgeNotifier.value = 'AAC 320kbps';
-    } else if (q.contains('LOW')) {
-      qualityBadgeNotifier.value = 'AAC 96kbps';
-    } else {
-      qualityBadgeNotifier.value = 'Lossless FLAC';
-    }
-  }
-
-  /// 트랙 단독 재생 시 TIDAL 연관 추천곡(similarTracks)을 백그라운드로 가져와 큐를 채웁니다.
-  Future<void> _autoFetchSimilarTracks(String trackId) async {
-    try {
-      final token = await _authRepo.autoLogin();
-      if (token == null) return;
-      final similars = await _apiClient.getSimilarTracks(trackId, token.accessToken, limit: 30);
-      if (similars.isNotEmpty && currentTrack?.id == trackId) {
-        final newTracks = similars.where((t) => t.id != trackId).toList();
-        _queue = [currentTrack!, ...newTracks];
-        _originalQueue = List.of(_queue);
-        _notifyQueue();
-        AppLogger.log('PLAYER', '✨ 연관 추천곡 ${newTracks.length}개 자동 큐 등록 완료', type: LogType.success);
-      }
-    } catch (e) {
-      AppLogger.log('PLAYER', '연관 추천곡 조회 실패: $e', type: LogType.warning);
-    }
-  }
-
-  /// 폰 내장 스피커 재생 (TIDAL 공식 SDK playbackEngine)
-  Future<void> _playViaPhone(MediaTrack track) async {
-    await _authRepo.autoLogin();
-    AppLogger.log('PLAYER', '📱 스마트폰 TIDAL SDK 재생 요청 (Track ID: ${track.id})', type: LogType.network);
-    await TidalSdkNativeBridge.playTrack(trackId: track.id);
-  }
-
-  /// DLNA 스피커 재생
-  Future<void> _playViaDlna(MediaTrack track) async {
-    // 폰 내장 스피커 오디오 출력을 완전 정지 (동시 재생 방지)
-    await TidalSdkNativeBridge.stopTrack();
-    AppLogger.log('PLAYER', '⏹ 스마트폰 TIDAL SDK 완전 정지 (DLNA 단독 재생)', type: LogType.info);
-
-    String proxyUrl = '';
-    try {
-      final token = await _authRepo.autoLogin();
-      if (token != null) {
-        final playbackInfo = await _apiClient.getPlaybackInfo(track.id, token.accessToken);
-        if (playbackInfo != null) {
-          if (playbackInfo.audioQuality.isNotEmpty) {
-            _updateQualityBadge(playbackInfo.audioQuality);
-          }
-          proxyUrl = await TidalSdkNativeBridge.registerTrackStream(
-            trackId: track.id,
-            directUrl: playbackInfo.streamUrl,
-            manifestXml: playbackInfo.manifest,
-            allowedHost: Uri.tryParse(_dlnaManager.selectedDevice.locationUrl)?.host ?? '',
-          );
-          AppLogger.log('PLAYER', 'DLNA 프록시 주소 준비 완료 (Quality: ${playbackInfo.audioQuality})', type: LogType.success);
-        }
-      }
-    } catch (e) {
-      AppLogger.log('PLAYER', 'TIDAL 재생 정보 조회 예외: $e', type: LogType.error);
-    }
-
-    if (proxyUrl.isEmpty) {
-      AppLogger.log('PLAYER', 'DLNA 프록시 스트림 URL 생성 실패 - DLNA 재생 불가', type: LogType.error);
-      isPlayingNotifier.value = false;
-      return;
-    }
-
-    AppLogger.log('PLAYER', '🔊 DLNA 재생: "${_dlnaManager.selectedDevice.friendlyName}"', type: LogType.network);
-
-    final ok = await _dlnaManager.playOnSelectedDevice(streamUrl: proxyUrl, title: track.title);
-    if (!ok) {
-      AppLogger.log('PLAYER', 'DLNA 재생 명령 실패', type: LogType.error);
-      isPlayingNotifier.value = false;
-    }
-  }
-
-  /// 출력 기기 전환
-  Future<void> switchPlaybackDevice(DlnaDevice newDevice) async {
-    final currentDevice = _dlnaManager.selectedDevice;
-    final track = currentTrackNotifier.value;
-
-    if (currentDevice.udn == newDevice.udn) return;
-
-    AppLogger.log('PLAYER', '출력 기기 전환: "${currentDevice.friendlyName}" → "${newDevice.friendlyName}"', type: LogType.info);
-
-    if (isPlayingNotifier.value && track != null) {
-      if (!currentDevice.isLocalSpeaker) {
-        await _dlnaManager.stopCurrent();
-        AppLogger.log('PLAYER', '기존 DLNA 재생 정지 완료', type: LogType.info);
-      }
-
-      _dlnaManager.selectDevice(newDevice);
-      await playTrack(track);
-    } else {
-      _dlnaManager.selectDevice(newDevice);
-    }
-  }
-
-  void _startProgressTimer() {
-    _stopProgressTimer();
-    _syncCounter = 0;
-    _progressTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
-      if (!isPlayingNotifier.value) return;
-      final current = progressSecondsNotifier.value;
-      final max = durationSecondsNotifier.value;
-
-      // 4초마다 DLNA 스피커의 실제 재생 위치와 Duration을 동기화하여 오차 보정
-      if (!_dlnaManager.selectedDevice.isLocalSpeaker) {
-        _syncCounter++;
-        if (_syncCounter % 4 == 0) {
-          final pos = await _dlnaManager.syncPosition();
-          if (pos != null) {
-            final speakerProgress = pos['progress'] ?? 0;
-            final speakerDuration = pos['duration'] ?? 0;
-            if (speakerProgress > 0 && (speakerProgress - progressSecondsNotifier.value).abs() > 2) {
-              progressSecondsNotifier.value = speakerProgress;
-            }
-            if (speakerDuration > 0 && durationSecondsNotifier.value != speakerDuration) {
-              durationSecondsNotifier.value = speakerDuration;
-            }
-          }
-        }
-      }
-
-      if (current < max) {
-        progressSecondsNotifier.value = current + 1;
-      } else {
-        // 곡 종료 시: 한 곡 반복 / 다음 곡 자동 재생
-        _stopProgressTimer();
-        AppLogger.log('PLAYER', '🎵 곡 재생 완료 -> 다음 곡 자동 재생 시도', type: LogType.info);
-        skipToNext(autoPlay: true);
-      }
-    });
-  }
-
-  void _stopProgressTimer() {
-    _progressTimer?.cancel();
-    _progressTimer = null;
-  }
-
-  void togglePlayPause() {
-    if (currentTrackNotifier.value == null) return;
-    if (isPlayingNotifier.value) {
-      pause();
-    } else {
-      resume();
-    }
-  }
-
-  void pause() {
-    isPlayingNotifier.value = false;
-    _stopProgressTimer();
-    if (_dlnaManager.selectedDevice.isLocalSpeaker) {
-      TidalSdkNativeBridge.pauseTrack();
-    } else {
-      _dlnaManager.pauseCurrent();
-    }
-    AppLogger.log('PLAYER', '음원 일시정지', type: LogType.info);
-  }
-
-  void resume() {
-    if (currentTrackNotifier.value == null) return;
-    isPlayingNotifier.value = true;
-    _startProgressTimer();
-    if (_dlnaManager.selectedDevice.isLocalSpeaker) {
-      TidalSdkNativeBridge.resumeTrack();
-    } else {
-      _dlnaManager.resumeCurrent();
-    }
-    AppLogger.log('PLAYER', '음원 재생 재개: ${currentTrackNotifier.value!.title}', type: LogType.info);
-  }
-
-  /// 재생 위치 탐색(Seek)
-  void seekTo(int seconds) {
-    final clamped = seconds.clamp(0, durationSecondsNotifier.value);
-    progressSecondsNotifier.value = clamped;
-    if (_dlnaManager.selectedDevice.isLocalSpeaker) {
-      TidalSdkNativeBridge.seekTrack(clamped * 1000);
-    } else {
-      _dlnaManager.seek(clamped);
-    }
-  }
-
-  void stop() {
-    _stopProgressTimer();
-    isPlayingNotifier.value = false;
-    progressSecondsNotifier.value = 0;
-    TidalSdkNativeBridge.stopForegroundService();
-    if (_dlnaManager.selectedDevice.isLocalSpeaker) {
-      TidalSdkNativeBridge.stopTrack();
-    } else {
-      _dlnaManager.stopCurrent();
-    }
-  }
-
-  /// 다음 곡으로 이동
-  void skipToNext({bool autoPlay = false}) {
-    if (repeatModeNotifier.value == PlaybackRepeatMode.one && autoPlay && currentTrack != null) {
-      // 한 곡 반복 모드이고 곡이 끝나서 넘어온 경우: 같은 곡 처음부터 재개
-      seekTo(0);
-      playTrack(currentTrack!);
-      return;
-    }
-
-    if (_queue.isNotEmpty && _queueIndex < _queue.length - 1) {
-      _queueIndex++;
-      _notifyQueue();
-      playTrack(_queue[_queueIndex]);
-      AppLogger.log('PLAYER', '다음 곡: "${_queue[_queueIndex].title}" (큐 인덱스: $_queueIndex / ${_queue.length})', type: LogType.info);
-    } else if (_queue.isNotEmpty && repeatModeNotifier.value == PlaybackRepeatMode.all) {
-      // 전체 반복 모드: 첫 곡으로 순환
-      _queueIndex = 0;
-      _notifyQueue();
-      playTrack(_queue[0]);
-      AppLogger.log('PLAYER', '🔁 전체 반복: 첫 곡으로 순환 ("${_queue[0].title}")', type: LogType.info);
-    } else {
-      // 큐가 끝나면 추가 추천곡 가져오기 시도
-      if (currentTrack != null) {
-        _autoFetchSimilarTracks(currentTrack!.id);
-      }
-      if (_dlnaManager.selectedDevice.isLocalSpeaker) {
-        TidalSdkNativeBridge.skipToNext();
-      }
-    }
-  }
-
-  /// 이전 곡으로 이동
-  void skipToPrevious() {
-    if (progressSecondsNotifier.value > 3) {
-      seekTo(0);
-      return;
-    }
-
-    if (_queue.isNotEmpty && _queueIndex > 0) {
-      _queueIndex--;
-      _notifyQueue();
-      playTrack(_queue[_queueIndex]);
-      AppLogger.log('PLAYER', '이전 곡: "${_queue[_queueIndex].title}" (큐 인덱스: $_queueIndex)', type: LogType.info);
-    } else {
-      seekTo(0);
-      AppLogger.log('PLAYER', '이전 곡 없음 → 현재 곡 처음으로', type: LogType.info);
-    }
   }
 }
