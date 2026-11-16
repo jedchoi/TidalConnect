@@ -18,3 +18,6 @@ build/
 .dartServer/
 .dart-tool/
 .superpowers/
+
+# 빌드 시 주입하는 TIDAL 키 (config/tidal.example.json 참고)
+config/tidal.json

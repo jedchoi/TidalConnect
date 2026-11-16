@@ -1,0 +1,5 @@
+{
+  "TIDAL_CLIENT_ID": "<client id>",
+  "TIDAL_CLIENT_SECRET": "<client secret>",
+  "TIDAL_REDIRECT_URI": "https://tidal.com/android/login/auth"
+}

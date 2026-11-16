@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/config/tidal_config.dart';
 import 'core/providers.dart';
 import 'core/theme/app_theme.dart';
 import 'features/main/presentation/splash_screen.dart';
@@ -7,6 +8,11 @@ import 'features/player/data/player_manager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  assert(
+    TidalConfig.isConfigured,
+    'TIDAL 키가 없습니다. flutter run --dart-define-from-file=config/tidal.json 으로 실행하세요.',
+  );
 
   final container = ProviderContainer();
   final authRepository = container.read(authRepositoryProvider);
