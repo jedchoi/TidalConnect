@@ -13,7 +13,6 @@ import java.net.Inet4Address
 import java.security.SecureRandom
 import java.util.Enumeration
 import java.util.concurrent.TimeUnit
-import java.util.regex.Pattern
 
 /**
  * 로컬 HTTP 스트림 프록시 서버 (NanoHTTPD 기반)
@@ -236,29 +235,13 @@ class TidalStreamProxyServer(val boundHost: String) : NanoHTTPD(boundHost, PROXY
      */
     private fun proxyDashManifest(session: IHTTPSession, manifestXml: String): Response {
         return try {
-            val initPattern = Pattern.compile("initialization=\"([^\"]+)\"", Pattern.CASE_INSENSITIVE)
-            val initMatcher = initPattern.matcher(manifestXml)
-            val initUrl = if (initMatcher.find()) initMatcher.group(1)?.replace("&amp;", "&") else null
-
-            val mediaPattern = Pattern.compile("media=\"([^\"]+)\"", Pattern.CASE_INSENSITIVE)
-            val mediaMatcher = mediaPattern.matcher(manifestXml)
-            val mediaTemplate = if (mediaMatcher.find()) mediaMatcher.group(1)?.replace("&amp;", "&") else null
-
-            val startNumPattern = Pattern.compile("startNumber=\"(\\d+)\"", Pattern.CASE_INSENSITIVE)
-            val startMatcher = startNumPattern.matcher(manifestXml)
-            val startNumber = if (startMatcher.find()) startMatcher.group(1)?.toIntOrNull() ?: 1 else 1
-
-            // SegmentTimeline 내의 모든 r="숫자" 값 합산
-            var totalSegments = 0
-            val repeatPattern = Pattern.compile("r=\"(\\d+)\"", Pattern.CASE_INSENSITIVE)
-            val repeatMatcher = repeatPattern.matcher(manifestXml)
-            while (repeatMatcher.find()) {
-                val r = repeatMatcher.group(1)?.toIntOrNull() ?: 0
-                totalSegments += (r + 1)
-            }
-
-            val segmentCount = if (totalSegments > 10) totalSegments + 5 else 120
-            val endNumber = startNumber + segmentCount
+            val manifest = DashManifest.parse(manifestXml)
+                ?: return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "Invalid DASH manifest")
+            val initUrl = manifest.initializationUrl
+            val mediaTemplate = manifest.mediaTemplate
+            val startNumber = manifest.startNumber
+            val endNumber = startNumber + manifest.segmentCount - 1
+            val segmentCount = manifest.segmentCount
 
             Log.i(TAG, "DASH 지연 스트리밍 시작 - init: ${initUrl != null}, 세그먼트: $startNumber..$endNumber (총 $segmentCount 개)")
 
@@ -285,7 +268,7 @@ class TidalStreamProxyServer(val boundHost: String) : NanoHTTPD(boundHost, PROXY
                         }
                     }
 
-                    if (currentStep == 1 && currentSegNum <= endNumber && !mediaTemplate.isNullOrEmpty()) {
+                    if (currentStep == 1 && currentSegNum <= endNumber) {
                         val num = currentSegNum++
                         val segUrl = mediaTemplate.replace("\$Number\$", num.toString())
                         try {
