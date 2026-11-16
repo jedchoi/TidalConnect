@@ -24,6 +24,7 @@ import io.flutter.plugin.common.MethodChannel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -261,6 +262,31 @@ object PlaybackCore {
         }
     }
 
+    /** Flutter에 곡의 새 스트림 정보를 요청한다. 20초 안에 답이 없으면 null. */
+    private suspend fun requestStreamFromDart(trackId: String): Map<String, Any?>? {
+        val ch = channel ?: return null
+        return withTimeoutOrNull(20_000) {
+            withContext(Dispatchers.Main) {
+                suspendCancellableCoroutine { cont ->
+                    ch.invokeMethod("refreshTrackStream", mapOf("trackId" to trackId), object : MethodChannel.Result {
+                        override fun success(result: Any?) {
+                            @Suppress("UNCHECKED_CAST")
+                            if (cont.isActive) cont.resume(result as? Map<String, Any?>)
+                        }
+
+                        override fun error(errorCode: String, errorMessage: String?, errorDetails: Any?) {
+                            if (cont.isActive) cont.resume(null)
+                        }
+
+                        override fun notImplemented() {
+                            if (cont.isActive) cont.resume(null)
+                        }
+                    })
+                }
+            }
+        }
+    }
+
     /** Flutter에 사용자 토큰 갱신을 요청하고 결과를 기다린다. 20초 안에 답이 없으면 null. */
     private suspend fun requestTokenFromDart(channel: MethodChannel): Map<String, Any?>? =
         withTimeoutOrNull(20_000) {
@@ -332,6 +358,8 @@ object PlaybackCore {
         return try {
             current?.stop()
             TidalStreamProxyServer(wifiIp).also {
+                // 프록시 작업 스레드에서 호출되므로 Dart 응답을 기다리는 동안 이 스레드만 막는다.
+                it.streamRefresher = { trackId -> runBlocking { requestStreamFromDart(trackId) } }
                 it.start(30_000, false)
                 proxyServer = it
                 Log.i("PROXY", "로컬 스트림 프록시 시작: $wifiIp:${TidalStreamProxyServer.PROXY_PORT}")

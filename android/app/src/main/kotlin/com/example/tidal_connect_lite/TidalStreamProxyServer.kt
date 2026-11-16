@@ -102,6 +102,32 @@ class TidalStreamProxyServer(val boundHost: String) : NanoHTTPD(boundHost, PROXY
         else -> "m4a"
     }
 
+    /**
+     * CDN 서명 주소가 만료(401·403)되었을 때 같은 곡의 새 스트림 정보를 받아오는 함수.
+     * 결과는 directUrl, manifestXml, mimeType을 담은 맵이며, 실패하면 null.
+     */
+    @Volatile
+    var streamRefresher: ((trackId: String) -> Map<String, Any?>?)? = null
+
+    /** 만료된 주소를 새 주소로 바꿔 등록부를 갱신한다. */
+    private fun refreshStream(token: String, info: StreamInfo): StreamInfo? {
+        val fresh = try {
+            streamRefresher?.invoke(info.trackId)
+        } catch (e: Exception) {
+            Log.w(TAG, "스트림 재요청 실패: ${e.message}")
+            null
+        } ?: return null
+        val updated = info.copy(
+            directUrl = fresh["directUrl"] as? String ?: "",
+            manifestXml = fresh["manifestXml"] as? String ?: "",
+            mimeType = (fresh["mimeType"] as? String)?.ifEmpty { null } ?: info.mimeType,
+        )
+        if (updated.directUrl.isEmpty() && updated.manifestXml.isEmpty()) return null
+        synchronized(streamRegistry) { streamRegistry[token] = updated }
+        Log.i(TAG, "만료된 스트림 주소를 갱신: TrackID=${info.trackId}")
+        return updated
+    }
+
     private fun newToken(): String {
         val bytes = ByteArray(8)
         secureRandom.nextBytes(bytes)
@@ -142,7 +168,7 @@ class TidalStreamProxyServer(val boundHost: String) : NanoHTTPD(boundHost, PROXY
 
         return if (info.directUrl.isNotEmpty()) {
             Log.i(TAG, "🚀 Direct CDN 스트림 중계 시작: TrackID=$trackId")
-            proxyDirectCdn(session, info.directUrl, info.mimeType)
+            proxyDirectCdn(session, token, info, allowRefresh = true)
         } else {
             Log.i(TAG, "🚀 DASH 매니페스트 세그먼트 중계 시작: TrackID=$trackId")
             proxyDashManifest(session, info.manifestXml)
@@ -172,7 +198,9 @@ class TidalStreamProxyServer(val boundHost: String) : NanoHTTPD(boundHost, PROXY
         return response
     }
 
-    private fun proxyDirectCdn(session: IHTTPSession, cdnUrl: String, mimeType: String): Response {
+    private fun proxyDirectCdn(session: IHTTPSession, token: String, info: StreamInfo, allowRefresh: Boolean): Response {
+        val cdnUrl = info.directUrl
+        val mimeType = info.mimeType
         if (cdnUrl.isEmpty()) {
             return newFixedLengthResponse(Response.Status.BAD_REQUEST, "text/plain", "CDN URL required")
         }
@@ -188,6 +216,18 @@ class TidalStreamProxyServer(val boundHost: String) : NanoHTTPD(boundHost, PROXY
 
             val response = httpClient.newCall(requestBuilder.build()).execute()
             val responseBody = response.body
+
+            if ((response.code == 401 || response.code == 403) && allowRefresh) {
+                // 오래 일시정지한 뒤처럼 서명 주소가 만료된 경우: 새 주소를 받아 한 번만 재시도
+                response.close()
+                val refreshed = refreshStream(token, info)
+                    ?: return newFixedLengthResponse(Response.Status.FORBIDDEN, "text/plain", "Stream expired")
+                return if (refreshed.directUrl.isNotEmpty()) {
+                    proxyDirectCdn(session, token, refreshed, allowRefresh = false)
+                } else {
+                    proxyDashManifest(session, refreshed.manifestXml)
+                }
+            }
 
             if (responseBody == null || !response.isSuccessful) {
                 Log.e(TAG, "TIDAL CDN 오류 응답: ${response.code}")

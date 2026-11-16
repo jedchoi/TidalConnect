@@ -65,6 +65,14 @@ class TidalSdkNativeBridge {
   }
 
   static Future<Map<String, Object>?> Function()? _tokenRefresher;
+  static Future<Map<String, Object>?> Function(String trackId)? _streamRefresher;
+
+  /// 프록시가 만료된 CDN 주소를 만났을 때 같은 곡의 새 스트림 정보를 돌려줄 함수를 등록한다.
+  /// 반환 맵: directUrl, manifestXml, mimeType. 실패하면 null.
+  static void setStreamRefresher(Future<Map<String, Object>?> Function(String trackId) refresher) {
+    _streamRefresher = refresher;
+    _installHandler();
+  }
   static bool _handlerInstalled = false;
 
   /// 네이티브 SDK가 토큰 만료·오류로 새 토큰을 요청할 때 호출할 함수를 등록한다.
@@ -85,6 +93,11 @@ class TidalSdkNativeBridge {
           final refresher = _tokenRefresher;
           if (refresher == null) return null;
           return refresher();
+        case 'refreshTrackStream':
+          final refresher = _streamRefresher;
+          final trackId = (call.arguments as Map?)?['trackId']?.toString() ?? '';
+          if (refresher == null || trackId.isEmpty) return null;
+          return refresher(trackId);
         default:
           throw MissingPluginException('Unknown method ${call.method}');
       }

@@ -32,7 +32,19 @@ class DlnaBackend implements PlaybackBackend {
   DlnaBackend({required TidalAuthRepository auth, required TidalApiClient api, required DlnaManager dlna})
       : _auth = auth,
         _api = api,
-        _dlna = dlna;
+        _dlna = dlna {
+    TidalSdkNativeBridge.setStreamRefresher(_refreshStream);
+  }
+
+  /// 서명 주소 만료 시 네이티브 프록시가 호출한다.
+  Future<Map<String, Object>?> _refreshStream(String trackId) async {
+    final token = await _auth.getValidUserToken();
+    if (token == null) return null;
+    final info = await _api.getPlaybackInfo(trackId, token.accessToken, quality: preferredQuality);
+    if (info == null) return null;
+    AppLogger.log('DLNA_BACKEND', '만료된 스트림 주소 재발급 (TrackID: $trackId)', type: LogType.info);
+    return {'directUrl': info.streamUrl, 'manifestXml': info.manifest, 'mimeType': info.mimeType};
+  }
 
   /// DLNA로 요청할 음질. LOSSLESS는 단일 FLAC 주소라 Range 요청과 탐색이 된다.
   /// HI_RES_LOSSLESS는 DASH로 와서 탐색이 안 되므로 사용자가 고를 때만 쓴다.
