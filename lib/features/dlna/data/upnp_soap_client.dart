@@ -1,6 +1,25 @@
 import 'package:dio/dio.dart';
 import '../../../core/utils/app_logger.dart';
 
+/// 스피커 화면에 보일 곡 정보.
+class DidlMetadata {
+  final String title;
+  final String artist;
+  final String album;
+  final String albumArtUri;
+  final int durationSeconds;
+  final String mimeType;
+
+  const DidlMetadata({
+    required this.title,
+    this.artist = '',
+    this.album = '',
+    this.albumArtUri = '',
+    this.durationSeconds = 0,
+    this.mimeType = '',
+  });
+}
+
 class UPnPSoapClient {
   final Dio _dio;
 
@@ -15,21 +34,34 @@ class UPnPSoapClient {
         .replaceAll("'", '&apos;');
   }
 
-  static String buildSetAVTransportURIXml(String streamUrl, String title) {
+  /// DIDL-Lite 메타데이터를 담아 SetAVTransportURI 요청을 만든다.
+  static String buildSetAVTransportURIXml(String streamUrl, DidlMetadata meta) {
     final escapedStreamUrl = _escapeXml(streamUrl);
-    final escapedTitle = _escapeXml(title.isNotEmpty ? title : 'Tidal Music');
+    final title = _escapeXml(meta.title.isNotEmpty ? meta.title : 'Tidal Music');
+    final mime = meta.mimeType.isNotEmpty ? meta.mimeType : '*';
+    final duration = meta.durationSeconds > 0 ? ' duration="${formatDidlDuration(meta.durationSeconds)}"' : '';
 
-    final didlLite = '<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" '
-        'xmlns:dc="http://purl.org/dc/elements/1.1/" '
-        'xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">'
-        '<item id="0" parentID="0" restricted="1">'
-        '<dc:title>$escapedTitle</dc:title>'
-        '<upnp:class>object.item.audioItem.musicTrack</upnp:class>'
-        '<res protocolInfo="http-get:*:*:*">$escapedStreamUrl</res>'
-        '</item>'
-        '</DIDL-Lite>';
+    final didlLite = StringBuffer()
+      ..write('<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" ')
+      ..write('xmlns:dc="http://purl.org/dc/elements/1.1/" ')
+      ..write('xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">')
+      ..write('<item id="0" parentID="0" restricted="1">')
+      ..write('<dc:title>$title</dc:title>');
+    if (meta.artist.isNotEmpty) {
+      final artist = _escapeXml(meta.artist);
+      didlLite
+        ..write('<dc:creator>$artist</dc:creator>')
+        ..write('<upnp:artist>$artist</upnp:artist>');
+    }
+    if (meta.album.isNotEmpty) didlLite.write('<upnp:album>${_escapeXml(meta.album)}</upnp:album>');
+    if (meta.albumArtUri.isNotEmpty) didlLite.write('<upnp:albumArtURI>${_escapeXml(meta.albumArtUri)}</upnp:albumArtURI>');
+    didlLite
+      ..write('<upnp:class>object.item.audioItem.musicTrack</upnp:class>')
+      ..write('<res protocolInfo="http-get:*:$mime:*"$duration>$escapedStreamUrl</res>')
+      ..write('</item>')
+      ..write('</DIDL-Lite>');
 
-    final escapedMetaData = _escapeXml(didlLite);
+    final escapedMetaData = _escapeXml(didlLite.toString());
 
     return '''<?xml version="1.0" encoding="utf-8"?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
@@ -41,6 +73,14 @@ class UPnPSoapClient {
     </u:SetAVTransportURI>
   </s:Body>
 </s:Envelope>''';
+  }
+
+  /// DIDL-Lite의 duration 형식(H:MM:SS.000).
+  static String formatDidlDuration(int seconds) {
+    final h = seconds ~/ 3600;
+    final m = ((seconds % 3600) ~/ 60).toString().padLeft(2, '0');
+    final s = (seconds % 60).toString().padLeft(2, '0');
+    return '$h:$m:$s.000';
   }
 
   static String buildPlayXml() {
@@ -103,11 +143,11 @@ class UPnPSoapClient {
 </s:Envelope>''';
   }
 
-  Future<bool> setAVTransportURI(String controlUrl, String streamUrl, String title) async {
+  Future<bool> setAVTransportURI(String controlUrl, String streamUrl, DidlMetadata meta) async {
     return await _sendSoapRequest(
       controlUrl: controlUrl,
       soapAction: 'urn:schemas-upnp-org:service:AVTransport:1#SetAVTransportURI',
-      xmlPayload: buildSetAVTransportURIXml(streamUrl, title),
+      xmlPayload: buildSetAVTransportURIXml(streamUrl, meta),
     );
   }
 

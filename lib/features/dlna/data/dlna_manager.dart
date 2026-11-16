@@ -23,7 +23,7 @@ class DlnaManager {
     AppLogger.log('DLNA_UI', '오디오 출력 기기 변경: "${device.friendlyName}" (${device.locationUrl})', type: LogType.success);
   }
 
-  Future<bool> playOnSelectedDevice({required String streamUrl, required String title}) async {
+  Future<bool> playOnSelectedDevice({required String streamUrl, required DidlMetadata metadata}) async {
     final device = selectedDevice;
     if (device.isLocalSpeaker) {
       // Local mobile speaker handled natively via TIDAL SDK Player
@@ -44,7 +44,7 @@ class DlnaManager {
       AppLogger.log('DLNA_PLAY', 'DLNA Stop 전송 완료 (SetAVTransportURI 전 초기화)', type: LogType.info);
 
       // ② SetAVTransportURI: 새 스트림 URL 등록
-      final setUriOk = await _soapClient.setAVTransportURI(targetControlUrl, streamUrl, title);
+      final setUriOk = await _soapClient.setAVTransportURI(targetControlUrl, streamUrl, metadata);
       AppLogger.log('DLNA_PLAY', 'SetAVTransportURI 결과: $setUriOk', type: LogType.info);
 
       if (setUriOk) {

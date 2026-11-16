@@ -3,6 +3,7 @@ import '../../../../core/native/tidal_sdk_native_bridge.dart';
 import '../../../../core/utils/app_logger.dart';
 import '../../../auth/data/tidal_auth_repository.dart';
 import '../../../dlna/data/dlna_manager.dart';
+import '../../../dlna/data/upnp_soap_client.dart';
 import '../../../tidal_api/data/tidal_api_client.dart';
 import '../../../tidal_api/domain/models/media_item.dart';
 import 'playback_backend.dart';
@@ -81,7 +82,17 @@ class DlnaBackend implements PlaybackBackend {
     ));
 
     AppLogger.log('DLNA_BACKEND', '스피커 재생 요청: "${device.friendlyName}"', type: LogType.network);
-    final ok = await _dlna.playOnSelectedDevice(streamUrl: proxyUrl, title: track.title);
+    final ok = await _dlna.playOnSelectedDevice(
+      streamUrl: proxyUrl,
+      metadata: DidlMetadata(
+        title: track.title,
+        artist: track.artistName,
+        album: track.albumTitle,
+        albumArtUri: track.coverUrl,
+        durationSeconds: track.durationSeconds,
+        mimeType: info.mimeType,
+      ),
+    );
     if (isCancelled()) return;
     if (!ok) {
       throw PlaybackException('DLNA_PLAY_FAILED', '"${device.friendlyName}"에 재생 명령을 보내지 못했습니다.');
