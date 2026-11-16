@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import '../../../core/config/tidal_config.dart';
@@ -151,17 +150,6 @@ class _TidalWebViewLoginModalState extends State<TidalWebViewLoginModal> {
     }
   }
 
-  Future<void> _openExternalBrowser() async {
-    try {
-      AppLogger.log('TIDAL_AUTH', '외부 브라우저(Chrome Custom Tabs)로 OAuth 로그인 페이지 실행', type: LogType.network);
-      if (await canLaunchUrl(_authUri)) {
-        await launchUrl(_authUri, mode: LaunchMode.externalApplication);
-      }
-    } catch (e) {
-      AppLogger.log('TIDAL_AUTH', '외부 브라우저 호출 오류: $e', type: LogType.error);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -174,13 +162,6 @@ class _TidalWebViewLoginModalState extends State<TidalWebViewLoginModal> {
           icon: const Icon(Icons.close, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(null),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.open_in_browser, color: AppColors.cyanAccent),
-            tooltip: '외부 크롬 브라우저로 열기',
-            onPressed: _openExternalBrowser,
-          ),
-        ],
         bottom: _isLoadingPage || _isExchangingToken
             ? const PreferredSize(
                 preferredSize: Size.fromHeight(2),
