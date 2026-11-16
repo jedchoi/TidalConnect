@@ -31,7 +31,6 @@ class DebugLogScreen extends StatelessWidget {
       case LogType.network:
         return AppColors.cyanAccent;
       case LogType.info:
-      default:
         return Colors.white70;
     }
   }

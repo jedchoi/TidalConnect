@@ -42,7 +42,6 @@ class _MiniPlayerWidgetState extends ConsumerState<MiniPlayerWidget> {
       builder: (context, currentTrack, _) {
         final title = currentTrack?.title ?? 'Tidal 음원 선택 안됨';
         final artist = currentTrack?.artistName ?? 'Tidal Connect Lite';
-        final album = currentTrack?.albumTitle ?? 'Tidal Collection';
         final coverUrl = currentTrack?.coverUrl ?? '';
 
         return ValueListenableBuilder<DlnaDevice>(

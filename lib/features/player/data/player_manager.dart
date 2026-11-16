@@ -33,7 +33,6 @@ class PlayerManager {
   @visibleForTesting
   PlayerManager.forTesting();
 
-  late TidalAuthRepository _authRepo;
   late TidalApiClient _apiClient;
   DlnaManager _dlnaManager = DlnaManager.instance;
   final PlayQueue _queue = PlayQueue();
@@ -99,7 +98,6 @@ class PlayerManager {
     _configured = true;
     if (dlnaManager != null) _dlnaManager = dlnaManager;
     _apiClient = apiClient ?? TidalApiClient(authRepository: authRepository);
-    _authRepo = authRepository;
     _phone = phone ?? PhoneBackend();
     _dlna = dlna ?? DlnaBackend(auth: authRepository, api: _apiClient, dlna: _dlnaManager);
     _phone.events.listen((e) => _onBackendEvent(_phone, e));

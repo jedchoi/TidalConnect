@@ -75,8 +75,9 @@ class UPnPSoapClient {
         ..write('<upnp:artist>$artist</upnp:artist>');
     }
     if (meta.album.isNotEmpty) didlLite.write('<upnp:album>${_escapeXml(meta.album)}</upnp:album>');
-    if (meta.albumArtUri.isNotEmpty)
+    if (meta.albumArtUri.isNotEmpty) {
       didlLite.write('<upnp:albumArtURI>${_escapeXml(meta.albumArtUri)}</upnp:albumArtURI>');
+    }
     didlLite
       ..write('<upnp:class>object.item.audioItem.musicTrack</upnp:class>')
       ..write('<res protocolInfo="http-get:*:$mime:*"$duration>$escapedStreamUrl</res>')

@@ -221,10 +221,6 @@ class MediaPlaylist {
       description: description,
       coverUrl: coverPath,
       numberOfTracks: numberOfTracks,
-      audioQuality:
-          json.containsKey('audioQuality') || json.containsKey('mediaMetadata') || json.containsKey('audioModes')
-              ? resolveAudioQuality(json)
-              : '',
     );
   }
 }
