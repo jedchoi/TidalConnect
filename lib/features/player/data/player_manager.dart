@@ -15,7 +15,12 @@ class PlayerManager {
   static final PlayerManager instance = PlayerManager._internal();
   PlayerManager._internal();
 
-  final TidalAuthRepository _authRepo = TidalAuthRepository();
+  late TidalAuthRepository _authRepo;
+
+  /// 앱 시작 시 공유 인증 저장소를 주입한다.
+  void configure({required TidalAuthRepository authRepository}) {
+    _authRepo = authRepository;
+  }
   final TidalApiClient _apiClient = TidalApiClient();
   final DlnaManager _dlnaManager = DlnaManager.instance;
 

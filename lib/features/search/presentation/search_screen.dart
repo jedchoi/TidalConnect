@@ -1,23 +1,23 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/providers.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../auth/data/tidal_auth_repository.dart';
 import '../../player/data/player_manager.dart';
 import '../../tidal_api/data/tidal_api_client.dart';
 import '../../tidal_api/domain/models/media_item.dart';
 
-class SearchScreen extends StatefulWidget {
+class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
 
   @override
-  State<SearchScreen> createState() => _SearchScreenState();
+  ConsumerState<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> {
+class _SearchScreenState extends ConsumerState<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
-  final TidalAuthRepository _authRepo = TidalAuthRepository();
   final TidalApiClient _apiClient = TidalApiClient();
   final PlayerManager _playerManager = PlayerManager.instance;
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
@@ -104,11 +104,10 @@ class _SearchScreenState extends State<SearchScreen> {
     _saveSearchHistory(query);
     setState(() => _isSearching = true);
     try {
-      var token = await _authRepo.autoLogin();
-      token ??= await _authRepo.authenticateClientCredentials();
+      final accessToken = await ref.read(authRepositoryProvider).getCatalogToken();
 
-      if (token != null) {
-        final tracks = await _apiClient.searchTracks(query, token.accessToken);
+      if (accessToken != null) {
+        final tracks = await _apiClient.searchTracks(query, accessToken);
         if (mounted) {
           setState(() => _searchTracks = tracks);
         }

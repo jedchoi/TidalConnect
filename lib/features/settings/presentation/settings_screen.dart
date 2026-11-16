@@ -1,25 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/data/tidal_auth_repository.dart';
-import '../../auth/data/tidal_external_auth_service.dart';
 import '../../auth/presentation/tidal_webview_login_modal.dart';
 import '../../dlna/data/dlna_manager.dart';
 import 'debug_log_screen.dart';
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _isAuthenticating = false;
   String _authStatusText = '로그인 필요 (Tidal 계정 미인증)';
   bool _isLoggedIn = false;
 
   final DlnaManager _dlnaManager = DlnaManager.instance;
-  final TidalAuthRepository _authRepo = TidalAuthRepository();
+  TidalAuthRepository get _authRepo => ref.read(authRepositoryProvider);
 
   @override
   void initState() {

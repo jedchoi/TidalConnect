@@ -1,23 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/app_logger.dart';
-import '../../auth/data/tidal_auth_repository.dart';
 import '../../player/data/player_manager.dart';
 import '../../player/presentation/mini_player_widget.dart';
 import '../../tidal_api/data/tidal_api_client.dart';
 import '../../tidal_api/domain/models/media_item.dart';
 
-class AlbumDetailScreen extends StatefulWidget {
+class AlbumDetailScreen extends ConsumerStatefulWidget {
   final MediaAlbum album;
 
   const AlbumDetailScreen({super.key, required this.album});
 
   @override
-  State<AlbumDetailScreen> createState() => _AlbumDetailScreenState();
+  ConsumerState<AlbumDetailScreen> createState() => _AlbumDetailScreenState();
 }
 
-class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
-  final TidalAuthRepository _authRepo = TidalAuthRepository();
+class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
   final TidalApiClient _apiClient = TidalApiClient();
   final PlayerManager _playerManager = PlayerManager.instance;
 
@@ -33,11 +33,10 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   Future<void> _loadAlbumTracks() async {
     setState(() => _isLoading = true);
     try {
-      var token = await _authRepo.autoLogin();
-      token ??= await _authRepo.authenticateClientCredentials();
+      final accessToken = await ref.read(authRepositoryProvider).getCatalogToken();
 
-      if (token != null) {
-        final tracks = await _apiClient.getAlbumTracks(widget.album.id, token.accessToken);
+      if (accessToken != null) {
+        final tracks = await _apiClient.getAlbumTracks(widget.album.id, accessToken);
         if (mounted) {
           setState(() {
             _tracks = tracks;

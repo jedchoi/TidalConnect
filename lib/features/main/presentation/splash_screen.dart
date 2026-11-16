@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../auth/data/tidal_auth_repository.dart';
 import '../../dlna/data/dlna_manager.dart';
 import 'main_screen.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerProviderStateMixin {
   late AnimationController _animController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
@@ -41,7 +42,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     // 1. 유료 계정 토큰 자동 복원
     setState(() => _statusText = 'TIDAL 계정 인증 확인 중...');
     try {
-      await TidalAuthRepository().autoLogin();
+      await ref.read(authRepositoryProvider).autoLogin();
     } catch (_) {}
 
     // 2. DLNA 네트워크 스피커 백그라운드 탐색 시작

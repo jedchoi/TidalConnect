@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/app_logger.dart';
-import '../../auth/data/tidal_auth_repository.dart';
 import '../../favorites/presentation/album_detail_screen.dart';
 import '../../favorites/presentation/playlist_artwork_widget.dart';
 import '../../favorites/presentation/playlist_detail_screen.dart';
@@ -9,15 +10,14 @@ import '../../player/data/player_manager.dart';
 import '../../tidal_api/data/tidal_api_client.dart';
 import '../../tidal_api/domain/models/media_item.dart';
 
-class ExploreScreen extends StatefulWidget {
+class ExploreScreen extends ConsumerStatefulWidget {
   const ExploreScreen({super.key});
 
   @override
-  State<ExploreScreen> createState() => _ExploreScreenState();
+  ConsumerState<ExploreScreen> createState() => _ExploreScreenState();
 }
 
-class _ExploreScreenState extends State<ExploreScreen> {
-  final _authRepo = TidalAuthRepository();
+class _ExploreScreenState extends ConsumerState<ExploreScreen> {
   final _apiClient = TidalApiClient();
   final _playerManager = PlayerManager.instance;
 
@@ -35,14 +35,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
   Future<void> _loadExploreData() async {
     setState(() => _isLoading = true);
     try {
-      var token = await _authRepo.autoLogin();
-      token ??= await _authRepo.authenticateClientCredentials();
+      final accessToken = await ref.read(authRepositoryProvider).getCatalogToken();
 
-      if (token != null) {
+      if (accessToken != null) {
         final results = await Future.wait([
-          _apiClient.getFeaturedAlbums(token.accessToken),
-          _apiClient.getFeaturedPlaylists(token.accessToken),
-          _apiClient.getFeaturedTracks(token.accessToken),
+          _apiClient.getFeaturedAlbums(accessToken),
+          _apiClient.getFeaturedPlaylists(accessToken),
+          _apiClient.getFeaturedTracks(accessToken),
         ]);
 
         if (mounted) {

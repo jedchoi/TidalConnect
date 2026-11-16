@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/app_logger.dart';
-import '../../auth/data/tidal_auth_repository.dart';
 import '../../player/data/player_manager.dart';
 import '../../tidal_api/data/tidal_api_client.dart';
 import '../../tidal_api/domain/models/media_item.dart';
@@ -9,15 +10,14 @@ import 'album_detail_screen.dart';
 import 'playlist_artwork_widget.dart';
 import 'playlist_detail_screen.dart';
 
-class MyCollectionScreen extends StatefulWidget {
+class MyCollectionScreen extends ConsumerStatefulWidget {
   const MyCollectionScreen({super.key});
 
   @override
-  State<MyCollectionScreen> createState() => _MyCollectionScreenState();
+  ConsumerState<MyCollectionScreen> createState() => _MyCollectionScreenState();
 }
 
-class _MyCollectionScreenState extends State<MyCollectionScreen> {
-  final _authRepo = TidalAuthRepository();
+class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
   final _apiClient = TidalApiClient();
   final _playerManager = PlayerManager.instance;
 
@@ -40,7 +40,7 @@ class _MyCollectionScreenState extends State<MyCollectionScreen> {
       _errorMessage = null;
     });
     try {
-      final userToken = await _authRepo.autoLogin();
+      final userToken = await ref.read(authRepositoryProvider).autoLogin();
 
       if (userToken == null || userToken.userId.isEmpty) {
         if (mounted) {
