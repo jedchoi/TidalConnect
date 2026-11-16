@@ -5,13 +5,11 @@ import fi.iki.elonen.NanoHTTPD
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.InputStream
-import java.io.SequenceInputStream
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import java.net.Inet4Address
 import java.security.SecureRandom
-import java.util.Enumeration
 import java.util.concurrent.TimeUnit
 
 /**
@@ -237,60 +235,9 @@ class TidalStreamProxyServer(val boundHost: String) : NanoHTTPD(boundHost, PROXY
         return try {
             val manifest = DashManifest.parse(manifestXml)
                 ?: return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "Invalid DASH manifest")
-            val initUrl = manifest.initializationUrl
-            val mediaTemplate = manifest.mediaTemplate
-            val startNumber = manifest.startNumber
-            val endNumber = startNumber + manifest.segmentCount - 1
-            val segmentCount = manifest.segmentCount
-
-            Log.i(TAG, "DASH 지연 스트리밍 시작 - init: ${initUrl != null}, 세그먼트: $startNumber..$endNumber (총 $segmentCount 개)")
-
-            // 요청에 맞춰 하나씩 다운로드하여 공급하는 Lazy Enumeration
-            val lazyEnumeration = object : Enumeration<InputStream> {
-                private var currentStep = if (!initUrl.isNullOrEmpty()) 0 else 1
-                private var currentSegNum = startNumber
-
-                override fun hasMoreElements(): Boolean {
-                    return currentStep == 0 || (currentStep == 1 && currentSegNum <= endNumber)
-                }
-
-                override fun nextElement(): InputStream {
-                    if (currentStep == 0) {
-                        currentStep = 1
-                        try {
-                            val initReq = Request.Builder().url(initUrl!!).build()
-                            val initResp = httpClient.newCall(initReq).execute()
-                            if (initResp.isSuccessful && initResp.body != null) {
-                                return initResp.body!!.byteStream()
-                            }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "DASH init 세그먼트 다운로드 실패: ${e.message}")
-                        }
-                    }
-
-                    if (currentStep == 1 && currentSegNum <= endNumber) {
-                        val num = currentSegNum++
-                        val segUrl = mediaTemplate.replace("\$Number\$", num.toString())
-                        try {
-                            val segReq = Request.Builder().url(segUrl).build()
-                            val segResp = httpClient.newCall(segReq).execute()
-                            if (segResp.isSuccessful && segResp.body != null) {
-                                return segResp.body!!.byteStream()
-                            }
-                        } catch (e: Exception) {
-                            Log.w(TAG, "DASH 세그먼트 #$num 다운로드 실패/종료: ${e.message}")
-                        }
-                    }
-
-                    // 더 이상 없거나 실패 시 빈 스트림 반환
-                    return java.io.ByteArrayInputStream(ByteArray(0))
-                }
-            }
-
-            val combinedStream = SequenceInputStream(lazyEnumeration)
-
-            val proxyResponse = newChunkedResponse(Response.Status.OK, "audio/mp4", combinedStream)
-            proxyResponse.addHeader("Accept-Ranges", "bytes")
+            Log.i(TAG, "DASH 중계 시작 - init: ${manifest.initializationUrl != null}, 세그먼트 ${manifest.segmentCount}개")
+            // 이어 붙인 스트림은 바이트 위치로 탐색할 수 없으므로 Accept-Ranges를 알리지 않는다.
+            val proxyResponse = newChunkedResponse(Response.Status.OK, "audio/mp4", DashSegmentInputStream(httpClient, manifest))
             proxyResponse.addHeader("Access-Control-Allow-Origin", "*")
             proxyResponse.addHeader("Connection", "keep-alive")
             proxyResponse

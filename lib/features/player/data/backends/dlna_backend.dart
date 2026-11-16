@@ -41,8 +41,11 @@ class DlnaBackend implements PlaybackBackend {
   @override
   Stream<BackendEvent> get events => _events.stream;
 
+  /// DASH 중계는 세그먼트를 이어 붙인 스트림이라 탐색할 수 없다.
+  bool _canSeek = true;
+
   @override
-  bool get canSeek => true;
+  bool get canSeek => _canSeek;
 
   @override
   Future<void> play(MediaTrack track, {Duration startPosition = Duration.zero, required IsCancelled isCancelled}) async {
@@ -62,6 +65,7 @@ class DlnaBackend implements PlaybackBackend {
       throw const PlaybackException('NO_STREAM', '이 곡의 스트림 정보를 받지 못했습니다.');
     }
 
+    _canSeek = !info.isDash;
     final device = _dlna.selectedDevice;
     final proxyUrl = await TidalSdkNativeBridge.registerTrackStream(
       trackId: track.id,
@@ -97,7 +101,7 @@ class DlnaBackend implements PlaybackBackend {
     if (!ok) {
       throw PlaybackException('DLNA_PLAY_FAILED', '"${device.friendlyName}"에 재생 명령을 보내지 못했습니다.');
     }
-    if (startPosition > Duration.zero) {
+    if (startPosition > Duration.zero && _canSeek) {
       await _dlna.seek(startPosition.inSeconds);
     }
     _startPolling(track);

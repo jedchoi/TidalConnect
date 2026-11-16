@@ -188,6 +188,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                                 ? _dragSliderValue
                                 : progressSec.toDouble().clamp(0.0, maxDuration);
 
+                            final canSeek = _playerManager.canSeekNotifier.value;
                             return Column(
                               children: [
                                 Slider(
@@ -196,18 +197,19 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                                   max: maxDuration,
                                   activeColor: AppColors.cyanAccent,
                                   inactiveColor: AppColors.surfaceLight,
-                                  onChangeStart: (val) {
+                                  // DASH(Hi-Res) 스피커 재생처럼 탐색이 안 되는 경우 슬라이더를 비활성화한다.
+                                  onChangeStart: !canSeek ? null : (val) {
                                     setState(() {
                                       _isUserDraggingSlider = true;
                                       _dragSliderValue = val;
                                     });
                                   },
-                                  onChanged: (val) {
+                                  onChanged: !canSeek ? null : (val) {
                                     setState(() {
                                       _dragSliderValue = val;
                                     });
                                   },
-                                  onChangeEnd: (val) {
+                                  onChangeEnd: !canSeek ? null : (val) {
                                     setState(() {
                                       _isUserDraggingSlider = false;
                                     });

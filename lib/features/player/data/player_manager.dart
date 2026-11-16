@@ -201,7 +201,9 @@ class PlayerManager {
     }
     try {
       await _backend.play(track, startPosition: startPosition, isCancelled: isCancelled);
-      return !isCancelled();
+      if (isCancelled()) return false;
+      canSeekNotifier.value = _backend.canSeek;
+      return true;
     } catch (e) {
       if (isCancelled()) return false;
       final message = e is PlaybackException ? e.message : '재생을 시작하지 못했습니다.';
