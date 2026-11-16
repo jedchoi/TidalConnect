@@ -10,9 +10,19 @@ class SSDPDiscoveryService {
   static const int multicastPort = 1900;
   final Dio _dio;
 
-  SSDPDiscoveryService({Dio? dio}) : _dio = dio ?? Dio();
+  SSDPDiscoveryService({Dio? dio})
+      : _dio = dio ??
+            Dio(BaseOptions(
+              connectTimeout: const Duration(seconds: 3),
+              receiveTimeout: const Duration(seconds: 3),
+            ));
 
-  Future<List<DlnaDevice>> discoverDevices({Duration timeout = const Duration(seconds: 4)}) async {
+  /// SSDP로 렌더러를 찾는다. 기기를 찾는 즉시 [onDeviceFound]로 알리고,
+  /// 응답 대기 시간이 끝나면 진행 중인 기기 설명 요청까지 기다린 뒤 전체 목록을 돌려준다.
+  Future<List<DlnaDevice>> discoverDevices({
+    Duration timeout = const Duration(seconds: 4),
+    void Function(DlnaDevice device)? onDeviceFound,
+  }) async {
     final List<DlnaDevice> devices = [DlnaDevice.localSpeaker];
     final Set<String> seenLocations = {};
     final Set<String> seenUdns = {DlnaDevice.localSpeaker.udn};
@@ -51,15 +61,18 @@ class SSDPDiscoveryService {
       Timer(const Duration(milliseconds: 600), () => sendMSearchBursts());
 
       final completer = Completer<List<DlnaDevice>>();
-      Timer(timeout, () {
+      final pending = <Future<void>>[];
+      Timer(timeout, () async {
         socket?.close();
+        // 응답은 받았지만 설명 XML을 아직 받는 중인 기기를 버리지 않는다(요청마다 3초 타임아웃).
+        await Future.wait(pending);
         if (!completer.isCompleted) {
-          AppLogger.log('SSDP_NET', 'SSDP 탐색 종료 (${timeout.inSeconds}초 소요). 고유 발견 기기: ${devices.length}개', type: devices.length > 1 ? LogType.success : LogType.warning);
+          AppLogger.log('SSDP_NET', 'SSDP 탐색 종료. 발견 기기: ${devices.length}개', type: devices.length > 1 ? LogType.success : LogType.warning);
           completer.complete(devices);
         }
       });
 
-      socket.listen((RawSocketEvent event) async {
+      socket.listen((RawSocketEvent event) {
         if (event == RawSocketEvent.read) {
           final datagram = socket?.receive();
           if (datagram != null) {
@@ -83,19 +96,16 @@ class SSDPDiscoveryService {
 
             AppLogger.log('SSDP_NET', 'UDP 중복 없음 확인 ➔ XML 수신 시작 [from ${datagram.address.address}] LOCATION: $location', type: LogType.info);
 
-            final device = await _fetchDeviceDescription(location, baseUdn);
-            if (device != null) {
-              // Final duplicate safety check against existing list
+            pending.add(_fetchDeviceDescription(location, baseUdn).then((device) {
+              if (device == null || completer.isCompleted) return;
+              // 같은 기기가 여러 인터페이스로 응답한 경우만 걸러낸다(이름이 같은 다른 스피커는 유지).
               final isDuplicate = devices.any((d) =>
-                  d.locationUrl == device.locationUrl ||
-                  (d.udn.isNotEmpty && d.udn == device.udn) ||
-                  (d.friendlyName == device.friendlyName && !d.isLocalSpeaker));
-
-              if (!isDuplicate) {
-                devices.add(device);
-                AppLogger.log('SSDP_NET', 'DLNA 렌더러 등록 완료: "${device.friendlyName}" (${device.locationUrl})', type: LogType.success);
-              }
-            }
+                  d.locationUrl == device.locationUrl || (d.udn.isNotEmpty && d.udn == device.udn));
+              if (isDuplicate) return;
+              devices.add(device);
+              onDeviceFound?.call(device);
+              AppLogger.log('SSDP_NET', 'DLNA 렌더러 등록: "${device.friendlyName}"', type: LogType.success);
+            }));
           }
         }
       });
@@ -157,15 +167,9 @@ class SSDPDiscoveryService {
         renderingControlUrl: renderingControlUrl,
       );
     } catch (e) {
-      AppLogger.log('SSDP_NET', 'XML 명세 수신 예외 [URL: $locationUrl]: $e', type: LogType.warning);
-      final baseUri = Uri.parse(locationUrl);
-      return DlnaDevice(
-        udn: usn,
-        friendlyName: 'DLNA Audio Renderer (${baseUri.host})',
-        locationUrl: locationUrl,
-        avTransportControlUrl: locationUrl,
-        renderingControlUrl: locationUrl,
-      );
+      // 설명을 받지 못한 기기는 렌더러인지 알 수 없으므로 목록에 넣지 않는다.
+      AppLogger.log('SSDP_NET', 'XML 명세 수신 실패 [$locationUrl]: $e', type: LogType.warning);
+      return null;
     }
   }
 

@@ -165,7 +165,11 @@ class DlnaManager {
     AppLogger.log('DLNA_UI', '전역 DLNA 네트워크 탐색 시작...', type: LogType.info);
 
     try {
-      final newDevices = await _ssdpService.discoverDevices();
+      // 찾는 즉시 목록에 반영해 탐색이 끝나기 전에도 고를 수 있게 한다.
+      devicesNotifier.value = [DlnaDevice.localSpeaker];
+      final newDevices = await _ssdpService.discoverDevices(
+        onDeviceFound: (device) => devicesNotifier.value = List.unmodifiable([...devicesNotifier.value, device]),
+      );
       devicesNotifier.value = List.unmodifiable(newDevices);
       
       final remoteCount = newDevices.where((d) => !d.isLocalSpeaker).length;
