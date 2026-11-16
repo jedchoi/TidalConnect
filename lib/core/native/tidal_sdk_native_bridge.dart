@@ -189,6 +189,13 @@ class TidalSdkNativeBridge {
     }
   }
 
+  /// Android 13 이상에서 재생 알림 권한을 요청한다.
+  static Future<void> requestNotificationPermission() async {
+    try {
+      await _channel.invokeMethod('requestNotificationPermission');
+    } catch (_) {}
+  }
+
   /// DLNA 스트리밍 중 Wi-Fi 절전을 막는 WifiLock을 잡거나 놓는다.
   static Future<void> setStreamingLock(bool enabled) async {
     try {

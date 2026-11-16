@@ -1,6 +1,13 @@
 package com.example.tidal_connect_lite
 
+import android.Manifest
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import java.lang.ref.WeakReference
 import android.content.Context
 import android.net.wifi.WifiManager
 import android.util.Log
@@ -27,6 +34,7 @@ import kotlin.coroutines.resume
 object PlaybackCore {
     private const val CHANNEL = "com.example.tidal_connect_lite/tidal_sdk"
     private const val EVENT_CHANNEL = "com.example.tidal_connect_lite/player_events"
+    private const val NOTIFICATION_REQUEST_CODE = 1001
 
     private lateinit var appContext: Context
     private lateinit var auth: TidalAuthManager
@@ -36,9 +44,11 @@ object PlaybackCore {
     private var channel: MethodChannel? = null
     private var attachedMessenger: BinaryMessenger? = null
     private var wifiLock: WifiManager.WifiLock? = null
+    private var activityRef: WeakReference<Activity>? = null
 
     /** Flutter 엔진에 채널을 연결한다. 같은 엔진에 다시 붙으면 아무것도 하지 않는다. */
     fun attach(engine: FlutterEngine, context: Context) {
+        activityRef = WeakReference(context as? Activity)
         val messenger = engine.dartExecutor.binaryMessenger
         if (attachedMessenger === messenger) return
         attachedMessenger = messenger
@@ -148,6 +158,9 @@ object PlaybackCore {
                 playerManager = null
                 result.success(mapOf("status" to "released"))
             }
+            "requestNotificationPermission" -> {
+                result.success(requestNotificationPermission())
+            }
             "setStreamingLock" -> {
                 setWifiLock(call.argument<Boolean>("enabled") == true)
                 result.success(null)
@@ -218,6 +231,20 @@ object PlaybackCore {
                 }
             }
         }
+
+    /**
+     * Android 13 이상에서 재생 알림 권한을 요청한다. 이미 허용되었거나 필요 없으면 true.
+     * 거부해도 재생은 계속되며 알림만 보이지 않는다.
+     */
+    private fun requestNotificationPermission(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+        val granted = ContextCompat.checkSelfPermission(appContext, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        if (granted) return true
+        val activity = activityRef?.get() ?: return false
+        ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_REQUEST_CODE)
+        return false
+    }
 
     /**
      * DLNA 재생 중에만 WifiLock을 잡아 화면이 꺼져도 Wi-Fi가 절전으로 끊기지 않게 한다.

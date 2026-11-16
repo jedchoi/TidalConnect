@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../../../core/native/tidal_sdk_native_bridge.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../auth/data/tidal_auth_repository.dart';
 import '../../dlna/data/dlna_manager.dart';
@@ -65,6 +66,8 @@ class PlayerManager {
   /// 가장 최근 재생 오류. 메인 화면이 구독해 스낵바로 보여준다.
   final ValueNotifier<PlayerError?> errorNotifier = ValueNotifier(null);
   int _errorSeq = 0;
+
+  bool _notificationPermissionAsked = false;
 
   /// 가장 최근 재생 요청의 순번. 오래된 요청의 비동기 결과를 버리는 데 쓴다.
   int _requestSeq = 0;
@@ -192,6 +195,11 @@ class PlayerManager {
     _updateQualityBadge(StreamQuality(audioQuality: track.audioQuality));
 
     AppLogger.log('PLAYER', '재생 요청: "${track.title}" - ${track.artistName} (${track.id})', type: LogType.info);
+    if (!_notificationPermissionAsked) {
+      // 첫 재생 때 한 번만 요청한다. 거부해도 재생은 계속된다.
+      _notificationPermissionAsked = true;
+      TidalSdkNativeBridge.requestNotificationPermission();
+    }
     try {
       await _backend.play(track, startPosition: startPosition, isCancelled: isCancelled);
       return !isCancelled();
