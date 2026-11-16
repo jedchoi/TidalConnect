@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import '../../../core/native/tidal_sdk_native_bridge.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../auth/data/tidal_auth_repository.dart';
 import '../../dlna/data/dlna_manager.dart';
@@ -147,7 +146,6 @@ class PlayerManager {
     isPlayingNotifier.value = false;
     isBufferingNotifier.value = false;
     progressSecondsNotifier.value = 0;
-    TidalSdkNativeBridge.stopForegroundService();
   }
 
   // ──────────────────────────────────────────────
@@ -196,10 +194,7 @@ class PlayerManager {
     AppLogger.log('PLAYER', '재생 요청: "${track.title}" - ${track.artistName} (${track.id})', type: LogType.info);
     try {
       await _backend.play(track, startPosition: startPosition, isCancelled: isCancelled);
-      if (isCancelled()) return false;
-      // 백그라운드 재생 유지(알림 + WakeLock/WifiLock)
-      TidalSdkNativeBridge.startForegroundService(title: track.title, artist: track.artistName);
-      return true;
+      return !isCancelled();
     } catch (e) {
       if (isCancelled()) return false;
       final message = e is PlaybackException ? e.message : '재생을 시작하지 못했습니다.';
@@ -285,7 +280,6 @@ class PlayerManager {
     isPlayingNotifier.value = false;
     isBufferingNotifier.value = false;
     progressSecondsNotifier.value = 0;
-    TidalSdkNativeBridge.stopForegroundService();
     await _backend.stop();
   }
 

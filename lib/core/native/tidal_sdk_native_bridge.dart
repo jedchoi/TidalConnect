@@ -189,23 +189,6 @@ class TidalSdkNativeBridge {
     }
   }
 
-  /// 백그라운드 재생 지속을 위한 Foreground Service 시작
-  static Future<void> startForegroundService({String title = 'Tidal Connect Lite', String artist = '음악 재생 중'}) async {
-    try {
-      await _channel.invokeMethod('startForegroundService', {
-        'title': title,
-        'artist': artist,
-      });
-    } catch (_) {}
-  }
-
-  /// 백그라운드 Foreground Service 정지
-  static Future<void> stopForegroundService() async {
-    try {
-      await _channel.invokeMethod('stopForegroundService');
-    } catch (_) {}
-  }
-
   /// Releases native Tidal SDK Player
   static Future<bool> releasePlayer() async {
     try {

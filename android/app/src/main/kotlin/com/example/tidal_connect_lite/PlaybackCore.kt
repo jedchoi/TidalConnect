@@ -109,7 +109,6 @@ object PlaybackCore {
             "playTrack" -> runPlayerAction(result) {
                 val trackId = call.argument<String>("trackId") ?: ""
                 requirePlayerManager().playTrack(trackId)
-                TidalPlaybackService.startService(appContext, "Tidal Connect Lite", "재생 중")
                 mapOf("status" to "playing", "trackId" to trackId)
             }
             "pauseTrack" -> runPlayerAction(result) {
@@ -118,7 +117,6 @@ object PlaybackCore {
             }
             "resumeTrack" -> runPlayerAction(result) {
                 requirePlayerManager().resume()
-                TidalPlaybackService.startService(appContext, "Tidal Connect Lite", "재생 중")
                 mapOf("status" to "resumed")
             }
             "seekTrack" -> runPlayerAction(result) {
@@ -146,18 +144,7 @@ object PlaybackCore {
             "releasePlayer" -> {
                 playerManager?.release()
                 playerManager = null
-                TidalPlaybackService.stopService(appContext)
                 result.success(mapOf("status" to "released"))
-            }
-            "startForegroundService" -> {
-                val title = call.argument<String>("title") ?: "Tidal Connect Lite"
-                val artist = call.argument<String>("artist") ?: "오디오 스트리밍 중"
-                TidalPlaybackService.startService(appContext, title, artist)
-                result.success(mapOf("status" to "service_started"))
-            }
-            "stopForegroundService" -> {
-                TidalPlaybackService.stopService(appContext)
-                result.success(mapOf("status" to "service_stopped"))
             }
             // ── DLNA 프록시 관련 채널 ──────────────────────────────────────
             "registerTrackStream" -> {
@@ -172,7 +159,6 @@ object PlaybackCore {
                     return
                 }
                 val shortUrl = server.registerTrackStream(trackId, directUrl, manifestXml, allowedHost)
-                TidalPlaybackService.startService(appContext, "DLNA 스트리밍", "Track ID: $trackId")
                 Log.i("PROXY", "registerTrackStream: TrackID=$trackId")
                 result.success(mapOf("proxyUrl" to shortUrl))
             }
