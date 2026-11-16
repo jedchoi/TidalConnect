@@ -25,6 +25,26 @@ class TidalSdkNativeBridge {
     }
   }
 
+  /// 유료 사용자의 OAuth 토큰(UserId + AccessToken)을 네이티브 TIDAL Player SDK에 주입하여 30초 제한을 해제합니다.
+  static Future<bool> updateUserCredentials({
+    required String userId,
+    required String accessToken,
+    int expiresInSeconds = 86400 * 30,
+  }) async {
+    try {
+      final result = await _channel.invokeMethod<Map>('updateUserCredentials', {
+        'userId': userId,
+        'accessToken': accessToken,
+        'expiresInSeconds': expiresInSeconds,
+      });
+      AppLogger.log('TIDAL_NATIVE_SDK', '✅ 네이티브 유료 계정 인증 정보(Level.USER) 동기화 완료: $result', type: LogType.success);
+      return true;
+    } catch (e) {
+      AppLogger.log('TIDAL_NATIVE_SDK', '네이티브 사용자 인증 동기화 실패: $e', type: LogType.error);
+      return false;
+    }
+  }
+
   /// Triggers authentication via native CredentialsProvider
   static Future<bool> authenticateUser() async {
     try {
@@ -86,6 +106,29 @@ class TidalSdkNativeBridge {
     }
   }
 
+  /// Skips to next track via TIDAL SDK
+  static Future<bool> skipToNext() async {
+    try {
+      await _channel.invokeMethod('skipToNext');
+      AppLogger.log('TIDAL_NATIVE_SDK', 'TIDAL SDK 다음 곡 명령', type: LogType.info);
+      return true;
+    } catch (e) {
+      AppLogger.log('TIDAL_NATIVE_SDK', 'TIDAL SDK 다음 곡 실패: $e', type: LogType.error);
+      return false;
+    }
+  }
+
+  /// 다음 트랙을 TIDAL SDK 큐에 미리 등록 (TIDAL SDK setNext API)
+  static Future<bool> setNextTrack(String trackId) async {
+    try {
+      await _channel.invokeMethod('setNextTrack', {'trackId': trackId});
+      AppLogger.log('TIDAL_NATIVE_SDK', '다음 트랙 등록: $trackId', type: LogType.info);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   /// Stops playback via native Tidal SDK player
   static Future<bool> stopTrack() async {
     try {
@@ -95,6 +138,23 @@ class TidalSdkNativeBridge {
     } catch (e) {
       return false;
     }
+  }
+
+  /// 백그라운드 재생 지속을 위한 Foreground Service 시작
+  static Future<void> startForegroundService({String title = 'Tidal Connect Lite', String artist = '음악 재생 중'}) async {
+    try {
+      await _channel.invokeMethod('startForegroundService', {
+        'title': title,
+        'artist': artist,
+      });
+    } catch (_) {}
+  }
+
+  /// 백그라운드 Foreground Service 정지
+  static Future<void> stopForegroundService() async {
+    try {
+      await _channel.invokeMethod('stopForegroundService');
+    } catch (_) {}
   }
 
   /// Releases native Tidal SDK Player
@@ -107,4 +167,74 @@ class TidalSdkNativeBridge {
       return false;
     }
   }
+
+  /// 트랙의 스트림 정보(Direct URL 또는 DASH 매니페스트)를 프록시에 등록하고,
+  /// 50자 이내의 짧고 표준적인 DLNA 프록시 URL(예: http://192.168.45.63:8765/audio/189569817.mp4)을 반환합니다.
+  static Future<String> registerTrackStream({
+    required String trackId,
+    String directUrl = '',
+    String manifestXml = '',
+  }) async {
+    try {
+      final result = await _channel.invokeMethod<Map>('registerTrackStream', {
+        'trackId': trackId,
+        'directUrl': directUrl,
+        'manifestXml': manifestXml,
+      });
+      final proxyUrl = result?['proxyUrl']?.toString() ?? '';
+      AppLogger.log('TIDAL_NATIVE_SDK', '✅ DLNA 표준 프록시 URL 생성: $proxyUrl', type: LogType.success);
+      return proxyUrl;
+    } catch (e) {
+      AppLogger.log('TIDAL_NATIVE_SDK', 'DLNA 프록시 등록 오류: $e', type: LogType.error);
+      return '';
+    }
+  }
+
+  /// TIDAL CDN signed URL을 Android 로컬 프록시 URL로 변환합니다.
+  /// DLNA 스피커는 이 프록시 URL을 통해 스트림에 접근합니다.
+  /// 반환값 예: "http://192.168.45.100:8765/stream?url=https%3A%2F%2F..."
+  static Future<String> buildProxyUrl(String tidalStreamUrl) async {
+    try {
+      final result = await _channel.invokeMethod<Map>('buildProxyUrl', {
+        'tidalStreamUrl': tidalStreamUrl,
+      });
+      final proxyUrl = result?['proxyUrl']?.toString() ?? '';
+      AppLogger.log('TIDAL_NATIVE_SDK', '프록시 URL 생성: $proxyUrl', type: LogType.info);
+      return proxyUrl;
+    } catch (e) {
+      AppLogger.log('TIDAL_NATIVE_SDK', '프록시 URL 생성 실패: $e', type: LogType.error);
+      return '';
+    }
+  }
+
+  /// MPEG-DASH MPD 매니페스트를 로컬 세그먼트 프록시 스트림 URL로 변환합니다.
+  /// 반환값 예: "http://192.168.45.100:8765/dash_stream?manifest=..."
+  static Future<String> buildDashProxyUrl(String manifestXml) async {
+    try {
+      final result = await _channel.invokeMethod<Map>('buildDashProxyUrl', {
+        'manifestXml': manifestXml,
+      });
+      final proxyUrl = result?['proxyUrl']?.toString() ?? '';
+      AppLogger.log('TIDAL_NATIVE_SDK', 'DASH 프록시 URL 생성: $proxyUrl', type: LogType.info);
+      return proxyUrl;
+    } catch (e) {
+      AppLogger.log('TIDAL_NATIVE_SDK', 'DASH 프록시 URL 생성 실패: $e', type: LogType.error);
+      return '';
+    }
+  }
+
+  /// 로컬 프록시 서버 상태 조회
+  static Future<Map<String, dynamic>> getProxyServerStatus() async {
+    try {
+      final result = await _channel.invokeMethod<Map>('getProxyServerStatus');
+      return {
+        'isRunning': result?['isRunning'] ?? false,
+        'lanIp': result?['lanIp'] ?? '',
+        'port': result?['port'] ?? 8765,
+      };
+    } catch (e) {
+      return {'isRunning': false, 'lanIp': '', 'port': 8765};
+    }
+  }
 }
+

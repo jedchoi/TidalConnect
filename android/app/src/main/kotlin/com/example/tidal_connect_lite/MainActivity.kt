@@ -12,10 +12,14 @@ class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.example.tidal_connect_lite/tidal_sdk"
     private lateinit var authManager: TidalAuthManager
     private var playerManager: TidalPlayerManager? = null
+    private var proxyServer: TidalStreamProxyServer? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         authManager = TidalAuthManager(applicationContext)
+
+        // 로컬 스트림 프록시 서버 시작 (DLNA relay용)
+        startProxyServer()
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
@@ -38,6 +42,15 @@ class MainActivity : FlutterActivity() {
                         "clientId" to clientId
                     ))
                 }
+                "updateUserCredentials" -> {
+                    val userId = call.argument<String>("userId") ?: ""
+                    val accessToken = call.argument<String>("accessToken") ?: ""
+                    val expiresInSeconds = (call.argument<Int>("expiresInSeconds") ?: 86400).toLong()
+
+                    authManager.updateUserCredentials(userId, accessToken, expiresInSeconds)
+                    Log.i("TIDAL_NATIVE_SDK", "updateUserCredentials 호출됨 (UserId: $userId, Token length: ${accessToken.length})")
+                    result.success(mapOf("status" to "updated", "userId" to userId))
+                }
                 "authenticateUser" -> {
                     CoroutineScope(Dispatchers.Main).launch {
                         val success = authManager.authenticateUser()
@@ -47,6 +60,7 @@ class MainActivity : FlutterActivity() {
                 "playTrack" -> {
                     val trackId = call.argument<String>("trackId") ?: ""
                     playerManager?.playTrack(trackId)
+                    TidalPlaybackService.startService(applicationContext, "Tidal Connect Lite", "트랙 ID: $trackId 재생 중")
                     result.success(mapOf("status" to "playing", "trackId" to trackId))
                 }
                 "pauseTrack" -> {
@@ -55,6 +69,7 @@ class MainActivity : FlutterActivity() {
                 }
                 "resumeTrack" -> {
                     playerManager?.resume()
+                    TidalPlaybackService.startService(applicationContext, "Tidal Connect Lite", "재생 중")
                     result.success(mapOf("status" to "resumed"))
                 }
                 "seekTrack" -> {
@@ -64,17 +79,111 @@ class MainActivity : FlutterActivity() {
                 }
                 "stopTrack" -> {
                     playerManager?.stop()
+                    TidalPlaybackService.stopService(applicationContext)
                     result.success(mapOf("status" to "stopped"))
+                }
+                "skipToNext" -> {
+                    playerManager?.skipToNext()
+                    result.success(mapOf("status" to "skipped_to_next"))
+                }
+                "setNextTrack" -> {
+                    val nextTrackId = call.argument<String>("trackId") ?: ""
+                    playerManager?.setNextTrack(nextTrackId)
+                    result.success(mapOf("status" to "next_track_set", "trackId" to nextTrackId))
+                }
+                "getPosition" -> {
+                    val positionSec = playerManager?.getCurrentPosition() ?: 0f
+                    result.success(mapOf("positionSeconds" to positionSec))
                 }
                 "releasePlayer" -> {
                     playerManager?.release()
                     playerManager = null
+                    TidalPlaybackService.stopService(applicationContext)
                     result.success(mapOf("status" to "released"))
+                }
+                "startForegroundService" -> {
+                    val title = call.argument<String>("title") ?: "Tidal Connect Lite"
+                    val artist = call.argument<String>("artist") ?: "오디오 스트리밍 중"
+                    TidalPlaybackService.startService(applicationContext, title, artist)
+                    result.success(mapOf("status" to "service_started"))
+                }
+                "stopForegroundService" -> {
+                    TidalPlaybackService.stopService(applicationContext)
+                    result.success(mapOf("status" to "service_stopped"))
+                }
+                // ── DLNA 프록시 관련 채널 ──────────────────────────────────────
+                "registerTrackStream" -> {
+                    val trackId = call.argument<String>("trackId") ?: ""
+                    val directUrl = call.argument<String>("directUrl") ?: ""
+                    val manifestXml = call.argument<String>("manifestXml") ?: ""
+
+                    proxyServer?.registerTrackStream(trackId, directUrl, manifestXml)
+                    val shortUrl = TidalStreamProxyServer.buildShortAudioUrl(trackId)
+                    TidalPlaybackService.startService(applicationContext, "DLNA 스트리밍", "Track ID: $trackId")
+                    Log.i("PROXY", "✅ registerTrackStream: TrackID=$trackId → Short URL: $shortUrl")
+                    result.success(mapOf("proxyUrl" to shortUrl))
+                }
+                "buildProxyUrl" -> {
+                    val tidalStreamUrl = call.argument<String>("tidalStreamUrl") ?: ""
+                    if (tidalStreamUrl.isNotEmpty()) {
+                        proxyServer?.setCurrentStreamUrl(tidalStreamUrl)
+                    }
+                    val proxyUrl = TidalStreamProxyServer.buildShortAudioUrl("current")
+                    Log.i("PROXY", "buildProxyUrl: $tidalStreamUrl → $proxyUrl")
+                    result.success(mapOf("proxyUrl" to proxyUrl))
+                }
+                "buildDashProxyUrl" -> {
+                    val manifestXml = call.argument<String>("manifestXml") ?: ""
+                    if (manifestXml.isNotEmpty()) {
+                        proxyServer?.setCurrentManifest(manifestXml)
+                    }
+                    val proxyUrl = TidalStreamProxyServer.buildShortAudioUrl("current")
+                    Log.i("PROXY", "buildDashProxyUrl: (${manifestXml.length}자) → $proxyUrl")
+                    result.success(mapOf("proxyUrl" to proxyUrl))
+                }
+                "getProxyServerStatus" -> {
+                    val isAlive = proxyServer?.isAlive ?: false
+                    val lanIp = TidalStreamProxyServer.getLanIpAddress()
+                    result.success(mapOf(
+                        "isRunning" to isAlive,
+                        "lanIp" to lanIp,
+                        "port" to TidalStreamProxyServer.PROXY_PORT
+                    ))
                 }
                 else -> {
                     result.notImplemented()
                 }
             }
         }
+    }
+
+    private fun startProxyServer() {
+        try {
+            if (proxyServer == null) {
+                proxyServer = TidalStreamProxyServer()
+            }
+            if (!proxyServer!!.isAlive) {
+                proxyServer!!.start(30_000, false)
+                val lanIp = TidalStreamProxyServer.getLanIpAddress()
+                Log.i("PROXY", "로컬 스트림 프록시 서버 시작: http://$lanIp:${TidalStreamProxyServer.PROXY_PORT}")
+            }
+        } catch (e: Exception) {
+            Log.e("PROXY", "프록시 서버 시작 실패: ${e.message}", e)
+        }
+    }
+
+    override fun onDestroy() {
+        Log.i("MainActivity", "Activity onDestroy -> 리소스 정리")
+        try {
+            TidalPlayerManager.stopAll()
+            playerManager?.release()
+            playerManager = null
+            TidalPlaybackService.stopService(applicationContext)
+            proxyServer?.stop()
+            proxyServer = null
+        } catch (e: Exception) {
+            Log.w("MainActivity", "onDestroy 정리 오류: ${e.message}")
+        }
+        super.onDestroy()
     }
 }

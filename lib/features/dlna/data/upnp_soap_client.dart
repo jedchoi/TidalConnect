@@ -25,7 +25,7 @@ class UPnPSoapClient {
         '<item id="0" parentID="0" restricted="1">'
         '<dc:title>$escapedTitle</dc:title>'
         '<upnp:class>object.item.audioItem.musicTrack</upnp:class>'
-        '<res protocolInfo="http-get:*:audio/mp4:*">$escapedStreamUrl</res>'
+        '<res protocolInfo="http-get:*:*:*">$escapedStreamUrl</res>'
         '</item>'
         '</DIDL-Lite>';
 
@@ -77,6 +77,19 @@ class UPnPSoapClient {
 </s:Envelope>''';
   }
 
+  static String buildSeekXml(String relTime) {
+    return '''<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+  <s:Body>
+    <u:Seek xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
+      <InstanceID>0</InstanceID>
+      <Unit>REL_TIME</Unit>
+      <Target>$relTime</Target>
+    </u:Seek>
+  </s:Body>
+</s:Envelope>''';
+  }
+
   static String buildSetVolumeXml(int volumePercent) {
     return '''<?xml version="1.0" encoding="utf-8"?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
@@ -120,6 +133,93 @@ class UPnPSoapClient {
       soapAction: 'urn:schemas-upnp-org:service:AVTransport:1#Stop',
       xmlPayload: buildStopXml(),
     );
+  }
+
+  Future<bool> seek(String controlUrl, String relTime) async {
+    return await _sendSoapRequest(
+      controlUrl: controlUrl,
+      soapAction: 'urn:schemas-upnp-org:service:AVTransport:1#Seek',
+      xmlPayload: buildSeekXml(relTime),
+    );
+  }
+
+  static String buildGetPositionInfoXml() {
+    return '''<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+  <s:Body>
+    <u:GetPositionInfo xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
+      <InstanceID>0</InstanceID>
+    </u:GetPositionInfo>
+  </s:Body>
+</s:Envelope>''';
+  }
+
+  static String buildGetVolumeXml() {
+    return '''<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+  <s:Body>
+    <u:GetVolume xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1">
+      <InstanceID>0</InstanceID>
+      <Channel>Master</Channel>
+    </u:GetVolume>
+  </s:Body>
+</s:Envelope>''';
+  }
+
+  Future<Map<String, String>?> getPositionInfo(String controlUrl) async {
+    try {
+      final response = await _dio.post(
+        controlUrl,
+        data: buildGetPositionInfoXml(),
+        options: Options(
+          headers: {
+            'Content-Type': 'text/xml; charset="utf-8"',
+            'SOAPACTION': '"urn:schemas-upnp-org:service:AVTransport:1#GetPositionInfo"',
+          },
+          sendTimeout: const Duration(seconds: 3),
+          receiveTimeout: const Duration(seconds: 3),
+        ),
+      );
+      if (response.statusCode == 200) {
+        final xml = response.data.toString();
+        final relTime = _extractXmlTag(xml, 'RelTime') ?? '00:00:00';
+        final trackDuration = _extractXmlTag(xml, 'TrackDuration') ?? '00:00:00';
+        return {'RelTime': relTime, 'TrackDuration': trackDuration};
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<int?> getVolume(String controlUrl) async {
+    try {
+      final response = await _dio.post(
+        controlUrl,
+        data: buildGetVolumeXml(),
+        options: Options(
+          headers: {
+            'Content-Type': 'text/xml; charset="utf-8"',
+            'SOAPACTION': '"urn:schemas-upnp-org:service:RenderingControl:1#GetVolume"',
+          },
+          sendTimeout: const Duration(seconds: 3),
+          receiveTimeout: const Duration(seconds: 3),
+        ),
+      );
+      if (response.statusCode == 200) {
+        final xml = response.data.toString();
+        final volStr = _extractXmlTag(xml, 'CurrentVolume');
+        return volStr != null ? int.tryParse(volStr) : null;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  static String? _extractXmlTag(String xml, String tag) {
+    final start = xml.indexOf('<$tag>');
+    final end = xml.indexOf('</$tag>');
+    if (start != -1 && end != -1) {
+      return xml.substring(start + tag.length + 2, end).trim();
+    }
+    return null;
   }
 
   Future<bool> setVolume(String controlUrl, int volumePercent) async {

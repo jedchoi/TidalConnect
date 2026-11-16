@@ -38,10 +38,19 @@ class DlnaManager {
 
     AppLogger.log('DLNA_PLAY', 'DLNA 스피커 전송 시작: "${device.friendlyName}" ➔ $streamUrl', type: LogType.network);
     try {
+      // ① Stop 먼저: PAUSED 상태의 DLNA 렌더러는 SetAVTransportURI를 무시하는 경우가 있음
+      //   Stop → STOPPED 상태로 전환 후 새 URI 설정
+      await _soapClient.stop(targetControlUrl);
+      AppLogger.log('DLNA_PLAY', 'DLNA Stop 전송 완료 (SetAVTransportURI 전 초기화)', type: LogType.info);
+
+      // ② SetAVTransportURI: 새 스트림 URL 등록
       final setUriOk = await _soapClient.setAVTransportURI(targetControlUrl, streamUrl, title);
+      AppLogger.log('DLNA_PLAY', 'SetAVTransportURI 결과: $setUriOk', type: LogType.info);
+
       if (setUriOk) {
+        // ③ Play: 재생 시작
         final playOk = await _soapClient.play(targetControlUrl);
-        AppLogger.log('DLNA_PLAY', 'DLNA 재생 명령 응답: $playOk', type: LogType.success);
+        AppLogger.log('DLNA_PLAY', 'DLNA Play 명령 응답: $playOk', type: LogType.success);
         return playOk;
       }
     } catch (e) {
@@ -64,6 +73,66 @@ class DlnaManager {
     final targetControlUrl = device.avTransportControlUrl.isNotEmpty ? device.avTransportControlUrl : device.locationUrl;
     if (targetControlUrl.isEmpty) return false;
     return await _soapClient.play(targetControlUrl);
+  }
+
+  Future<bool> seek(int seconds) async {
+    final device = selectedDevice;
+    if (device.isLocalSpeaker) return true;
+    final targetControlUrl = device.avTransportControlUrl.isNotEmpty ? device.avTransportControlUrl : device.locationUrl;
+    if (targetControlUrl.isEmpty) return false;
+
+    final h = (seconds ~/ 3600).toString().padLeft(2, '0');
+    final m = ((seconds % 3600) ~/ 60).toString().padLeft(2, '0');
+    final s = (seconds % 60).toString().padLeft(2, '0');
+    final relTime = '$h:$m:$s';
+
+    AppLogger.log('DLNA_PLAY', '스피커 탐색(Seek) 요청 -> $relTime', type: LogType.info);
+    return await _soapClient.seek(targetControlUrl, relTime);
+  }
+
+  final ValueNotifier<int> volumeNotifier = ValueNotifier(50);
+
+  Future<bool> setVolume(int volumePercent) async {
+    final clamped = volumePercent.clamp(0, 100);
+    volumeNotifier.value = clamped;
+
+    final device = selectedDevice;
+    if (device.isLocalSpeaker) return true;
+
+    final targetRenderingUrl = device.renderingControlUrl.isNotEmpty ? device.renderingControlUrl : device.locationUrl;
+    if (targetRenderingUrl.isEmpty) return false;
+
+    AppLogger.log('DLNA_VOL', '🔊 스피커 볼륨 설정 요청: $clamped% -> $targetRenderingUrl', type: LogType.info);
+    return await _soapClient.setVolume(targetRenderingUrl, clamped);
+  }
+
+  /// 스피커의 실제 재생 위치(초)와 전체 길이(초)를 가져옵니다.
+  Future<Map<String, int>?> syncPosition() async {
+    final device = selectedDevice;
+    if (device.isLocalSpeaker) return null;
+
+    final targetControlUrl = device.avTransportControlUrl.isNotEmpty ? device.avTransportControlUrl : device.locationUrl;
+    if (targetControlUrl.isEmpty) return null;
+
+    final info = await _soapClient.getPositionInfo(targetControlUrl);
+    if (info != null) {
+      final relSec = _parseDurationToSeconds(info['RelTime'] ?? '');
+      final durSec = _parseDurationToSeconds(info['TrackDuration'] ?? '');
+      return {'progress': relSec, 'duration': durSec};
+    }
+    return null;
+  }
+
+  int _parseDurationToSeconds(String timeStr) {
+    if (timeStr.isEmpty || timeStr == 'NOT_IMPLEMENTED') return 0;
+    final parts = timeStr.split(':');
+    if (parts.length == 3) {
+      final h = int.tryParse(parts[0]) ?? 0;
+      final m = int.tryParse(parts[1]) ?? 0;
+      final s = double.tryParse(parts[2])?.toInt() ?? 0;
+      return h * 3600 + m * 60 + s;
+    }
+    return 0;
   }
 
   Future<bool> stopCurrent() async {

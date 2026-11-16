@@ -1,37 +1,38 @@
 package com.example.tidal_connect_lite
 
 import android.content.Context
-import com.tidal.sdk.auth.TidalAuth
+import android.util.Log
 import com.tidal.sdk.auth.CredentialsProvider
-import com.tidal.sdk.auth.model.AuthConfig
 
 class TidalAuthManager(private val context: Context) {
-    var credentialsProvider: CredentialsProvider? = null
+    var customCredentialsProvider: CustomCredentialsProvider? = null
         private set
+
+    val credentialsProvider: CredentialsProvider?
+        get() = customCredentialsProvider
 
     fun initializeAuth(clientId: String, clientSecret: String): Boolean {
         return try {
-            val authConfig = AuthConfig(
-                clientId = clientId,
-                clientSecret = clientSecret,
-                credentialsKey = "tidal_storage"
-            )
-            val tidalAuth = TidalAuth.getInstance(authConfig, context)
-            credentialsProvider = tidalAuth.credentialsProvider
+            customCredentialsProvider = CustomCredentialsProvider(context, clientId, clientSecret)
+            Log.i("TidalAuthManager", "CustomCredentialsProvider 초기화 성공")
             true
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("TidalAuthManager", "CustomCredentialsProvider 초기화 실패: ${e.message}", e)
             false
         }
     }
 
+    fun updateUserCredentials(userId: String, accessToken: String, expiresInSeconds: Long = 86400L * 30) {
+        customCredentialsProvider?.setUserCredentials(userId, accessToken, expiresInSeconds)
+        Log.i("TidalAuthManager", "사용자 인증 정보 업데이트 완료 (UserId: $userId)")
+    }
+
     suspend fun authenticateUser(): Boolean {
-        return try {
-            val credentials = credentialsProvider?.getCredentials()
-            credentials != null && credentials.isSuccess
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
-        }
+        val creds = customCredentialsProvider?.getCredentials()
+        return creds != null && creds.isSuccess
+    }
+
+    fun isUserLoggedIn(): Boolean {
+        return customCredentialsProvider?.isUserLoggedIn() ?: false
     }
 }

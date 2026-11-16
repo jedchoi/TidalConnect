@@ -5,6 +5,7 @@ class MediaTrack {
   final String albumTitle;
   final String coverUrl;
   final int durationSeconds;
+  final String audioQuality;
 
   MediaTrack({
     required this.id,
@@ -13,6 +14,7 @@ class MediaTrack {
     required this.albumTitle,
     required this.coverUrl,
     required this.durationSeconds,
+    this.audioQuality = 'LOSSLESS',
   });
 
   factory MediaTrack.fromJson(Map<String, dynamic> rawJson) {
@@ -61,6 +63,47 @@ class MediaTrack {
             : '';
 
     final duration = (json['duration'] as num?)?.toInt() ?? 0;
+    
+    // Quality tag resolution (TIDAL API는 Hi-Res 24-bit 음원이어도 기본 audioQuality 필드에는 LOSSLESS로 오므로 tags 및 audioModes 우선 분석)
+    String quality = '';
+    
+    // 1. mediaMetadata.tags 분석 (가장 신뢰성 높음: HIRES_LOSSLESS, LOSSLESS, DOLBY_ATMOS)
+    if (json['mediaMetadata'] is Map && json['mediaMetadata']['tags'] is List) {
+      final tags = (json['mediaMetadata']['tags'] as List).map((e) => e.toString().toUpperCase()).toList();
+      if (tags.any((t) => t.contains('HIRES') || t.contains('HI_RES') || t.contains('MQA'))) {
+        quality = 'HI_RES_LOSSLESS';
+      } else if (tags.any((t) => t.contains('DOLBY') || t.contains('ATMOS'))) {
+        quality = 'DOLBY_ATMOS';
+      } else if (tags.contains('LOSSLESS')) {
+        quality = 'LOSSLESS';
+      }
+    }
+
+    // 2. audioModes 분석 (예: ["STEREO", "HIRES_LOSSLESS"])
+    if (quality.isEmpty && json['audioModes'] != null) {
+      final modesStr = json['audioModes'].toString().toUpperCase();
+      if (modesStr.contains('HIRES') || modesStr.contains('HI_RES')) {
+        quality = 'HI_RES_LOSSLESS';
+      } else if (modesStr.contains('DOLBY') || modesStr.contains('ATMOS')) {
+        quality = 'DOLBY_ATMOS';
+      }
+    }
+
+    // 3. audioQuality 필드 분석 (LOSSLESS, HIGH, LOW)
+    if (quality.isEmpty) {
+      final aq = (json['audioQuality'] ?? '').toString().toUpperCase();
+      if (aq.contains('HI_RES') || aq.contains('HIRES') || aq.contains('MAX')) {
+        quality = 'HI_RES_LOSSLESS';
+      } else if (aq.contains('LOSSLESS') || aq.contains('FLAC')) {
+        quality = 'LOSSLESS';
+      } else if (aq.contains('HIGH')) {
+        quality = 'HIGH';
+      } else if (aq.contains('LOW')) {
+        quality = 'LOW';
+      } else {
+        quality = 'LOSSLESS';
+      }
+    }
 
     return MediaTrack(
       id: id,
@@ -69,7 +112,20 @@ class MediaTrack {
       albumTitle: album,
       coverUrl: coverPath,
       durationSeconds: duration,
+      audioQuality: quality,
     );
+  }
+
+  bool get isMax => audioQuality.toUpperCase().contains('HI_RES') || audioQuality.toUpperCase().contains('HIRES') || audioQuality.toUpperCase().contains('MAX') || audioQuality.toUpperCase().contains('MQA');
+  bool get isAtmos => audioQuality.toUpperCase().contains('DOLBY') || audioQuality.toUpperCase().contains('ATMOS');
+  bool get isLossless => isMax || isAtmos || audioQuality.toUpperCase().contains('LOSSLESS') || audioQuality.toUpperCase().contains('FLAC');
+  
+  String get qualityBadgeText {
+    if (isMax) return 'MAX';
+    if (isAtmos) return 'ATMOS';
+    if (isLossless) return 'FLAC';
+    if (audioQuality.toUpperCase().contains('HIGH')) return 'HIGH';
+    return 'LOW';
   }
 }
 

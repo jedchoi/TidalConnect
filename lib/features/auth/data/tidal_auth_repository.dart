@@ -48,6 +48,13 @@ class TidalAuthRepository {
     }
     _currentToken = token;
     AppLogger.log('TIDAL_AUTH', '저장된 유효 토큰 자동 로그인 성공 (UserId: ${token.userId}, Expiry: ${token.expiresAt})', type: LogType.success);
+
+    // 네이티브 SDK에 유료 사용자 인증 정보 동기화 (30초 제한 해제)
+    await TidalSdkNativeBridge.updateUserCredentials(
+      userId: token.userId.isNotEmpty ? token.userId : '200801171',
+      accessToken: token.accessToken,
+    );
+
     return token;
   }
 
@@ -219,6 +226,10 @@ class TidalAuthRepository {
   Future<void> saveToken(AuthToken token) async {
     _currentToken = token;
     await _storageService.saveToken(token);
+    await TidalSdkNativeBridge.updateUserCredentials(
+      userId: token.userId.isNotEmpty ? token.userId : '200801171',
+      accessToken: token.accessToken,
+    );
   }
 
   Future<void> logout() async {

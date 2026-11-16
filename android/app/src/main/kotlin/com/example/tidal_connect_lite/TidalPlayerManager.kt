@@ -105,6 +105,57 @@ class TidalPlayerManager(
         }
     }
 
+    /**
+     * 다음 트랙을 큐에 미리 등록 (TIDAL SDK setNext API)
+     * skipToNext() 호출 시 이 트랙으로 넘어감.
+     */
+    fun setNextTrack(trackId: String) {
+        val player = tidalPlayer ?: return
+        try {
+            if (trackId.isEmpty()) {
+                player.playbackEngine.setNext(null)
+                Log.i("TidalPlayerManager", "setNext(null) - 다음 트랙 초기화")
+            } else {
+                val mediaProduct = MediaProduct(
+                    productType = ProductType.TRACK,
+                    productId = trackId
+                )
+                player.playbackEngine.setNext(mediaProduct)
+                Log.i("TidalPlayerManager", "setNext: $trackId")
+            }
+        } catch (e: Exception) {
+            Log.e("TidalPlayerManager", "setNextTrack 실패: ${e.message}")
+        }
+    }
+
+    /**
+     * 다음 트랙으로 즉시 이동 (setNextTrack으로 등록된 트랙으로 전환)
+     */
+    fun skipToNext() {
+        val player = tidalPlayer ?: run {
+            Log.e("TidalPlayerManager", "skipToNext: Player not initialized")
+            return
+        }
+        try {
+            player.playbackEngine.skipToNext()
+            isCurrentlyPlaying = true
+            Log.i("TidalPlayerManager", "skipToNext() called")
+        } catch (e: Exception) {
+            Log.e("TidalPlayerManager", "skipToNext 실패: ${e.message}")
+        }
+    }
+
+    /**
+     * 현재 재생 위치 반환 (초 단위)
+     */
+    fun getCurrentPosition(): Float {
+        return try {
+            tidalPlayer?.playbackEngine?.assetPosition ?: 0f
+        } catch (e: Exception) {
+            0f
+        }
+    }
+
     fun pause() {
         try {
             tidalPlayer?.playbackEngine?.pause()
@@ -133,18 +184,41 @@ class TidalPlayerManager(
 
     fun seekTo(msec: Int) {
         try {
-            tidalPlayer?.playbackEngine?.seek(msec / 1000f)
-            Log.i("TidalPlayerManager", "Seek: ${msec}ms")
+            // TIDAL SDK PlaybackEngine.seek(time: Float) 내부 구현:
+            // extendedExoPlayer.seekTo(time.toLong()) -> 즉 밀리초(ms) 단위 Long을 요구함!
+            tidalPlayer?.playbackEngine?.seek(msec.toFloat())
+            Log.i("TidalPlayerManager", "Seek: ${msec}ms (passed ${msec.toFloat()} to SDK seek)")
         } catch (e: Exception) {
             Log.e("TidalPlayerManager", "Failed to seek", e)
         }
     }
 
+    companion object {
+        @Volatile
+        var activeInstance: TidalPlayerManager? = null
+
+        fun stopAll() {
+            try {
+                activeInstance?.stop()
+                activeInstance?.release()
+                activeInstance = null
+            } catch (e: Exception) {
+                Log.w("TidalPlayerManager", "stopAll 예외: ${e.message}")
+            }
+        }
+    }
+
+    init {
+        activeInstance?.release()
+        activeInstance = this
+    }
+
     fun stop() {
         try {
+            tidalPlayer?.playbackEngine?.pause()
             tidalPlayer?.playbackEngine?.reset()
             isCurrentlyPlaying = false
-            Log.i("TidalPlayerManager", "Playback stopped")
+            Log.i("TidalPlayerManager", "Playback fully stopped & reset")
         } catch (e: Exception) {
             Log.e("TidalPlayerManager", "Failed to stop playback", e)
         }
@@ -152,10 +226,13 @@ class TidalPlayerManager(
 
     fun release() {
         try {
+            tidalPlayer?.playbackEngine?.pause()
+            tidalPlayer?.playbackEngine?.reset()
             tidalPlayer?.release()
             tidalPlayer = null
             isCurrentlyPlaying = false
-            Log.i("TidalPlayerManager", "TIDAL Player released")
+            if (activeInstance == this) activeInstance = null
+            Log.i("TidalPlayerManager", "TIDAL Player fully released")
         } catch (e: Exception) {
             Log.e("TidalPlayerManager", "Failed to release TIDAL Player", e)
         }
