@@ -83,6 +83,15 @@ class TidalApiClient {
     }
   }
 
+  /// 목록 응답 한 페이지를 해석한다. totalNumberOfItems가 없으면 꽉 찬 페이지일 때 다음이 있다고 본다.
+  static PageResult<T> _page<T>(dynamic data, T Function(Map<String, dynamic>) parse,
+      {required int offset, required int limit}) {
+    final items = _items(data, parse);
+    final total = data is Map ? (data['totalNumberOfItems'] as num?)?.toInt() : null;
+    final hasMore = total != null ? offset + items.length < total && items.isNotEmpty : items.length >= limit;
+    return PageResult(items: items, offset: offset, total: total, hasMore: hasMore);
+  }
+
   static List<T> _items<T>(dynamic data, T Function(Map<String, dynamic>) parse) {
     if (data is! Map) throw const ApiFailure(ApiFailureKind.parse, '응답 형식이 올바르지 않습니다.');
     final items = data['items'];
@@ -94,31 +103,45 @@ class TidalApiClient {
   // 즐겨찾기
   // ──────────────────────────────────────────────
 
-  Future<List<MediaAlbum>> getFavoriteAlbums({required String userId}) async =>
-      _items(await _get('/users/$userId/favorites/albums', {'limit': 50}), MediaAlbum.fromJson);
+  static const int pageSize = 50;
 
-  Future<List<MediaPlaylist>> getFavoritePlaylists({required String userId}) async =>
-      _items(await _get('/users/$userId/favorites/playlists', {'limit': 50}), MediaPlaylist.fromJson);
+  Future<PageResult<MediaAlbum>> getFavoriteAlbums({required String userId, int offset = 0, int limit = pageSize}) async =>
+      _page(await _get('/users/$userId/favorites/albums', _paging(offset, limit, newestFirst: true)), MediaAlbum.fromJson,
+          offset: offset, limit: limit);
 
-  Future<List<MediaTrack>> getFavoriteTracks({required String userId}) async =>
-      _items(await _get('/users/$userId/favorites/tracks', {'limit': 50}), MediaTrack.fromJson);
+  Future<PageResult<MediaPlaylist>> getFavoritePlaylists({required String userId, int offset = 0, int limit = pageSize}) async =>
+      _page(await _get('/users/$userId/favorites/playlists', _paging(offset, limit, newestFirst: true)),
+          MediaPlaylist.fromJson, offset: offset, limit: limit);
+
+  Future<PageResult<MediaTrack>> getFavoriteTracks({required String userId, int offset = 0, int limit = pageSize}) async =>
+      _page(await _get('/users/$userId/favorites/tracks', _paging(offset, limit, newestFirst: true)), MediaTrack.fromJson,
+          offset: offset, limit: limit);
+
+  static Map<String, dynamic> _paging(int offset, int limit, {bool newestFirst = false}) => {
+        'offset': offset,
+        'limit': limit,
+        if (newestFirst) ...{'order': 'DATE', 'orderDirection': 'DESC'},
+      };
 
   // ──────────────────────────────────────────────
   // 앨범·플레이리스트 트랙
   // ──────────────────────────────────────────────
 
-  Future<List<MediaTrack>> getAlbumTracks(String albumId) async =>
-      _items(await _get('/albums/$albumId/tracks', {'limit': 100}), MediaTrack.fromJson);
+  Future<PageResult<MediaTrack>> getAlbumTracks(String albumId, {int offset = 0, int limit = 100}) async =>
+      _page(await _get('/albums/$albumId/tracks', _paging(offset, limit)), MediaTrack.fromJson,
+          offset: offset, limit: limit);
 
   /// 플레이리스트 트랙. /tracks가 비거나 실패하면 /items를 시도한다.
-  Future<List<MediaTrack>> getPlaylistTracks(String playlistId) async {
+  Future<PageResult<MediaTrack>> getPlaylistTracks(String playlistId, {int offset = 0, int limit = 100}) async {
     try {
-      final tracks = _items(await _get('/playlists/$playlistId/tracks', {'limit': 100}), MediaTrack.fromJson);
-      if (tracks.isNotEmpty) return tracks;
+      final page = _page(await _get('/playlists/$playlistId/tracks', _paging(offset, limit)), MediaTrack.fromJson,
+          offset: offset, limit: limit);
+      if (page.items.isNotEmpty || offset > 0) return page;
     } on ApiFailure catch (e) {
       if (e.kind == ApiFailureKind.network) rethrow;
     }
-    return _items(await _get('/playlists/$playlistId/items', {'limit': 100}), MediaTrack.fromJson);
+    return _page(await _get('/playlists/$playlistId/items', _paging(offset, limit)), MediaTrack.fromJson,
+        offset: offset, limit: limit);
   }
 
   // ──────────────────────────────────────────────
@@ -266,4 +289,16 @@ class TidalApiClient {
       ),
     );
   }
+}
+
+/// 목록 API 한 페이지.
+class PageResult<T> {
+  final List<T> items;
+  final int offset;
+
+  /// 서버가 알려준 전체 개수. 모르면 null.
+  final int? total;
+  final bool hasMore;
+
+  const PageResult({required this.items, required this.offset, this.total, required this.hasMore});
 }

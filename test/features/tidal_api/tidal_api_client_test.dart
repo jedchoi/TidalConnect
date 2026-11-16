@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tidal_connect_lite/features/tidal_api/data/tidal_api_client.dart';
 import 'package:tidal_connect_lite/features/tidal_api/domain/models/media_item.dart';
+
+import '../../helpers/fakes.dart';
 
 void main() {
   test('MediaTrack should parse JSON payload correctly', () {
@@ -93,6 +96,60 @@ void main() {
     test('lowerAudioQuality steps down one level', () {
       expect(lowerAudioQuality('HI_RES_LOSSLESS'), 'LOSSLESS');
       expect(lowerAudioQuality('LOW'), isNull);
+    });
+  });
+
+  group('페이지네이션', () {
+    Map<String, dynamic> trackJson(int id) => {
+          'id': id,
+          'title': 'T$id',
+          'duration': 100,
+          'artist': {'name': 'A'},
+          'album': {'title': 'Al', 'cover': ''},
+        };
+
+    TidalApiClient client(Map<String, dynamic> Function(RequestOptions o) respond, List<RequestOptions> seen) {
+      final dio = Dio(BaseOptions(baseUrl: TidalApiClient.baseUrl))
+        ..httpClientAdapter = FakeAdapter((o) async {
+          seen.add(o);
+          return jsonBody(respond(o));
+        });
+      return TidalApiClient(dio: dio);
+    }
+
+    test('offset·limit을 보내고 totalNumberOfItems로 다음 페이지 여부를 정한다', () async {
+      final seen = <RequestOptions>[];
+      final api = client(
+        (o) => {
+          'limit': 2,
+          'offset': o.queryParameters['offset'],
+          'totalNumberOfItems': 3,
+          'items': [
+            for (var i = o.queryParameters['offset'] as int; i < 3 && i < (o.queryParameters['offset'] as int) + 2; i++)
+              {'item': trackJson(i)},
+          ],
+        },
+        seen,
+      );
+
+      final first = await api.getFavoriteTracks(userId: 'u', limit: 2);
+      expect(first.items.map((t) => t.id), ['0', '1']);
+      expect(first.total, 3);
+      expect(first.hasMore, isTrue);
+
+      final second = await api.getFavoriteTracks(userId: 'u', offset: 2, limit: 2);
+      expect(second.items.map((t) => t.id), ['2']);
+      expect(second.hasMore, isFalse);
+
+      expect(seen.first.queryParameters['offset'], 0);
+      expect(seen.last.queryParameters['offset'], 2);
+      expect(seen.first.queryParameters['countryCode'], 'US');
+    });
+
+    test('전체 개수가 없으면 꽉 찬 페이지일 때만 다음이 있다고 본다', () async {
+      final api = client((o) => {'items': [for (var i = 0; i < 2; i++) trackJson(i)]}, []);
+      expect((await api.getAlbumTracks('a', limit: 2)).hasMore, isTrue);
+      expect((await api.getAlbumTracks('a', limit: 3)).hasMore, isFalse);
     });
   });
 }

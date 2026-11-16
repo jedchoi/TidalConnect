@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/app_logger.dart';
+import '../../../core/utils/paginator.dart';
+import '../../../core/widgets/load_more_indicator.dart';
+import '../../../core/widgets/track_tile.dart';
 import '../../tidal_api/data/tidal_api_client.dart';
 import '../../tidal_api/domain/models/media_item.dart';
 import 'album_detail_screen.dart';
@@ -22,14 +25,26 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
   bool _isLoading = true;
   bool _isLoggedIn = false;
   String? _errorMessage;
-  List<MediaAlbum> _albums = [];
-  List<MediaPlaylist> _playlists = [];
-  List<MediaTrack> _tracks = [];
+  String _userId = '';
+  late final Paginator<MediaAlbum> _albums =
+      Paginator((offset) => _apiClient.getFavoriteAlbums(userId: _userId, offset: offset));
+  late final Paginator<MediaPlaylist> _playlists =
+      Paginator((offset) => _apiClient.getFavoritePlaylists(userId: _userId, offset: offset));
+  late final Paginator<MediaTrack> _tracks =
+      Paginator((offset) => _apiClient.getFavoriteTracks(userId: _userId, offset: offset));
 
   @override
   void initState() {
     super.initState();
     _loadCollectionData();
+  }
+
+  @override
+  void dispose() {
+    _albums.dispose();
+    _playlists.dispose();
+    _tracks.dispose();
+    super.dispose();
   }
 
   Future<void> _loadCollectionData() async {
@@ -41,6 +56,9 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
       final userToken = await ref.read(authRepositoryProvider).autoLogin();
 
       if (userToken == null || userToken.userId.isEmpty) {
+        _albums.clear();
+        _playlists.clear();
+        _tracks.clear();
         if (mounted) {
           setState(() {
             _isLoggedIn = false;
@@ -52,22 +70,11 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
       }
 
       _isLoggedIn = true;
-      final userId = userToken.userId;
+      _userId = userToken.userId;
 
-      final results = await Future.wait([
-        _apiClient.getFavoriteAlbums(userId: userId),
-        _apiClient.getFavoritePlaylists(userId: userId),
-        _apiClient.getFavoriteTracks(userId: userId),
-      ]);
+      await Future.wait([_albums.refresh(), _playlists.refresh(), _tracks.refresh()]);
 
-      if (mounted) {
-        setState(() {
-          _albums = results[0] as List<MediaAlbum>;
-          _playlists = results[1] as List<MediaPlaylist>;
-          _tracks = results[2] as List<MediaTrack>;
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     } catch (e) {
       AppLogger.log('FAVORITES', '컬렉션 로딩 오류: $e', type: LogType.error);
       if (mounted) {
@@ -143,7 +150,17 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
       );
     }
 
-    final bool isEmpty = _albums.isEmpty && _playlists.isEmpty && _tracks.isEmpty;
+    return ListenableBuilder(
+      listenable: Listenable.merge([_albums, _playlists, _tracks]),
+      builder: (context, _) => _buildCollection(),
+    );
+  }
+
+  Widget _buildCollection() {
+    final albums = _albums.items;
+    final playlists = _playlists.items;
+    final tracks = _tracks.items;
+    final bool isEmpty = albums.isEmpty && playlists.isEmpty && tracks.isEmpty;
     if (isEmpty) {
       return Center(
         child: Column(
@@ -174,11 +191,14 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
     return RefreshIndicator(
       onRefresh: _loadCollectionData,
       color: AppColors.cyanAccent,
-      child: ListView(
+      child: NotificationListener<ScrollNotification>(
+        // 세로 목록 끝에 닿으면 트랙 다음 페이지를 받는다.
+        onNotification: _tracks.onScroll,
+        child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           // 1. 내 앨범 섹션
-          if (_albums.isNotEmpty) ...[
+          if (albums.isNotEmpty) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -186,18 +206,21 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
                   '내 앨범',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                 ),
-                Text('${_albums.length}개', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                Text('${_albums.totalCount}개', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
               ],
             ),
             const SizedBox(height: 12),
             SizedBox(
               height: 175,
-              child: ListView.separated(
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (n) => _albums.onScroll(n, axis: Axis.horizontal),
+                child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                itemCount: _albums.length,
+                itemCount: albums.length + (_albums.hasMore ? 1 : 0),
                 separatorBuilder: (_, __) => const SizedBox(width: 12),
                 itemBuilder: (context, index) {
-                  final album = _albums[index];
+                  if (index == albums.length) return LoadMoreIndicator(paginator: _albums, width: 60);
+                  final album = albums[index];
                   return GestureDetector(
                     onTap: () {
                       Navigator.push(
@@ -255,12 +278,13 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
                   );
                 },
               ),
+              ),
             ),
             const SizedBox(height: 24),
           ],
 
           // 2. 내 플레이리스트 섹션
-          if (_playlists.isNotEmpty) ...[
+          if (playlists.isNotEmpty) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -268,12 +292,12 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
                   '내 플레이리스트',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                 ),
-                Text('${_playlists.length}개', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                Text('${_playlists.totalCount}개', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
               ],
             ),
             const SizedBox(height: 12),
-            ...List.generate(_playlists.length, (index) {
-              final playlist = _playlists[index];
+            ...List.generate(playlists.length, (index) {
+              final playlist = playlists[index];
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
@@ -304,11 +328,12 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
                 ),
               );
             }),
+            if (_playlists.hasMore) LoadMoreIndicator(paginator: _playlists, asButton: true),
             const SizedBox(height: 24),
           ],
 
           // 3. 내 트랙 섹션
-          if (_tracks.isNotEmpty) ...[
+          if (tracks.isNotEmpty) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -316,17 +341,19 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
                   '내 트랙',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                 ),
-                Text('${_tracks.length}곡', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                Text('${_tracks.totalCount}곡', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
               ],
             ),
             const SizedBox(height: 12),
-            ...List.generate(_tracks.length, (index) {
-              final track = _tracks[index];
-              return TrackTile(track: track, queue: _tracks, index: index);
+            ...List.generate(tracks.length, (index) {
+              final track = tracks[index];
+              return TrackTile(track: track, queue: tracks, index: index);
             }),
+            if (_tracks.hasMore) LoadMoreIndicator(paginator: _tracks),
           ],
           const SizedBox(height: 80),
         ],
+      ),
       ),
     );
   }

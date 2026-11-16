@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/paginator.dart';
 import '../../../core/widgets/error_retry_view.dart';
+import '../../../core/widgets/load_more_indicator.dart';
 import '../../../core/widgets/track_tile.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../player/data/player_manager.dart';
@@ -26,7 +28,14 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
 
   bool _isLoading = true;
   String? _errorMessage;
-  List<MediaTrack> _tracks = [];
+  late final Paginator<MediaTrack> _pager = Paginator((offset) => _apiClient.getPlaylistTracks(widget.playlist.id, offset: offset));
+  List<MediaTrack> get _tracks => _pager.items;
+
+  @override
+  void dispose() {
+    _pager.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -40,13 +49,8 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
       _errorMessage = null;
     });
     try {
-      final tracks = await _apiClient.getPlaylistTracks(widget.playlist.id);
-      if (mounted) {
-        setState(() {
-          _tracks = tracks;
-          _isLoading = false;
-        });
-      }
+      await _pager.refresh();
+      if (mounted) setState(() => _isLoading = false);
     } catch (e) {
       AppLogger.log('PLAYLIST_DETAIL', '플레이리스트 트랙 로딩 오류: $e', type: LogType.error);
       if (mounted) {
@@ -88,7 +92,11 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
           ? const Center(child: CircularProgressIndicator(color: AppColors.cyanAccent))
           : _errorMessage != null
               ? ErrorRetryView(message: _errorMessage!, onRetry: _loadPlaylistTracks)
-              : CustomScrollView(
+              : ListenableBuilder(
+                  listenable: _pager,
+                  builder: (context, _) => NotificationListener<ScrollNotification>(
+                    onNotification: _pager.onScroll,
+                    child: CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(
                   child: Padding(
@@ -135,7 +143,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              '총 ${_tracks.length}곡',
+                              '총 ${_pager.totalCount}곡',
                               style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                             ),
                           ],
@@ -188,9 +196,12 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                     childCount: _tracks.length,
                   ),
                 ),
+                if (_pager.hasMore) SliverToBoxAdapter(child: LoadMoreIndicator(paginator: _pager)),
                 const SliverToBoxAdapter(child: SizedBox(height: 80)),
               ],
             ),
+                  ),
+                ),
     );
   }
 

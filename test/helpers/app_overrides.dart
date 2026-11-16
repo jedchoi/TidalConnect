@@ -22,14 +22,21 @@ class FakeApiClient extends TidalApiClient {
     return <T>[];
   }
 
+  Future<PageResult<T>> _emptyPage<T>(String name, int offset) async {
+    calls.add(name);
+    return PageResult<T>(items: <T>[], offset: offset, total: 0, hasMore: false);
+  }
+
   @override
-  Future<List<MediaAlbum>> getFavoriteAlbums({required String userId}) => _empty('getFavoriteAlbums');
+  Future<PageResult<MediaAlbum>> getFavoriteAlbums({required String userId, int offset = 0, int limit = 50}) =>
+      _emptyPage('getFavoriteAlbums', offset);
   @override
-  Future<List<MediaPlaylist>> getFavoritePlaylists({required String userId}) => _empty('getFavoritePlaylists');
+  Future<PageResult<MediaPlaylist>> getFavoritePlaylists({required String userId, int offset = 0, int limit = 50}) =>
+      _emptyPage('getFavoritePlaylists', offset);
   @override
-  Future<List<MediaTrack>> getFavoriteTracks({required String userId}) async {
+  Future<PageResult<MediaTrack>> getFavoriteTracks({required String userId, int offset = 0, int limit = 50}) async {
     calls.add('getFavoriteTracks');
-    return tracks;
+    return PageResult(items: tracks, offset: offset, total: tracks.length, hasMore: false);
   }
 
   @override
