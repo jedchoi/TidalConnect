@@ -61,7 +61,7 @@ class _TidalWebLoginDialogState extends State<TidalWebLoginDialog> {
 
   Future<void> _openTidalWebPage() async {
     final uri = Uri.parse(_authUrl);
-    AppLogger.log('TIDAL_AUTH', 'Tidal OAuth 웹 로그인 페이지 이동 시도: $_authUrl', type: LogType.network);
+    AppLogger.log('TIDAL_AUTH', 'Tidal OAuth 웹 로그인 페이지 이동 시도', type: LogType.network);
     try {
       final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!launched) {

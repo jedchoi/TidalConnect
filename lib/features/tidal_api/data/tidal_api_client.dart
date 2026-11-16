@@ -180,7 +180,7 @@ class TidalApiClient {
         final url = match.group(1)!.trim().replaceAll('&amp;', '&');
         // $Number$, $Time$, $Bandwidth$ 같은 템플릿 변수가 없는 완전한 URL만 채택
         if (!url.contains('\$Number') && !url.contains('\$Time') && !url.contains('\$Bandwidth')) {
-          AppLogger.log('TIDAL_API', 'DASH 완전한 BaseURL 추출 성공: $url', type: LogType.success);
+          AppLogger.log('TIDAL_API', 'DASH BaseURL 추출 성공: ${maskUrl(url)}', type: LogType.success);
           return url;
         }
       }
@@ -233,7 +233,7 @@ class TidalApiClient {
                     streamUrl = decodedJson['url'].toString().replaceAll('&amp;', '&');
                   }
                   if (streamUrl.isNotEmpty) {
-                    AppLogger.log('TIDAL_API', 'JSON 매니페스트 추출 성공: $streamUrl', type: LogType.success);
+                    AppLogger.log('TIDAL_API', 'JSON 매니페스트 추출 성공: ${maskUrl(streamUrl)}', type: LogType.success);
                     return TidalPlaybackInfo(
                       streamUrl: streamUrl,
                       manifest: decodedStr,
@@ -296,7 +296,7 @@ class TidalApiClient {
       );
       final url = response.data['url']?.toString().replaceAll('&amp;', '&') ?? '';
       if (url.isNotEmpty) {
-        AppLogger.log('TIDAL_API', '/streamUrl 엔드포인트 URL 획득 성공: $url', type: LogType.success);
+        AppLogger.log('TIDAL_API', '/streamUrl 엔드포인트 URL 획득 성공: ${maskUrl(url)}', type: LogType.success);
         return TidalPlaybackInfo(
           streamUrl: url,
           manifest: '',

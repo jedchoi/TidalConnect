@@ -36,7 +36,7 @@ class DlnaManager {
       return false;
     }
 
-    AppLogger.log('DLNA_PLAY', 'DLNA 스피커 전송 시작: "${device.friendlyName}" ➔ $streamUrl', type: LogType.network);
+    AppLogger.log('DLNA_PLAY', 'DLNA 스피커 전송 시작: "${device.friendlyName}" ➔ ${maskUrl(streamUrl)}', type: LogType.network);
     try {
       // ① Stop 먼저: PAUSED 상태의 DLNA 렌더러는 SetAVTransportURI를 무시하는 경우가 있음
       //   Stop → STOPPED 상태로 전환 후 새 URI 설정

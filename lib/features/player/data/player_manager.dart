@@ -328,7 +328,7 @@ class PlayerManager {
             manifestXml: playbackInfo.manifest,
             allowedHost: Uri.tryParse(_dlnaManager.selectedDevice.locationUrl)?.host ?? '',
           );
-          AppLogger.log('PLAYER', '🔗 DLNA 전용 단축 프록시 URL 획득 성공 (Quality: ${playbackInfo.audioQuality}): $proxyUrl', type: LogType.success);
+          AppLogger.log('PLAYER', 'DLNA 프록시 주소 준비 완료 (Quality: ${playbackInfo.audioQuality})', type: LogType.success);
         }
       }
     } catch (e) {
@@ -342,7 +342,6 @@ class PlayerManager {
     }
 
     AppLogger.log('PLAYER', '🔊 DLNA 재생: "${_dlnaManager.selectedDevice.friendlyName}"', type: LogType.network);
-    AppLogger.log('PLAYER', '   프록시 URL: $proxyUrl', type: LogType.network);
 
     final ok = await _dlnaManager.playOnSelectedDevice(streamUrl: proxyUrl, title: track.title);
     if (!ok) {

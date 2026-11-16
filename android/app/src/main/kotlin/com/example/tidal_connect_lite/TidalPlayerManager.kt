@@ -1,6 +1,7 @@
 package com.example.tidal_connect_lite
 
 import android.app.Application
+import android.content.pm.ApplicationInfo
 import android.content.Context
 import android.util.Log
 import com.tidal.sdk.auth.CredentialsProvider
@@ -60,7 +61,7 @@ class TidalPlayerManager(
                 application = app,
                 credentialsProvider = credentialsProvider,
                 eventSender = eventProducer.eventSender,
-                isDebuggable = true
+                isDebuggable = (app.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
             )
 
             Log.i("TidalPlayerManager", "TIDAL Official Player SDK initialized successfully")

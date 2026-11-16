@@ -25,7 +25,7 @@ class TidalExternalAuthService {
     // 1. Listen for deep link callback (tidalconnect://oauth-callback)
     _linkSubscription?.cancel();
     _linkSubscription = _appLinks.uriLinkStream.listen((Uri uri) async {
-      AppLogger.log('TIDAL_AUTH', '리다이렉트 딥링크 수신: $uri', type: LogType.network);
+      AppLogger.log('TIDAL_AUTH', '리다이렉트 딥링크 수신', type: LogType.network);
 
       if (uri.scheme == 'tidalconnect' && uri.host == 'oauth-callback') {
         final authCode = uri.queryParameters['code'];
@@ -58,7 +58,7 @@ class TidalExternalAuthService {
       'code_challenge_method': 'S256',
     });
 
-    AppLogger.log('TIDAL_AUTH', '인앱 브라우저(Chrome Custom Tabs)로 로그인 시작: ${authUrl.toString()}', type: LogType.network);
+    AppLogger.log('TIDAL_AUTH', '인앱 브라우저(Chrome Custom Tabs)로 로그인 시작', type: LogType.network);
 
     // 3. Launch In-App Custom Tabs browser (LaunchMode.inAppBrowserView)
     try {

@@ -24,6 +24,13 @@ class LogEntry {
   }
 }
 
+/// 로그에 남겨도 되는 형태로 URL을 줄인다. 쿼리 문자열(서명, 토큰)과 경로 끝의 토큰을 지운다.
+String maskUrl(String url) {
+  final uri = Uri.tryParse(url);
+  if (uri == null || uri.host.isEmpty) return '<url>';
+  return '${uri.scheme}://${uri.host}${uri.hasPort ? ':${uri.port}' : ''}/…';
+}
+
 class AppLogger {
   static final ValueNotifier<List<LogEntry>> logsNotifier = ValueNotifier<List<LogEntry>>([]);
   static final List<LogEntry> _logs = [];

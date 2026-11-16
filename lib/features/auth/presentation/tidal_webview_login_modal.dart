@@ -65,7 +65,7 @@ class _TidalWebViewLoginModalState extends State<TidalWebViewLoginModal> {
       'code_challenge_method': 'S256',
     });
 
-    AppLogger.log('TIDAL_AUTH', 'In-App WebView Tidal PKCE 로그인 시작 (RedirectURI: $_redirectUri): ${_authUri.toString()}', type: LogType.network);
+    AppLogger.log('TIDAL_AUTH', 'In-App WebView Tidal PKCE 로그인 시작', type: LogType.network);
 
     _controller = WebViewController()
       ..setUserAgent("Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36")
@@ -131,7 +131,7 @@ class _TidalWebViewLoginModalState extends State<TidalWebViewLoginModal> {
       _isExchangingToken = true;
     });
 
-    AppLogger.log('TIDAL_AUTH', 'TIDAL Authorization Code 획득 성공 (code: $code) ➔ Access Token 교환 시도', type: LogType.success);
+    AppLogger.log('TIDAL_AUTH', 'TIDAL 인증 코드 수신 -> 토큰 교환 시도', type: LogType.success);
 
     final token = await widget.authRepository.exchangeAuthorizationCode(
       code: code,
