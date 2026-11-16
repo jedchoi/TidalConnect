@@ -10,6 +10,8 @@ import com.tidal.sdk.common.TidalMessage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Flutter가 관리하는 사용자 OAuth 토큰을 TIDAL SDK에 공급한다.
@@ -33,6 +35,15 @@ class CustomCredentialsProvider(
 
     @Volatile
     private var currentExpiresTimestamp: Long = 0L
+
+    /**
+     * 토큰이 만료되었거나 SDK가 API 오류(apiErrorSubStatus)를 보고했을 때 새 토큰을 받아오는 함수.
+     * Flutter 쪽 갱신 로직을 호출하며, 결과는 userId, accessToken, expiresInSeconds를 담은 맵이다.
+     */
+    @Volatile
+    var tokenRefresher: (suspend () -> Map<String, Any?>?)? = null
+
+    private val refreshMutex = Mutex()
 
     init {
         // 예전 버전이 토큰을 평문으로 저장하던 파일을 지운다.
@@ -60,6 +71,7 @@ class CustomCredentialsProvider(
     }
 
     override suspend fun getCredentials(apiErrorSubStatus: String?): AuthResult<Credentials> {
+        refreshIfNeeded(apiErrorSubStatus)
         val token = currentAccessToken
         val credentials = Credentials(
             clientId = clientId,
@@ -78,10 +90,37 @@ class CustomCredentialsProvider(
         return !currentAccessToken.isNullOrBlank() && !currentUserId.isNullOrBlank()
     }
 
+    private suspend fun refreshIfNeeded(apiErrorSubStatus: String?) {
+        val tokenBefore = currentAccessToken ?: return
+        val expiringSoon = currentExpiresTimestamp - EXPIRY_MARGIN_SECONDS <= nowSeconds()
+        if (apiErrorSubStatus == null && !expiringSoon) return
+
+        refreshMutex.withLock {
+            // 기다리는 동안 다른 호출이 이미 갱신했으면 건너뛴다.
+            if (currentAccessToken != tokenBefore) return
+            Log.i(TAG, "토큰 재요청 (subStatus=$apiErrorSubStatus, expiringSoon=$expiringSoon)")
+            val refreshed = try {
+                tokenRefresher?.invoke()
+            } catch (e: Exception) {
+                Log.w(TAG, "토큰 재요청 실패: ${e.message}")
+                null
+            }
+            val userId = refreshed?.get("userId") as? String
+            val accessToken = refreshed?.get("accessToken") as? String
+            val expiresIn = (refreshed?.get("expiresInSeconds") as? Number)?.toLong()
+            if (userId != null && accessToken != null && expiresIn != null) {
+                setUserCredentials(userId, accessToken, expiresIn)
+            } else {
+                Log.w(TAG, "새 토큰을 받지 못함 - 기존 자격 증명 유지")
+            }
+        }
+    }
+
     private fun nowSeconds(): Long = System.currentTimeMillis() / 1000
 
     companion object {
         private const val TAG = "TidalAuth"
+        private const val EXPIRY_MARGIN_SECONDS = 60L
         private const val LEGACY_PREFS_NAME = "tidal_native_credentials"
         private val SCOPES = setOf("r_usr", "w_usr", "playback")
     }

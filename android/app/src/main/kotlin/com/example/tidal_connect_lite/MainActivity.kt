@@ -7,6 +7,10 @@ import io.flutter.plugin.common.MethodChannel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.resume
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.example.tidal_connect_lite/tidal_sdk"
@@ -21,12 +25,14 @@ class MainActivity : FlutterActivity() {
         // 로컬 스트림 프록시 서버 시작 (DLNA relay용)
         startProxyServer()
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+        val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+        channel.setMethodCallHandler { call, result ->
             when (call.method) {
                 "initTidalAuth" -> {
                     val clientId = call.argument<String>("clientId") ?: ""
                     val clientSecret = call.argument<String>("clientSecret") ?: ""
                     val isInitialized = authManager.initializeAuth(clientId, clientSecret)
+                    authManager.customCredentialsProvider?.tokenRefresher = { requestTokenFromDart(channel) }
                     
                     if (isInitialized && authManager.credentialsProvider != null) {
                         if (playerManager == null) {
@@ -160,6 +166,29 @@ class MainActivity : FlutterActivity() {
             }
         }
     }
+
+    /** Flutter에 사용자 토큰 갱신을 요청하고 결과를 기다린다. 20초 안에 답이 없으면 null. */
+    private suspend fun requestTokenFromDart(channel: MethodChannel): Map<String, Any?>? =
+        withTimeoutOrNull(20_000) {
+            withContext(Dispatchers.Main) {
+                suspendCancellableCoroutine { cont ->
+                    channel.invokeMethod("refreshUserToken", null, object : MethodChannel.Result {
+                        override fun success(result: Any?) {
+                            @Suppress("UNCHECKED_CAST")
+                            if (cont.isActive) cont.resume(result as? Map<String, Any?>)
+                        }
+
+                        override fun error(errorCode: String, errorMessage: String?, errorDetails: Any?) {
+                            if (cont.isActive) cont.resume(null)
+                        }
+
+                        override fun notImplemented() {
+                            if (cont.isActive) cont.resume(null)
+                        }
+                    })
+                }
+            }
+        }
 
     private fun startProxyServer() {
         try {
