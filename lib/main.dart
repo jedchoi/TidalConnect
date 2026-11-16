@@ -1,3 +1,4 @@
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/config/tidal_config.dart';
@@ -5,6 +6,7 @@ import 'core/providers.dart';
 import 'core/theme/app_theme.dart';
 import 'features/main/presentation/splash_screen.dart';
 import 'features/player/data/player_manager.dart';
+import 'features/player/data/wave_audio_handler.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +21,17 @@ Future<void> main() async {
   // 네이티브 SDK 초기화는 앱 생애 동안 한 번만 한다. 사용자 토큰 복원(autoLogin)은 스플래시에서 이어서 진행한다.
   await authRepository.initNativeSdk();
   PlayerManager.instance.configure(authRepository: authRepository);
+
+  // 잠금화면·알림·블루투스 버튼 제어와 백그라운드 재생 유지(포그라운드 서비스)
+  await AudioService.init(
+    builder: () => WaveAudioHandler(PlayerManager.instance),
+    config: const AudioServiceConfig(
+      androidNotificationChannelId: 'com.example.tidal_connect_lite.playback',
+      androidNotificationChannelName: 'WaveConnect 재생',
+      androidNotificationOngoing: true,
+      androidStopForegroundOnPause: true,
+    ),
+  );
 
   runApp(
     UncontrolledProviderScope(
