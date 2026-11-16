@@ -131,7 +131,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
                               decoration: BoxDecoration(
                                 color: AppColors.surfaceLight,
                                 borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: AppColors.cyanAccent.withOpacity(0.5)),
+                                border: Border.all(color: AppColors.cyanAccent.withValues(alpha: 0.5)),
                               ),
                               child: const Text('MASTER • Hi-Res', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.cyanAccent)),
                             ),

@@ -188,7 +188,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 children: devices.map((device) {
                   final isSelected = device.udn == _dlnaManager.selectedDevice.udn;
                   return Card(
-                    color: isSelected ? AppColors.cyanAccent.withOpacity(0.15) : AppColors.surfaceCard,
+                    color: isSelected ? AppColors.cyanAccent.withValues(alpha: 0.15) : AppColors.surfaceCard,
                     margin: const EdgeInsets.only(bottom: 8),
                     child: ListTile(
                       leading: Icon(

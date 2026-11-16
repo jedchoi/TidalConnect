@@ -80,9 +80,9 @@ class DebugLogScreen extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: _getLogColor(entry.type).withOpacity(0.2),
+                            color: _getLogColor(entry.type).withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: _getLogColor(entry.type).withOpacity(0.5)),
+                            border: Border.all(color: _getLogColor(entry.type).withValues(alpha: 0.5)),
                           ),
                           child: Text(
                             entry.tag,

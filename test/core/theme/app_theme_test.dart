@@ -22,10 +22,8 @@ void main() {
       expect(theme.brightness, Brightness.dark);
       expect(theme.scaffoldBackgroundColor, AppColors.background);
       expect(theme.cardColor, AppColors.surfaceCard);
-      expect(theme.colorScheme.background, AppColors.background);
       expect(theme.colorScheme.surface, AppColors.surfaceCard);
       expect(theme.colorScheme.primary, AppColors.cyanAccent);
-      expect(theme.colorScheme.onBackground, AppColors.textPrimary);
       expect(theme.colorScheme.onSurface, AppColors.textPrimary);
       expect(theme.textTheme, isNotNull);
     });

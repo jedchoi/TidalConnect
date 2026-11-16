@@ -89,7 +89,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.cyanAccent.withOpacity(0.12),
+                    color: AppColors.cyanAccent.withValues(alpha: 0.12),
                     blurRadius: 120,
                     spreadRadius: 40,
                   ),
@@ -136,7 +136,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
                             letterSpacing: 2.5,
-                            color: AppColors.cyanAccent.withOpacity(0.85),
+                            color: AppColors.cyanAccent.withValues(alpha: 0.85),
                           ),
                         ),
                       ],

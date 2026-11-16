@@ -48,7 +48,7 @@ class AppLogger {
     }
     logsNotifier.value = List.unmodifiable(_logs);
     if (kDebugMode) {
-      print('[${entry.formattedTime}] [$tag] $message');
+      debugPrint('[${entry.formattedTime}] [$tag] $message');
     }
   }
 

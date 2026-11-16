@@ -10,10 +10,8 @@ class AppTheme {
       scaffoldBackgroundColor: AppColors.background,
       cardColor: AppColors.surfaceCard,
       colorScheme: const ColorScheme.dark(
-        background: AppColors.background,
         surface: AppColors.surfaceCard,
         primary: AppColors.cyanAccent,
-        onBackground: AppColors.textPrimary,
         onSurface: AppColors.textPrimary,
       ),
       textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme),

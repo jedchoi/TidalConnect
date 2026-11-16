@@ -84,7 +84,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.5),
+                            color: Colors.black.withValues(alpha: 0.5),
                             blurRadius: 20,
                             offset: const Offset(0, 10),
                           ),
@@ -137,10 +137,10 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                             return Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: isMax ? Colors.amber.withOpacity(0.15) : AppColors.surfaceLight,
+                                color: isMax ? Colors.amber.withValues(alpha: 0.15) : AppColors.surfaceLight,
                                 borderRadius: BorderRadius.circular(6),
                                 border: Border.all(
-                                  color: isMax ? Colors.amberAccent : AppColors.cyanAccent.withOpacity(0.5),
+                                  color: isMax ? Colors.amberAccent : AppColors.cyanAccent.withValues(alpha: 0.5),
                                 ),
                               ),
                               child: Text(
@@ -392,10 +392,10 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                               return Container(
                                 margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: isPlayingThis ? AppColors.surfaceLight.withOpacity(0.6) : Colors.transparent,
+                                  color: isPlayingThis ? AppColors.surfaceLight.withValues(alpha: 0.6) : Colors.transparent,
                                   borderRadius: BorderRadius.circular(8),
                                   border: isPlayingThis
-                                      ? Border.all(color: AppColors.cyanAccent.withOpacity(0.8), width: 1.2)
+                                      ? Border.all(color: AppColors.cyanAccent.withValues(alpha: 0.8), width: 1.2)
                                       : null,
                                 ),
                                 child: ListTile(
@@ -440,7 +440,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: track.isMax ? Colors.amber.withOpacity(0.2) : AppColors.surfaceLight,
+                                          color: track.isMax ? Colors.amber.withValues(alpha: 0.2) : AppColors.surfaceLight,
                                           borderRadius: BorderRadius.circular(4),
                                         ),
                                         child: Text(

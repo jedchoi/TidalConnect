@@ -66,7 +66,7 @@ class _MiniPlayerWidgetState extends ConsumerState<MiniPlayerWidget> {
                     decoration: BoxDecoration(
                       color: AppColors.surfaceCard,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.cyanAccent.withOpacity(0.3)),
+                      border: Border.all(color: AppColors.cyanAccent.withValues(alpha: 0.3)),
                       boxShadow: const [
                         BoxShadow(color: Colors.black45, blurRadius: 8, offset: Offset(0, 4)),
                       ],
