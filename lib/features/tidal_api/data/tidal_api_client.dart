@@ -274,6 +274,30 @@ class TidalApiClient {
     return _items(await _get('/search/playlists', {'query': query, 'limit': limit}), MediaPlaylist.fromJson);
   }
 
+  Future<List<MediaArtist>> searchArtists(String query, {int limit = 20}) async {
+    if (query.trim().isEmpty) return const [];
+    return _items(await _get('/search/artists', {'query': query, 'limit': limit}), MediaArtist.fromJson);
+  }
+
+  /// 트랙·앨범·아티스트·플레이리스트를 한 번의 요청으로 검색한다.
+  Future<SearchResults> searchAll(String query, {int limit = 20}) async {
+    if (query.trim().isEmpty) return const SearchResults();
+    final data = await _get('/search', {
+      'query': query,
+      'limit': limit,
+      'types': 'TRACKS,ALBUMS,ARTISTS,PLAYLISTS',
+    });
+    if (data is! Map) throw const ApiFailure(ApiFailureKind.parse, '응답 형식이 올바르지 않습니다.');
+    List<T> section<T>(String key, T Function(Map<String, dynamic>) parse) =>
+        data[key] is Map ? _items(data[key], parse) : <T>[];
+    return SearchResults(
+      tracks: section('tracks', MediaTrack.fromJson),
+      albums: section('albums', MediaAlbum.fromJson),
+      artists: section('artists', MediaArtist.fromJson),
+      playlists: section('playlists', MediaPlaylist.fromJson),
+    );
+  }
+
   // ──────────────────────────────────────────────
   // 연관 추천곡
   // ──────────────────────────────────────────────
@@ -301,4 +325,21 @@ class PageResult<T> {
   final bool hasMore;
 
   const PageResult({required this.items, required this.offset, this.total, required this.hasMore});
+}
+
+/// 통합 검색 결과.
+class SearchResults {
+  final List<MediaTrack> tracks;
+  final List<MediaAlbum> albums;
+  final List<MediaArtist> artists;
+  final List<MediaPlaylist> playlists;
+
+  const SearchResults({
+    this.tracks = const [],
+    this.albums = const [],
+    this.artists = const [],
+    this.playlists = const [],
+  });
+
+  bool get isEmpty => tracks.isEmpty && albums.isEmpty && artists.isEmpty && playlists.isEmpty;
 }

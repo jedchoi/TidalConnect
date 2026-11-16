@@ -152,4 +152,39 @@ void main() {
       expect((await api.getAlbumTracks('a', limit: 3)).hasMore, isFalse);
     });
   });
+
+  test('searchAll은 한 번의 요청으로 네 종류 결과를 나눈다', () async {
+    final seen = <RequestOptions>[];
+    final dio = Dio(BaseOptions(baseUrl: TidalApiClient.baseUrl))
+      ..httpClientAdapter = FakeAdapter((o) async {
+        seen.add(o);
+        return jsonBody({
+          'tracks': {
+            'items': [
+              {'id': 1, 'title': 'Song', 'duration': 10, 'artist': {'name': 'A'}, 'album': {'title': 'B'}},
+            ],
+          },
+          'albums': {
+            'items': [
+              {'id': 2, 'title': 'Album', 'artist': {'name': 'A'}, 'cover': ''},
+            ],
+          },
+          'artists': {
+            'items': [
+              {'id': 3, 'name': 'Artist', 'picture': null},
+            ],
+          },
+          'playlists': {'items': []},
+        });
+      });
+    final results = await TidalApiClient(dio: dio).searchAll('q');
+
+    expect(seen.single.path, '/search');
+    expect(seen.single.queryParameters['types'], 'TRACKS,ALBUMS,ARTISTS,PLAYLISTS');
+    expect(results.tracks.single.title, 'Song');
+    expect(results.albums.single.title, 'Album');
+    expect(results.artists.single.name, 'Artist');
+    expect(results.playlists, isEmpty);
+    expect(results.isEmpty, isFalse);
+  });
 }

@@ -6,7 +6,9 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/error_retry_view.dart';
 import '../../../core/widgets/track_tile.dart';
 import '../../tidal_api/data/tidal_api_client.dart';
-import '../../tidal_api/domain/models/media_item.dart';
+import '../../favorites/presentation/album_detail_screen.dart';
+import '../../favorites/presentation/playlist_artwork_widget.dart';
+import '../../favorites/presentation/playlist_detail_screen.dart';
 import '../data/search_history_store.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
@@ -25,7 +27,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Timer? _debounce;
   int _searchSeq = 0;
   bool _isSearching = false;
-  List<MediaTrack> _searchTracks = [];
+  SearchResults _results = const SearchResults();
+  SearchCategory _category = SearchCategory.tracks;
   String? _searchError;
 
   @override
@@ -92,7 +95,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     if (query.trim().isEmpty) {
       if (mounted) {
         setState(() {
-          _searchTracks = [];
+          _results = const SearchResults();
           _searchError = null;
           _isSearching = false;
         });
@@ -104,9 +107,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       _searchError = null;
     });
     try {
-      final tracks = await _apiClient.searchTracks(query);
+      final results = await _apiClient.searchAll(query);
       if (mounted && seq == _searchSeq) {
-        setState(() => _searchTracks = tracks);
+        setState(() => _results = results);
       }
     } catch (e) {
       if (mounted && seq == _searchSeq) {
@@ -142,10 +145,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             TextField(
               controller: _searchController,
               onChanged: _onSearchChanged,
+              textInputAction: TextInputAction.search,
               onSubmitted: _submitSearch,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                hintText: '아티스트, 곡, 앨범 검색 (예: Queen, Jazz)',
+                hintText: '곡, 앨범, 아티스트, 플레이리스트 검색',
                 hintStyle: const TextStyle(color: AppColors.textSecondary),
                 prefixIcon: const Icon(Icons.search, color: AppColors.cyanAccent),
                 suffixIcon: _searchController.text.isNotEmpty
@@ -240,7 +244,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     if (_searchError != null) {
       return ErrorRetryView(message: _searchError!, onRetry: () => _performSearch(_searchController.text));
     }
-    if (_searchTracks.isEmpty) {
+    if (_results.isEmpty) {
       return const Center(
         child: Text(
           '검색 결과가 없습니다',
@@ -249,17 +253,177 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       );
     }
 
-    return ListView.builder(
-      itemCount: _searchTracks.length,
-      itemBuilder: (context, index) {
-        final track = _searchTracks[index];
-        return TrackTile(
-          track: track,
-          queue: _searchTracks,
-          index: index,
-          onPlay: () => _saveSearchHistory(_searchController.text),
-        );
-      },
+    return Column(
+      children: [
+        SizedBox(
+          height: 40,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            children: [
+              for (final c in SearchCategory.values)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text('${c.label} ${_countOf(c)}'),
+                    selected: _category == c,
+                    onSelected: (_) => setState(() => _category = c),
+                    selectedColor: AppColors.cyanAccent,
+                    backgroundColor: AppColors.surfaceCard,
+                    labelStyle: TextStyle(color: _category == c ? Colors.black : Colors.white, fontSize: 13),
+                    showCheckmark: false,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Expanded(child: _buildCategoryList()),
+      ],
     );
+  }
+
+  int _countOf(SearchCategory c) => switch (c) {
+        SearchCategory.tracks => _results.tracks.length,
+        SearchCategory.albums => _results.albums.length,
+        SearchCategory.artists => _results.artists.length,
+        SearchCategory.playlists => _results.playlists.length,
+      };
+
+  void _remember() => _saveSearchHistory(_searchController.text);
+
+  Widget _buildCategoryList() {
+    if (_countOf(_category) == 0) {
+      return Center(
+        child: Text('${_category.label} 결과가 없습니다', style: const TextStyle(color: AppColors.textSecondary)),
+      );
+    }
+    switch (_category) {
+      case SearchCategory.tracks:
+        final tracks = _results.tracks;
+        return ListView.builder(
+          itemCount: tracks.length,
+          itemBuilder: (context, index) => TrackTile(
+            track: tracks[index],
+            queue: tracks,
+            index: index,
+            onPlay: _remember,
+          ),
+        );
+      case SearchCategory.albums:
+        final albums = _results.albums;
+        return ListView.builder(
+          itemCount: albums.length,
+          itemBuilder: (context, index) {
+            final album = albums[index];
+            return _ResultTile(
+              leading: _Thumb(url: album.coverUrl, icon: Icons.album),
+              title: album.title,
+              subtitle: album.artistName,
+              onTap: () {
+                _remember();
+                Navigator.push(context, MaterialPageRoute(builder: (_) => AlbumDetailScreen(album: album)));
+              },
+            );
+          },
+        );
+      case SearchCategory.artists:
+        final artists = _results.artists;
+        return ListView.builder(
+          itemCount: artists.length,
+          itemBuilder: (context, index) {
+            final artist = artists[index];
+            return _ResultTile(
+              leading: _Thumb(url: artist.pictureUrl, icon: Icons.person, circle: true),
+              title: artist.name,
+              subtitle: '아티스트',
+              onTap: null,
+            );
+          },
+        );
+      case SearchCategory.playlists:
+        final playlists = _results.playlists;
+        return ListView.builder(
+          itemCount: playlists.length,
+          itemBuilder: (context, index) {
+            final playlist = playlists[index];
+            return _ResultTile(
+              leading: PlaylistArtworkWidget(coverUrl: playlist.coverUrl, size: 48, borderRadius: 6),
+              title: playlist.title,
+              subtitle: playlist.numberOfTracks > 0 ? '${playlist.numberOfTracks}곡' : '플레이리스트',
+              onTap: () {
+                _remember();
+                Navigator.push(context, MaterialPageRoute(builder: (_) => PlaylistDetailScreen(playlist: playlist)));
+              },
+            );
+          },
+        );
+    }
+  }
+}
+
+enum SearchCategory {
+  tracks('트랙'),
+  albums('앨범'),
+  artists('아티스트'),
+  playlists('플레이리스트');
+
+  const SearchCategory(this.label);
+  final String label;
+}
+
+class _ResultTile extends StatelessWidget {
+  final Widget leading;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+
+  const _ResultTile({required this.leading, required this.title, required this.subtitle, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceCard,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.surfaceLight),
+      ),
+      child: ListTile(
+        leading: leading,
+        title: Text(
+          title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+        subtitle: Text(
+          subtitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+        ),
+        trailing: onTap == null ? null : const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+        onTap: onTap,
+      ),
+    );
+  }
+}
+
+class _Thumb extends StatelessWidget {
+  final String url;
+  final IconData icon;
+  final bool circle;
+
+  const _Thumb({required this.url, required this.icon, this.circle = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final fallback = SizedBox(width: 48, height: 48, child: Icon(icon, color: AppColors.cyanAccent));
+    final image = url.isEmpty
+        ? fallback
+        : Image.network(url, width: 48, height: 48, fit: BoxFit.cover, errorBuilder: (_, __, ___) => fallback);
+    return circle
+        ? ClipOval(child: image)
+        : ClipRRect(borderRadius: BorderRadius.circular(6), child: image);
   }
 }

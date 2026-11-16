@@ -56,6 +56,12 @@ class FakeApiClient extends TidalApiClient {
   }
 
   @override
+  Future<SearchResults> searchAll(String query, {int limit = 20}) async {
+    calls.add('searchAll:$query');
+    return SearchResults(tracks: tracks);
+  }
+
+  @override
   Future<List<MediaAlbum>> searchAlbums(String query, {int limit = 20}) => _empty('searchAlbums');
   @override
   Future<List<MediaPlaylist>> searchPlaylists(String query, {int limit = 20}) => _empty('searchPlaylists');
