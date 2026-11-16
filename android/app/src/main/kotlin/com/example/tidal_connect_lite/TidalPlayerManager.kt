@@ -10,9 +10,17 @@ import com.tidal.sdk.eventproducer.model.EventsConfig
 import com.tidal.sdk.player.Player
 import com.tidal.sdk.player.common.model.MediaProduct
 import com.tidal.sdk.player.common.model.ProductType
+import com.tidal.sdk.player.common.model.AssetPresentation
+import com.tidal.sdk.player.playbackengine.model.Event
+import com.tidal.sdk.player.playbackengine.model.PlaybackContext
+import com.tidal.sdk.player.playbackengine.model.PlaybackState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 class TidalPlayerManager(
     private val context: Context,
@@ -21,6 +29,15 @@ class TidalPlayerManager(
     private var tidalPlayer: Player? = null
     private var isCurrentlyPlaying = false
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+
+    /**
+     * 재생 이벤트를 Flutter로 내보내는 콜백. 메인 스레드에서 호출된다.
+     * 형식: {type: state|position|transition|ended|error, ...}
+     */
+    var onEvent: ((Map<String, Any?>) -> Unit)? = null
+
+    private var eventsJob: Job? = null
+    private var positionJob: Job? = null
 
     /**
      * TIDAL Player는 앱 전체에서 하나만 생성한다.
@@ -65,10 +82,77 @@ class TidalPlayerManager(
             )
 
             Log.i("TidalPlayerManager", "TIDAL Official Player SDK initialized successfully")
+            collectEvents()
         } catch (e: Exception) {
             Log.e("TidalPlayerManager", "Failed to initialize TIDAL Player: ${e.message}", e)
             tidalPlayer = null
         }
+    }
+
+    /** SDK 이벤트를 Flutter용 맵으로 바꿔 내보낸다. */
+    private fun collectEvents() {
+        val player = tidalPlayer ?: return
+        eventsJob?.cancel()
+        eventsJob = scope.launch {
+            player.playbackEngine.events.collect { event ->
+                when (event) {
+                    is Event.PlaybackStateChange -> {
+                        emit(mapOf("type" to "state", "state" to event.playbackState.name))
+                        if (event.playbackState == PlaybackState.PLAYING) startPositionTicker() else stopPositionTicker()
+                    }
+                    is Event.MediaProductTransition -> emit(transitionMap(event.playbackContext))
+                    is Event.MediaProductEnded -> emit(
+                        mapOf("type" to "ended", "trackId" to event.playbackContext.productId)
+                    )
+                    is Event.StreamingPrivilegesRevoked -> emit(
+                        mapOf(
+                            "type" to "error",
+                            "code" to "PRIVILEGES_REVOKED",
+                            "message" to "다른 기기(${event.privilegedClientDisplayName ?: "알 수 없음"})에서 재생을 시작해 이 기기의 재생이 중단되었습니다."
+                        )
+                    )
+                    is Event.Error -> emit(
+                        mapOf("type" to "error", "code" to event.errorCode, "message" to (event::class.simpleName ?: "Error"))
+                    )
+                    else -> Unit
+                }
+            }
+        }
+    }
+
+    private fun transitionMap(context: PlaybackContext): Map<String, Any?> {
+        val track = context as? PlaybackContext.Track
+        return mapOf(
+            "type" to "transition",
+            "trackId" to context.productId,
+            "durationMs" to (context.duration * 1000).toLong(),
+            "preview" to (context.assetPresentation == AssetPresentation.PREVIEW),
+            "audioQuality" to track?.audioQuality?.name,
+            "bitDepth" to track?.audioBitDepth,
+            "sampleRate" to track?.audioSampleRate,
+            "codec" to track?.audioCodec,
+        )
+    }
+
+    /** 재생 중에는 500ms마다 위치를 보낸다. */
+    private fun startPositionTicker() {
+        if (positionJob?.isActive == true) return
+        positionJob = scope.launch {
+            while (isActive) {
+                val seconds = try { tidalPlayer?.playbackEngine?.assetPosition ?: 0f } catch (e: Exception) { 0f }
+                emit(mapOf("type" to "position", "positionMs" to (seconds * 1000).toLong()))
+                delay(POSITION_INTERVAL_MS)
+            }
+        }
+    }
+
+    private fun stopPositionTicker() {
+        positionJob?.cancel()
+        positionJob = null
+    }
+
+    private fun emit(event: Map<String, Any?>) {
+        onEvent?.invoke(event)
     }
 
     /**
@@ -195,6 +279,8 @@ class TidalPlayerManager(
     }
 
     companion object {
+        private const val POSITION_INTERVAL_MS = 500L
+
         @Volatile
         var activeInstance: TidalPlayerManager? = null
 
@@ -229,6 +315,8 @@ class TidalPlayerManager(
         try {
             tidalPlayer?.playbackEngine?.pause()
             tidalPlayer?.playbackEngine?.reset()
+            stopPositionTicker()
+            eventsJob?.cancel()
             tidalPlayer?.release()
             tidalPlayer = null
             isCurrentlyPlaying = false

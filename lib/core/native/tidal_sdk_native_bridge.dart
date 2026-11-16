@@ -4,6 +4,16 @@ import '../../core/utils/app_logger.dart';
 
 class TidalSdkNativeBridge {
   static const MethodChannel _channel = MethodChannel('com.example.tidal_connect_lite/tidal_sdk');
+  static const EventChannel _playerEvents = EventChannel('com.example.tidal_connect_lite/player_events');
+
+  static Stream<Map<String, dynamic>>? _playerEventStream;
+
+  /// 네이티브 TIDAL 플레이어 이벤트.
+  /// 형식: {type: state|position|transition|ended|error, ...}
+  static Stream<Map<String, dynamic>> get playerEvents => _playerEventStream ??= _playerEvents
+      .receiveBroadcastStream()
+      .map((event) => Map<String, dynamic>.from(event as Map))
+      .asBroadcastStream();
 
   /// Initializes native Tidal SDK Authentication and Player
   static Future<bool> initTidalAuth({

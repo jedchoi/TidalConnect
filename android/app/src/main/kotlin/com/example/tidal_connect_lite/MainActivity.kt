@@ -3,6 +3,7 @@ package com.example.tidal_connect_lite
 import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -14,13 +15,27 @@ import kotlin.coroutines.resume
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.example.tidal_connect_lite/tidal_sdk"
+    private val EVENT_CHANNEL = "com.example.tidal_connect_lite/player_events"
     private lateinit var authManager: TidalAuthManager
     private var playerManager: TidalPlayerManager? = null
     private var proxyServer: TidalStreamProxyServer? = null
+    private var playerEventSink: EventChannel.EventSink? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         authManager = TidalAuthManager(applicationContext)
+
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, EVENT_CHANNEL).setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    playerEventSink = events
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    playerEventSink = null
+                }
+            }
+        )
 
         val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         channel.setMethodCallHandler { call, result ->
@@ -33,7 +48,9 @@ class MainActivity : FlutterActivity() {
                     
                     if (isInitialized && authManager.credentialsProvider != null) {
                         if (playerManager == null) {
-                            playerManager = TidalPlayerManager(applicationContext, authManager.credentialsProvider)
+                            playerManager = TidalPlayerManager(applicationContext, authManager.credentialsProvider).also {
+                                it.onEvent = { event -> playerEventSink?.success(event) }
+                            }
                         }
                         Log.i("TIDAL_NATIVE_SDK", "initializePlayer() called")
                         playerManager?.initializePlayer()
