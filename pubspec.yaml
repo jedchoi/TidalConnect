@@ -21,6 +21,7 @@ dependencies:
   webview_flutter_android: ^4.12.0
   crypto: ^3.0.7
   audio_service: ^0.18.19
+  xml: ^6.5.0
 
 dev_dependencies:
   flutter_test:

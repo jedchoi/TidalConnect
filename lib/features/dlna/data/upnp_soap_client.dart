@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:xml/xml.dart';
 import '../../../core/utils/app_logger.dart';
 
 /// 스피커 화면에 보일 곡 정보.
@@ -286,12 +287,14 @@ class UPnPSoapClient {
     return null;
   }
 
+  /// SOAP 응답에서 [tag] 요소의 값을 읽는다(네임스페이스 접두어는 무시).
   static String? _extractXmlTag(String xml, String tag) {
-    final start = xml.indexOf('<$tag>');
-    final end = xml.indexOf('</$tag>');
-    if (start != -1 && end != -1) {
-      return xml.substring(start + tag.length + 2, end).trim();
-    }
+    try {
+      final doc = XmlDocument.parse(xml);
+      for (final element in doc.descendants.whereType<XmlElement>()) {
+        if (element.name.local == tag) return element.innerText.trim();
+      }
+    } catch (_) {}
     return null;
   }
 
