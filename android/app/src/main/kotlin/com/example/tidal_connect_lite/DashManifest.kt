@@ -21,22 +21,34 @@ data class DashManifest(
     fun segmentUrl(index: Int): String = mediaTemplate.replace("\$Number\$", (startNumber + index).toString())
 
     companion object {
+        /** 마지막 [parse] 실패 이유. 로그에 남겨 실기기에서 원인을 찾는 데 쓴다. */
+        @Volatile var lastError: String? = null
+
         /** MPD를 해석한다. 필요한 값이 없으면 null. */
         fun parse(mpdXml: String): DashManifest? {
+            // MPD에는 DOCTYPE이 없다. DOCTYPE이 있으면 외부 엔티티(XXE) 시도로 보고 거부한다.
+            // Android의 DocumentBuilderFactory는 disallow-doctype-decl 같은 Xerces 기능을 지원하지 않아
+            // setFeature가 예외를 던지므로(JVM 테스트에서는 통과), 기능 설정 대신 직접 검사한다.
+            if (mpdXml.contains("<!DOCTYPE", ignoreCase = true) || mpdXml.contains("<!ENTITY", ignoreCase = true)) {
+                lastError = "DOCTYPE/ENTITY 포함"
+                return null
+            }
             val doc = try {
                 DocumentBuilderFactory.newInstance().apply {
                     isNamespaceAware = false
-                    // 외부 엔티티를 읽지 않는다(XXE 방지)
-                    setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+                    isExpandEntityReferences = false
                 }.newDocumentBuilder().parse(InputSource(StringReader(mpdXml)))
             } catch (e: Exception) {
+                lastError = "XML 파싱 실패: ${e.javaClass.simpleName}: ${e.message}"
                 return null
             }
 
-            val template = doc.getElementsByTagName("SegmentTemplate").item(0) as? Element ?: return null
+            val template = doc.getElementsByTagName("SegmentTemplate").item(0) as? Element
+                ?: return null.also { lastError = "SegmentTemplate 없음" }
             val baseUrl = doc.getElementsByTagName("BaseURL").item(0)?.textContent?.trim().orEmpty()
 
-            val media = template.getAttribute("media").takeIf { it.isNotEmpty() } ?: return null
+            val media = template.getAttribute("media").takeIf { it.isNotEmpty() }
+                ?: return null.also { lastError = "media 속성 없음" }
             val init = template.getAttribute("initialization").takeIf { it.isNotEmpty() }
             val startNumber = template.getAttribute("startNumber").toIntOrNull() ?: 1
 
@@ -47,7 +59,8 @@ data class DashManifest(
                 val s = segments.item(i) as Element
                 count += 1 + (s.getAttribute("r").toIntOrNull() ?: 0).coerceAtLeast(0)
             }
-            if (count == 0) return null
+            if (count == 0) return null.also { lastError = "SegmentTimeline에 세그먼트 없음" }
+            lastError = null
 
             return DashManifest(
                 initializationUrl = init?.let { resolve(baseUrl, it) },

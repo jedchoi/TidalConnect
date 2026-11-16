@@ -181,6 +181,9 @@ class TidalStreamProxyServer(val boundHost: String) : NanoHTTPD(boundHost, PROXY
     /** HEAD 요청에는 본문 없이 형식과 길이만 알려준다. */
     private fun headResponse(info: StreamInfo): Response {
         var length = -1L
+        if (info.directUrl.isEmpty() && info.manifestXml.isNotEmpty()) {
+            DashManifest.parse(info.manifestXml)?.let { length = dashLength(info.manifestXml, it) ?: -1L }
+        }
         if (info.directUrl.isNotEmpty()) {
             try {
                 httpClient.newCall(Request.Builder().url(info.directUrl).head().build()).execute().use {
@@ -190,10 +193,13 @@ class TidalStreamProxyServer(val boundHost: String) : NanoHTTPD(boundHost, PROXY
                 Log.w(TAG, "HEAD 길이 조회 실패: ${e.message}")
             }
         }
-        // 본문은 보내지 않지만 Content-Length는 실제 파일 길이로 알린다.
-        val response = newFixedLengthResponse(
-            Response.Status.OK, info.mimeType, java.io.ByteArrayInputStream(ByteArray(0)), length.coerceAtLeast(0)
-        )
+        // 본문은 보내지 않지만 Content-Length는 실제 파일 길이로 알린다. 길이를 모르면 알리지 않는다(0으로 알리면
+        // 렌더러가 빈 파일로 여긴다).
+        val response = if (length >= 0) {
+            newFixedLengthResponse(Response.Status.OK, info.mimeType, java.io.ByteArrayInputStream(ByteArray(0)), length)
+        } else {
+            newChunkedResponse(Response.Status.OK, info.mimeType, java.io.ByteArrayInputStream(ByteArray(0)))
+        }
         if (info.directUrl.isNotEmpty()) response.addHeader("Accept-Ranges", "bytes")
         return response
     }
@@ -274,16 +280,69 @@ class TidalStreamProxyServer(val boundHost: String) : NanoHTTPD(boundHost, PROXY
     private fun proxyDashManifest(session: IHTTPSession, manifestXml: String): Response {
         return try {
             val manifest = DashManifest.parse(manifestXml)
-                ?: return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "Invalid DASH manifest")
-            Log.i(TAG, "DASH 중계 시작 - init: ${manifest.initializationUrl != null}, 세그먼트 ${manifest.segmentCount}개")
+            if (manifest == null) {
+                Log.e(TAG, "DASH 매니페스트 해석 실패: ${DashManifest.lastError}")
+                return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "Invalid DASH manifest")
+            }
+            val length = dashLength(manifestXml, manifest)
+            Log.i(TAG, "DASH 중계 시작 - init: ${manifest.initializationUrl != null}, 세그먼트 ${manifest.segmentCount}개, 길이 $length")
             // 이어 붙인 스트림은 바이트 위치로 탐색할 수 없으므로 Accept-Ranges를 알리지 않는다.
-            val proxyResponse = newChunkedResponse(Response.Status.OK, "audio/mp4", DashSegmentInputStream(httpClient, manifest))
+            // 길이를 알면 Content-Length를 보낸다. 많은 렌더러가 길이 없는 chunked 응답을 재생하지 않는다.
+            val stream = DashSegmentInputStream(httpClient, manifest)
+            val proxyResponse = if (length != null) {
+                newFixedLengthResponse(Response.Status.OK, "audio/mp4", stream, length)
+            } else {
+                newChunkedResponse(Response.Status.OK, "audio/mp4", stream)
+            }
             proxyResponse.addHeader("Access-Control-Allow-Origin", "*")
             proxyResponse.addHeader("Connection", "keep-alive")
             proxyResponse
         } catch (e: Exception) {
             Log.e(TAG, "DASH 프록시 예외: ${e.message}", e)
             newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "DASH error: ${e.message}")
+        }
+    }
+
+    /** 매니페스트별로 계산한 전체 길이(초기화 + 모든 세그먼트). 알 수 없으면 저장하지 않는다. */
+    private val dashLengthCache = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    /**
+     * 세그먼트마다 HEAD 요청을 보내 전체 바이트 수를 구한다. 하나라도 길이를 모르면 null.
+     * 렌더러가 HEAD와 GET을 여러 번 보내도 매니페스트당 한 번만 계산한다.
+     */
+    private fun dashLength(manifestXml: String, manifest: DashManifest): Long? {
+        dashLengthCache[manifestXml]?.let { return it }
+        val urls = buildList {
+            manifest.initializationUrl?.let { add(it) }
+            for (i in 0 until manifest.segmentCount) add(manifest.segmentUrl(i))
+        }
+        val pool = java.util.concurrent.Executors.newFixedThreadPool(8)
+        return try {
+            val futures = urls.map { url ->
+                pool.submit<Long?> {
+                    try {
+                        httpClient.newCall(Request.Builder().url(url).head().build()).execute().use {
+                            if (it.isSuccessful) it.header("Content-Length")?.toLongOrNull() else null
+                        }
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+            }
+            var total = 0L
+            for (f in futures) {
+                val size = f.get(10, TimeUnit.SECONDS) ?: return null.also {
+                    Log.w(TAG, "DASH 세그먼트 길이를 알 수 없어 chunked로 보냄")
+                }
+                total += size
+            }
+            dashLengthCache[manifestXml] = total
+            total
+        } catch (e: Exception) {
+            Log.w(TAG, "DASH 길이 계산 실패: ${e.message}")
+            null
+        } finally {
+            pool.shutdownNow()
         }
     }
 }
