@@ -4,17 +4,38 @@ import '../../../core/utils/app_logger.dart';
 import '../domain/models/media_item.dart';
 
 class TidalPlaybackInfo {
+  /// 단일 파일 스트림 주소(BTS). DASH면 빈 문자열.
   final String streamUrl;
+
+  /// DASH MPD 원문. 단일 파일 스트림이면 빈 문자열.
   final String manifest;
   final String manifestMimeType;
+
+  /// 실제 오디오 MIME(예: audio/flac, audio/mp4).
+  final String mimeType;
   final String audioQuality;
+  final int? bitDepth;
+  final int? sampleRate;
 
   TidalPlaybackInfo({
     required this.streamUrl,
     required this.manifest,
     required this.manifestMimeType,
     required this.audioQuality,
+    this.mimeType = 'audio/mp4',
+    this.bitDepth,
+    this.sampleRate,
   });
+
+  bool get isDash => streamUrl.isEmpty && manifest.isNotEmpty;
+}
+
+/// 음질 단계. 요청한 음질이 안 되면 한 단계 아래로 한 번만 다시 시도한다.
+const List<String> audioQualityLadder = ['HI_RES_LOSSLESS', 'LOSSLESS', 'HIGH', 'LOW'];
+
+String? lowerAudioQuality(String quality) {
+  final i = audioQualityLadder.indexOf(quality);
+  return (i == -1 || i == audioQualityLadder.length - 1) ? null : audioQualityLadder[i + 1];
 }
 
 class TidalApiClient {
@@ -172,170 +193,90 @@ class TidalApiClient {
   // 실시간 재생 정보 (MPEG-DASH MPD 및 오디오 스트림 URL) 발급
   // ──────────────────────────────────────────────
 
-  static String _extractUrlFromDashMpd(String mpdXml) {
+  /// 재생용 스트림 정보를 받는다. [quality]로 한 번 요청하고, 실패하면 한 단계 낮은 음질로 한 번 더 요청한다.
+  Future<TidalPlaybackInfo?> getPlaybackInfo(String trackId, String accessToken, {String quality = 'LOSSLESS'}) async {
+    final first = await _requestPlaybackInfo(trackId, accessToken, quality);
+    if (first != null) return first;
+    final lower = lowerAudioQuality(quality);
+    if (lower == null) return null;
+    AppLogger.log('TIDAL_API', '$quality 스트림 실패 -> $lower로 재시도', type: LogType.warning);
+    return _requestPlaybackInfo(trackId, accessToken, lower);
+  }
+
+  Future<TidalPlaybackInfo?> _requestPlaybackInfo(String trackId, String accessToken, String quality) async {
+    AppLogger.log('TIDAL_API', 'GET /tracks/$trackId/playbackinfopostpaywall (audioquality=$quality)', type: LogType.network);
     try {
-      // 1. <BaseURL> 태그 검색 (TIDAL DASH 매니페스트의 완전한 단일 오디오 파일 URL)
-      final baseMatches = RegExp(r'<BaseURL[^>]*>(https?:\/\/[^<]+)<\/BaseURL>', caseSensitive: false).allMatches(mpdXml);
-      for (final match in baseMatches) {
-        final url = match.group(1)!.trim().replaceAll('&amp;', '&');
-        // $Number$, $Time$, $Bandwidth$ 같은 템플릿 변수가 없는 완전한 URL만 채택
-        if (!url.contains('\$Number') && !url.contains('\$Time') && !url.contains('\$Bandwidth')) {
-          AppLogger.log('TIDAL_API', 'DASH BaseURL 추출 성공: ${maskUrl(url)}', type: LogType.success);
-          return url;
-        }
+      final response = await _dio.get(
+        '/tracks/$trackId/playbackinfopostpaywall',
+        queryParameters: {
+          'audioquality': quality,
+          'playbackmode': 'STREAM',
+          'assetpresentation': 'FULL',
+        },
+        options: Options(headers: _buildHeaders(accessToken)),
+      );
+      final info = parsePlaybackInfo(response.data, fallbackQuality: quality);
+      if (info == null) {
+        AppLogger.log('TIDAL_API', '스트림 정보 해석 실패 ($quality)', type: LogType.warning);
+      } else {
+        AppLogger.log('TIDAL_API', '스트림 정보 수신: ${info.audioQuality}, ${info.isDash ? 'DASH' : info.mimeType}', type: LogType.success);
       }
+      return info;
     } catch (e) {
-      AppLogger.log('TIDAL_API', 'DASH MPD XML 파싱 예외: $e', type: LogType.warning);
+      final status = e is DioException ? e.response?.statusCode : null;
+      AppLogger.log('TIDAL_API', '스트림 정보 요청 실패 ($quality, HTTP $status)', type: LogType.warning);
+      return null;
     }
-    return '';
   }
 
-  Future<TidalPlaybackInfo?> getPlaybackInfo(String trackId, String accessToken, {String soundQuality = 'HI_RES_LOSSLESS'}) async {
-    // 🎧 최고 음질(MAX / Hi-Res Lossless -> FLAC Lossless -> High -> Low) 우선 시도
-    final qualities = ['HI_RES_LOSSLESS', 'LOSSLESS', soundQuality, 'HIGH', 'LOW'];
-    TidalPlaybackInfo? fallbackDASHInfo;
+  /// playbackinfopostpaywall 응답을 해석한다. BTS(JSON)면 단일 주소를, DASH면 MPD 원문을 담는다.
+  static TidalPlaybackInfo? parsePlaybackInfo(dynamic data, {required String fallbackQuality}) {
+    if (data is! Map) return null;
+    final manifest = data['manifest'] as String? ?? '';
+    final manifestMimeType = data['manifestMimeType'] as String? ?? '';
+    final quality = data['audioQuality'] as String? ?? fallbackQuality;
+    final bitDepth = (data['bitDepth'] as num?)?.toInt();
+    final sampleRate = (data['sampleRate'] as num?)?.toInt();
+    if (manifest.isEmpty) return null;
 
-    // 1. DRM-Free Direct FLAC/AAC JSON 규격 (application/vnd.tidal.bts / emu) 우선 요청
-    final manifestMimeTypes = ['application/vnd.tidal.bts', 'application/vnd.tidal.emu', 'application/dash+xml'];
-    for (final q in qualities.toSet()) {
-      for (final mime in manifestMimeTypes) {
-        try {
-          AppLogger.log('TIDAL_API', 'GET $baseUrl/tracks/$trackId/playbackinfopostpaywall (audioquality=$q, mime=$mime)', type: LogType.network);
-          final response = await _dio.get(
-            '/tracks/$trackId/playbackinfopostpaywall',
-            queryParameters: {
-              'audioquality': q,
-              'playbackmode': 'STREAM',
-              'assetpresentation': 'FULL',
-              'manifestMimeType': mime,
-            },
-            options: Options(headers: _buildHeaders(accessToken)),
-          );
-
-          final data = response.data;
-          if (data is Map<String, dynamic>) {
-            final manifest = data['manifest'] as String? ?? '';
-            final manifestMimeType = data['manifestMimeType'] as String? ?? 'application/dash+xml';
-            final quality = data['audioQuality'] as String? ?? q;
-
-            if (manifest.isNotEmpty) {
-              try {
-                final decodedBytes = base64.decode(manifest);
-                final decodedStr = utf8.decode(decodedBytes, allowMalformed: true).replaceAll('&amp;', '&');
-
-                if (decodedStr.trim().startsWith('{')) {
-                  // BTS / EMU JSON Format
-                  final decodedJson = jsonDecode(decodedStr);
-                  String streamUrl = '';
-                  if (decodedJson is Map && decodedJson['urls'] is List && (decodedJson['urls'] as List).isNotEmpty) {
-                    streamUrl = (decodedJson['urls'] as List).first.toString().replaceAll('&amp;', '&');
-                  } else if (decodedJson is Map && decodedJson['url'] != null) {
-                    streamUrl = decodedJson['url'].toString().replaceAll('&amp;', '&');
-                  }
-                  if (streamUrl.isNotEmpty) {
-                    AppLogger.log('TIDAL_API', 'JSON 매니페스트 추출 성공: ${maskUrl(streamUrl)}', type: LogType.success);
-                    return TidalPlaybackInfo(
-                      streamUrl: streamUrl,
-                      manifest: decodedStr,
-                      manifestMimeType: manifestMimeType,
-                      audioQuality: quality,
-                    );
-                  }
-                } else {
-                  // MPEG-DASH MPD XML Format -> BaseURL 추출 시도
-                  final extractedUrl = _extractUrlFromDashMpd(decodedStr);
-                  if (extractedUrl.isNotEmpty) {
-                    return TidalPlaybackInfo(
-                      streamUrl: extractedUrl,
-                      manifest: decodedStr,
-                      manifestMimeType: 'application/dash+xml',
-                      audioQuality: quality,
-                    );
-                  } else {
-                    AppLogger.log('TIDAL_API', 'DASH MPD 매니페스트 수신 ($q) - BaseURL 미발견, 다른 품질 폴백 시도', type: LogType.info);
-                    fallbackDASHInfo ??= TidalPlaybackInfo(
-                      streamUrl: '',
-                      manifest: decodedStr,
-                      manifestMimeType: 'application/dash+xml',
-                      audioQuality: quality,
-                    );
-                  }
-                }
-              } catch (e) {
-                AppLogger.log('TIDAL_API', '매니페스트 디코딩 예외: $e', type: LogType.warning);
-              }
-            }
-
-            if (data['url'] != null && data['url'].toString().isNotEmpty) {
-              final directUrl = data['url'].toString().replaceAll('&amp;', '&');
-              return TidalPlaybackInfo(
-                streamUrl: directUrl,
-                manifest: '',
-                manifestMimeType: 'audio/mp4',
-                audioQuality: quality,
-              );
-            }
-          }
-        } catch (e) {
-          AppLogger.log('TIDAL_API', 'playbackinfopostpaywall ($q, $mime) 시도 실패: $e', type: LogType.warning);
-        }
-      }
-    }
-
-    // DASH 폴백 정보가 있으면 반환
-    if (fallbackDASHInfo != null) {
-      return fallbackDASHInfo;
-    }
-
-    // 2. /tracks/$trackId/streamUrl 시도
+    final String decoded;
     try {
-      final response = await _dio.get(
-        '/tracks/$trackId/streamUrl',
-        queryParameters: {'countryCode': 'US', 'soundQuality': 'HIGH'},
-        options: Options(headers: _buildHeaders(accessToken)),
-      );
-      final url = response.data['url']?.toString().replaceAll('&amp;', '&') ?? '';
-      if (url.isNotEmpty) {
-        AppLogger.log('TIDAL_API', '/streamUrl 엔드포인트 URL 획득 성공: ${maskUrl(url)}', type: LogType.success);
-        return TidalPlaybackInfo(
-          streamUrl: url,
-          manifest: '',
-          manifestMimeType: 'audio/mp4',
-          audioQuality: 'HIGH',
-        );
-      }
-    } catch (_) {}
-
-    // 3. 트랙 상세 메타데이터 previewUrl 폴백
-    try {
-      final response = await _dio.get(
-        '/tracks/$trackId',
-        queryParameters: {'countryCode': 'US'},
-        options: Options(headers: _buildHeaders(accessToken)),
-      );
-      final data = response.data;
-      if (data is Map<String, dynamic>) {
-        if (data['previewUrl'] != null && data['previewUrl'].toString().isNotEmpty) {
-          final url = data['previewUrl'].toString().replaceAll('&amp;', '&');
-          return TidalPlaybackInfo(
-            streamUrl: url,
-            manifest: '',
-            manifestMimeType: 'audio/mp4',
-            audioQuality: 'PREVIEW',
-          );
-        }
-      }
-    } catch (_) {}
-
-    return fallbackDASHInfo;
-  }
-
-  Future<String?> getStreamUrl(String trackId, String accessToken, {String soundQuality = 'HIGH'}) async {
-    final info = await getPlaybackInfo(trackId, accessToken, soundQuality: soundQuality);
-    if (info != null && info.streamUrl.isNotEmpty) {
-      return info.streamUrl;
+      decoded = utf8.decode(base64.decode(manifest), allowMalformed: true);
+    } catch (_) {
+      return null;
     }
-    return null;
+
+    if (manifestMimeType.contains('dash') || decoded.trimLeft().startsWith('<')) {
+      return TidalPlaybackInfo(
+        streamUrl: '',
+        manifest: decoded,
+        manifestMimeType: 'application/dash+xml',
+        mimeType: 'audio/mp4',
+        audioQuality: quality,
+        bitDepth: bitDepth,
+        sampleRate: sampleRate,
+      );
+    }
+
+    try {
+      final json = jsonDecode(decoded);
+      if (json is! Map) return null;
+      final urls = json['urls'];
+      final url = (urls is List && urls.isNotEmpty) ? urls.first.toString() : (json['url']?.toString() ?? '');
+      if (url.isEmpty) return null;
+      final codecs = json['codecs']?.toString().toLowerCase() ?? '';
+      return TidalPlaybackInfo(
+        streamUrl: url,
+        manifest: '',
+        manifestMimeType: manifestMimeType,
+        mimeType: json['mimeType']?.toString() ?? (codecs.contains('flac') ? 'audio/flac' : 'audio/mp4'),
+        audioQuality: quality,
+        bitDepth: bitDepth,
+        sampleRate: sampleRate,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   // ──────────────────────────────────────────────

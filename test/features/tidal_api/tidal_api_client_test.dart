@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tidal_connect_lite/features/tidal_api/data/tidal_api_client.dart';
 import 'package:tidal_connect_lite/features/tidal_api/domain/models/media_item.dart';
 
 void main() {
@@ -62,5 +64,35 @@ void main() {
     expect(artist.id, '888');
     expect(artist.name, 'Artist Name');
     expect(artist.pictureUrl, contains('artist/pic/uuid'));
+  });
+
+  group('parsePlaybackInfo', () {
+    String b64(String s) => base64.encode(utf8.encode(s));
+
+    test('BTS manifest yields a single direct URL and its MIME type', () {
+      final info = TidalApiClient.parsePlaybackInfo({
+        'audioQuality': 'LOSSLESS',
+        'manifestMimeType': 'application/vnd.tidal.bts',
+        'manifest': b64(jsonEncode({'mimeType': 'audio/flac', 'codecs': 'flac', 'urls': ['https://cdn.example/a.flac?sig=1']})),
+      }, fallbackQuality: 'LOSSLESS')!;
+      expect(info.isDash, isFalse);
+      expect(info.streamUrl, 'https://cdn.example/a.flac?sig=1');
+      expect(info.mimeType, 'audio/flac');
+    });
+
+    test('DASH manifest keeps the MPD text', () {
+      final info = TidalApiClient.parsePlaybackInfo({
+        'audioQuality': 'HI_RES_LOSSLESS',
+        'manifestMimeType': 'application/dash+xml',
+        'manifest': b64('<?xml version="1.0"?><MPD></MPD>'),
+      }, fallbackQuality: 'HI_RES_LOSSLESS')!;
+      expect(info.isDash, isTrue);
+      expect(info.manifest, contains('<MPD>'));
+    });
+
+    test('lowerAudioQuality steps down one level', () {
+      expect(lowerAudioQuality('HI_RES_LOSSLESS'), 'LOSSLESS');
+      expect(lowerAudioQuality('LOW'), isNull);
+    });
   });
 }
