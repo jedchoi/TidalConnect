@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/error_retry_view.dart';
+import '../../../core/widgets/track_tile.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../player/data/player_manager.dart';
 import '../../player/presentation/mini_player_widget.dart';
@@ -169,98 +170,21 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
                       final track = _tracks[index];
-                      return ListenableBuilder(
-                        // 현재 곡과 재생 상태가 바뀔 때마다 아이콘을 다시 그린다.
-                        listenable: Listenable.merge([_playerManager.currentTrackNotifier, _playerManager.isPlayingNotifier]),
-                        builder: (context, _) {
-                          final currentTrack = _playerManager.currentTrack;
-                          final isCurrent = currentTrack?.id == track.id;
-                          return Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: isCurrent ? AppColors.cyanAccent.withOpacity(0.1) : AppColors.surfaceCard,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: isCurrent ? AppColors.cyanAccent : AppColors.surfaceLight),
-                            ),
-                            child: ListTile(
-                              leading: SizedBox(
-                                width: 28,
-                                child: Center(
-                                  child: isCurrent
-                                      ? const Icon(Icons.equalizer, color: AppColors.cyanAccent, size: 20)
-                                      : Text('${index + 1}', style: const TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold)),
-                                ),
-                              ),
-                              title: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      track.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: isCurrent ? AppColors.cyanAccent : Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: track.isMax ? Colors.amber.withOpacity(0.2) : AppColors.surfaceLight,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      track.qualityBadgeText,
-                                      style: TextStyle(
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.bold,
-                                        color: track.isMax ? Colors.amberAccent : AppColors.cyanAccent,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              subtitle: Text(
-                                track.artistName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    _formatDuration(track.durationSeconds),
-                                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  IconButton(
-                                    icon: Icon(
-                                      isCurrent && _playerManager.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill,
-                                      color: AppColors.cyanAccent,
-                                    ),
-                                    onPressed: () {
-                                      if (isCurrent) {
-                                        _playerManager.togglePlayPause();
-                                      } else {
-                                        final idx = _tracks.indexOf(track);
-                                        _playerManager.setQueue(_tracks, startIndex: idx);
-                                        _playerManager.playTrack(track);
-                                      }
-                                    },
-                                  ),
-                                ],
-                              ),
-                              onTap: () {
-                                final idx = _tracks.indexOf(track);
-                                _playerManager.setQueue(_tracks, startIndex: idx);
-                                _playerManager.playTrack(track);
-                              },
-                            ),
-                          );
-                        },
+                      return TrackTile(
+                        track: track,
+                        queue: _tracks,
+                        index: index,
+                        subtitle: track.artistName,
+                        showDuration: true,
+                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        leadingBuilder: (isCurrent) => SizedBox(
+                          width: 28,
+                          child: Center(
+                            child: isCurrent
+                                ? const Icon(Icons.equalizer, color: AppColors.cyanAccent, size: 20)
+                                : Text('${index + 1}', style: const TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
                       );
                     },
                     childCount: _tracks.length,
@@ -281,9 +205,4 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
     );
   }
 
-  String _formatDuration(int seconds) {
-    final m = seconds ~/ 60;
-    final s = (seconds % 60).toString().padLeft(2, '0');
-    return '$m:$s';
-  }
 }

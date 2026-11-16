@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/format.dart';
 import '../../dlna/domain/models/dlna_device.dart';
 import '../../dlna/data/dlna_manager.dart';
 import '../../tidal_api/domain/models/media_item.dart';
@@ -223,8 +224,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text(_formatDuration(currentVal.toInt()), style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                                      Text(_formatDuration(maxDuration.toInt()), style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                      Text(formatDuration(currentVal.toInt()), style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                      Text(formatDuration(maxDuration.toInt()), style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                                     ],
                                   ),
                                 ),
@@ -484,7 +485,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                   trailing: isPlayingThis
                                       ? const Icon(Icons.equalizer, color: AppColors.cyanAccent, size: 22)
                                       : Text(
-                                          _formatDuration(track.durationSeconds),
+                                          formatDuration(track.durationSeconds),
                                           style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                                         ),
                                   onTap: () {
@@ -508,9 +509,4 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     );
   }
 
-  String _formatDuration(int seconds) {
-    final m = seconds ~/ 60;
-    final s = (seconds % 60).toString().padLeft(2, '0');
-    return '$m:$s';
-  }
 }

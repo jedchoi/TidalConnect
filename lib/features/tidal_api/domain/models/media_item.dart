@@ -1,3 +1,10 @@
+/// TIDAL 이미지 UUID(예: 1a2b-3c4d-...)를 이미지 주소로 바꾼다. 이미 주소면 그대로, 비어 있으면 빈 문자열.
+String tidalImageUrl(String uuidOrUrl, {int size = 640}) {
+  if (uuidOrUrl.startsWith('http')) return uuidOrUrl;
+  if (uuidOrUrl.isEmpty || !uuidOrUrl.contains('-')) return '';
+  return 'https://resources.tidal.com/images/${uuidOrUrl.replaceAll('-', '/')}/${size}x$size.jpg';
+}
+
 class MediaTrack {
   final String id;
   final String title;
@@ -56,11 +63,7 @@ class MediaTrack {
       coverUuid = json['cover'].toString();
     }
 
-    final coverPath = (coverUuid.isNotEmpty && coverUuid.contains('-'))
-        ? 'https://resources.tidal.com/images/${coverUuid.replaceAll("-", "/")}/640x640.jpg'
-        : (coverUuid.startsWith('http'))
-            ? coverUuid
-            : '';
+    final coverPath = tidalImageUrl(coverUuid);
 
     final duration = (json['duration'] as num?)?.toInt() ?? 0;
     
@@ -167,11 +170,7 @@ class MediaAlbum {
     }
 
     final coverUuid = json['cover']?.toString() ?? '';
-    final coverPath = (coverUuid.isNotEmpty && coverUuid.contains('-'))
-        ? 'https://resources.tidal.com/images/${coverUuid.replaceAll("-", "/")}/640x640.jpg'
-        : (coverUuid.startsWith('http'))
-            ? coverUuid
-            : '';
+    final coverPath = tidalImageUrl(coverUuid);
 
     final numberOfTracks = (json['numberOfTracks'] as num?)?.toInt() ??
         (json['trackCount'] as num?)?.toInt() ??
@@ -216,11 +215,7 @@ class MediaPlaylist {
 
     // Extract image UUID (squareImage or image, not uuid)
     final imageUuid = json['squareImage'] as String? ?? json['image'] as String? ?? '';
-    final coverPath = (imageUuid.isNotEmpty && imageUuid.contains('-'))
-        ? 'https://resources.tidal.com/images/${imageUuid.replaceAll("-", "/")}/640x640.jpg'
-        : (imageUuid.startsWith('http'))
-            ? imageUuid
-            : '';
+    final coverPath = tidalImageUrl(imageUuid);
 
     final numberOfTracks = (json['numberOfTracks'] as num?)?.toInt() ??
         (json['trackCount'] as num?)?.toInt() ??
@@ -250,11 +245,7 @@ class MediaArtist {
 
   factory MediaArtist.fromJson(Map<String, dynamic> json) {
     final picUuid = json['picture'] as String? ?? '';
-    final picPath = (picUuid.isNotEmpty && picUuid.contains('-'))
-        ? 'https://resources.tidal.com/images/${picUuid.replaceAll("-", "/")}/320x320.jpg'
-        : (picUuid.startsWith('http'))
-            ? picUuid
-            : '';
+    final picPath = tidalImageUrl(picUuid, size: 320);
     return MediaArtist(
       id: json['id'].toString(),
       name: json['name'] as String? ?? '',

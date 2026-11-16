@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/app_logger.dart';
-import '../../player/data/player_manager.dart';
 import '../../tidal_api/data/tidal_api_client.dart';
 import '../../tidal_api/domain/models/media_item.dart';
 import 'album_detail_screen.dart';
@@ -19,7 +18,6 @@ class MyCollectionScreen extends ConsumerStatefulWidget {
 
 class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
   TidalApiClient get _apiClient => ref.read(apiClientProvider);
-  PlayerManager get _playerManager => ref.read(playerManagerProvider);
 
   bool _isLoading = true;
   bool _isLoggedIn = false;
@@ -324,92 +322,7 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
             const SizedBox(height: 12),
             ...List.generate(_tracks.length, (index) {
               final track = _tracks[index];
-              return ListenableBuilder(
-                // 현재 곡과 재생 상태가 바뀔 때마다 아이콘을 다시 그린다.
-                listenable: Listenable.merge([_playerManager.currentTrackNotifier, _playerManager.isPlayingNotifier]),
-                builder: (context, _) {
-                  final currentTrack = _playerManager.currentTrack;
-                  final isCurrent = currentTrack?.id == track.id;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      tileColor: isCurrent ? AppColors.cyanAccent.withOpacity(0.1) : AppColors.surfaceCard,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        side: BorderSide(color: isCurrent ? AppColors.cyanAccent : AppColors.surfaceLight),
-                      ),
-                      leading: ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: track.coverUrl.isNotEmpty
-                            ? Image.network(track.coverUrl, width: 44, height: 44, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.music_note, color: AppColors.cyanAccent))
-                            : const Icon(Icons.music_note, color: AppColors.cyanAccent),
-                      ),
-                      title: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              track.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: isCurrent ? AppColors.cyanAccent : Colors.white,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: track.isMax ? Colors.amber.withOpacity(0.2) : AppColors.surfaceLight,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              track.qualityBadgeText,
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                                color: track.isMax ? Colors.amberAccent : AppColors.cyanAccent,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      subtitle: Text(
-                        '${track.artistName} • ${track.albumTitle}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                      ),
-                      trailing: IconButton(
-                        icon: Icon(
-                          isCurrent && _playerManager.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill,
-                          color: AppColors.cyanAccent,
-                        ),
-                        onPressed: () {
-                          if (isCurrent) {
-                            _playerManager.togglePlayPause();
-                          } else {
-                            final idx = _tracks.indexOf(track);
-                            _playerManager.playTrack(track, queue: _tracks, index: idx != -1 ? idx : 0);
-                          }
-                        },
-                      ),
-                      onTap: () {
-                        final idx = _tracks.indexOf(track);
-                        _playerManager.playTrack(track, queue: _tracks, index: idx != -1 ? idx : 0);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('"${track.title}" 재생을 시작합니다.'),
-                            backgroundColor: AppColors.cyanAccent,
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                      },
-                    ),
-                  );
-                },
-              );
+              return TrackTile(track: track, queue: _tracks, index: index);
             }),
           ],
           const SizedBox(height: 80),
