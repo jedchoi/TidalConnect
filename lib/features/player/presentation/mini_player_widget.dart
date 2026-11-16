@@ -56,13 +56,7 @@ class _MiniPlayerWidgetState extends ConsumerState<MiniPlayerWidget> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => NowPlayingScreen(
-                          title: title,
-                          artist: artist,
-                          album: album,
-                          coverUrl: coverUrl,
-                          selectedDevice: selectedDevice,
-                        ),
+                        builder: (context) => const NowPlayingScreen(),
                       ),
                     );
                   },

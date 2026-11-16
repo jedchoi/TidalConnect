@@ -180,9 +180,6 @@ class TidalPlayerManager(
         requirePlayer().playbackEngine.skipToNext()
     }
 
-    /** 현재 재생 위치(초). */
-    fun getCurrentPosition(): Float = tidalPlayer?.playbackEngine?.assetPosition ?: 0f
-
     fun pause() {
         requirePlayer().playbackEngine.pause()
     }

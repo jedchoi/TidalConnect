@@ -21,9 +21,7 @@ import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -159,12 +157,6 @@ object PlaybackCore {
                 auth.clearUserCredentials()
                 result.success(mapOf("status" to "cleared"))
             }
-            "authenticateUser" -> {
-                CoroutineScope(Dispatchers.Main).launch {
-                    val success = auth.authenticateUser()
-                    result.success(mapOf("status" to if (success) "authenticated" else "auth_failed"))
-                }
-            }
             "playTrack" -> runPlayerAction(result) {
                 val trackId = call.argument<String>("trackId") ?: ""
                 requirePlayerManager().playTrack(trackId)
@@ -196,15 +188,6 @@ object PlaybackCore {
                 requirePlayerManager().setNextTrack(nextTrackId)
                 mapOf("status" to "next_track_set", "trackId" to nextTrackId)
             }
-            "getPosition" -> {
-                val positionSec = playerManager?.getCurrentPosition() ?: 0f
-                result.success(mapOf("positionSeconds" to positionSec))
-            }
-            "releasePlayer" -> {
-                playerManager?.release()
-                playerManager = null
-                result.success(mapOf("status" to "released"))
-            }
             "getPhoneVolume" -> result.success(phoneVolumePercent())
             "setPhoneVolume" -> {
                 setPhoneVolumePercent(call.argument<Int>("percent") ?: 0)
@@ -233,15 +216,6 @@ object PlaybackCore {
                 val shortUrl = server.registerTrackStream(trackId, directUrl, manifestXml, allowedHost, mimeType)
                 Log.i("PROXY", "registerTrackStream: TrackID=$trackId")
                 result.success(mapOf("proxyUrl" to shortUrl))
-            }
-            "getProxyServerStatus" -> {
-                val isAlive = proxyServer?.isAlive ?: false
-                val lanIp = proxyServer?.boundHost ?: ""
-                result.success(mapOf(
-                    "isRunning" to isAlive,
-                    "lanIp" to lanIp,
-                    "port" to TidalStreamProxyServer.PROXY_PORT
-                ))
             }
             else -> {
                 result.notImplemented()

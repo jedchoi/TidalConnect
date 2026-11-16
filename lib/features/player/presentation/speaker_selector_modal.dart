@@ -14,8 +14,6 @@ class SpeakerSelectorModal extends ConsumerWidget {
 
   static void show(
     BuildContext context, {
-    List<DlnaDevice>? devices,
-    DlnaDevice? selectedDevice,
     required Function(DlnaDevice) onSelectDevice,
   }) {
     showModalBottomSheet(

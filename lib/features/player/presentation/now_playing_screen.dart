@@ -9,29 +9,9 @@ import '../../tidal_api/domain/models/media_item.dart';
 import '../data/player_manager.dart';
 import 'speaker_selector_modal.dart';
 
+/// 지금 재생 중인 곡의 전체 화면. 표시 내용은 모두 PlayerManager에서 읽는다.
 class NowPlayingScreen extends ConsumerStatefulWidget {
-  final String title;
-  final String artist;
-  final String album;
-  final String coverUrl;
-  final String qualityBadge;
-  final DlnaDevice activeDevice;
-  final List<DlnaDevice> availableDevices;
-  final Function(DlnaDevice)? onSelectDevice;
-
-  NowPlayingScreen({
-    super.key,
-    required this.title,
-    required this.artist,
-    required this.album,
-    required this.coverUrl,
-    this.qualityBadge = 'FLAC 16-bit 44.1kHz',
-    DlnaDevice? activeDevice,
-    DlnaDevice? selectedDevice,
-    List<DlnaDevice>? availableDevices,
-    this.onSelectDevice,
-  })  : activeDevice = activeDevice ?? selectedDevice ?? DlnaDevice.localSpeaker,
-        availableDevices = availableDevices ?? [DlnaDevice.localSpeaker];
+  const NowPlayingScreen({super.key});
 
   @override
   ConsumerState<NowPlayingScreen> createState() => _NowPlayingScreenState();
@@ -76,8 +56,6 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                 onPressed: () {
                   SpeakerSelectorModal.show(
                     context,
-                    devices: _dlnaManager.devices,
-                    selectedDevice: selectedDevice,
                     onSelectDevice: (dev) => _playerManager.switchPlaybackDevice(dev),
                   );
                 },
@@ -87,10 +65,10 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
           body: ValueListenableBuilder<MediaTrack?>(
             valueListenable: _playerManager.currentTrackNotifier,
             builder: (context, track, _) {
-              final currentTitle = track?.title ?? widget.title;
-              final currentArtist = track?.artistName ?? widget.artist;
-              final currentAlbum = track?.albumTitle ?? widget.album;
-              final currentCoverUrl = track?.coverUrl ?? widget.coverUrl;
+              final currentTitle = track?.title ?? '재생 중인 곡 없음';
+              final currentArtist = track?.artistName ?? '';
+              final currentAlbum = track?.albumTitle ?? '';
+              final currentCoverUrl = track?.coverUrl ?? '';
 
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),

@@ -37,12 +37,6 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="tidalconnect" android:host="oauth-callback" />
-            </intent-filter>
         </activity>
 
         <!-- audio_service: 미디어 세션, 재생 알림, 포그라운드 서비스 -->

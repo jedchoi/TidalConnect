@@ -104,18 +104,6 @@ class TidalSdkNativeBridge {
     });
   }
 
-  /// Triggers authentication via native CredentialsProvider
-  static Future<bool> authenticateUser() async {
-    try {
-      final result = await _channel.invokeMethod<Map>('authenticateUser');
-      AppLogger.log('TIDAL_NATIVE_SDK', '네이티브 CredentialsProvider 인증 상태: $result', type: LogType.info);
-      return result?['status'] == 'authenticated';
-    } catch (e) {
-      AppLogger.log('TIDAL_NATIVE_SDK', '네이티브 인증 실행 예외: $e', type: LogType.error);
-      return false;
-    }
-  }
-
   /// Triggers playback via official TIDAL SDK Player (playbackEngine)
   static Future<bool> playTrack({
     required String trackId,
@@ -235,17 +223,6 @@ class TidalSdkNativeBridge {
     } catch (_) {}
   }
 
-  /// Releases native Tidal SDK Player
-  static Future<bool> releasePlayer() async {
-    try {
-      await _channel.invokeMethod('releasePlayer');
-      AppLogger.log('TIDAL_NATIVE_SDK', '네이티브 Player release 완료', type: LogType.info);
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-
   /// 트랙의 스트림 정보(Direct URL 또는 DASH 매니페스트)를 프록시에 등록하고,
   /// 50자 이내의 짧고 표준적인 DLNA 프록시 URL(예: http://192.168.45.63:8765/audio/189569817.mp4)을 반환합니다.
   static Future<String> registerTrackStream({
@@ -271,19 +248,4 @@ class TidalSdkNativeBridge {
       return '';
     }
   }
-
-  /// 로컬 프록시 서버 상태 조회
-  static Future<Map<String, dynamic>> getProxyServerStatus() async {
-    try {
-      final result = await _channel.invokeMethod<Map>('getProxyServerStatus');
-      return {
-        'isRunning': result?['isRunning'] ?? false,
-        'lanIp': result?['lanIp'] ?? '',
-        'port': result?['port'] ?? 8765,
-      };
-    } catch (e) {
-      return {'isRunning': false, 'lanIp': '', 'port': 8765};
-    }
-  }
 }
-

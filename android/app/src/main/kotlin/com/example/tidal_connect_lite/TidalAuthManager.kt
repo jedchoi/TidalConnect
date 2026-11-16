@@ -41,10 +41,6 @@ class TidalAuthManager(private val context: Context) {
         customCredentialsProvider?.clearUserCredentials()
     }
 
-    suspend fun authenticateUser(): Boolean {
-        val creds = customCredentialsProvider?.getCredentials()
-        return creds != null && creds.isSuccess
-    }
 
     fun isUserLoggedIn(): Boolean {
         return customCredentialsProvider?.isUserLoggedIn() ?: false
