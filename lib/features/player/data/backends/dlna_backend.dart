@@ -33,6 +33,10 @@ class DlnaBackend implements PlaybackBackend {
         _api = api,
         _dlna = dlna;
 
+  /// DLNA로 요청할 음질. LOSSLESS는 단일 FLAC 주소라 Range 요청과 탐색이 된다.
+  /// HI_RES_LOSSLESS는 DASH로 와서 탐색이 안 되므로 사용자가 고를 때만 쓴다.
+  String preferredQuality = 'LOSSLESS';
+
   @override
   Stream<BackendEvent> get events => _events.stream;
 
@@ -51,7 +55,7 @@ class DlnaBackend implements PlaybackBackend {
       throw const PlaybackException('NOT_LOGGED_IN', '스피커로 재생하려면 TIDAL 로그인이 필요합니다.');
     }
 
-    final info = await _api.getPlaybackInfo(track.id, token.accessToken);
+    final info = await _api.getPlaybackInfo(track.id, token.accessToken, quality: preferredQuality);
     if (isCancelled()) return;
     if (info == null) {
       throw const PlaybackException('NO_STREAM', '이 곡의 스트림 정보를 받지 못했습니다.');
