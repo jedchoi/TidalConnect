@@ -46,11 +46,12 @@ String? lowerAudioQuality(String quality) {
 class TidalApiClient {
   final Dio _dio;
   static const String baseUrl = 'https://api.tidal.com/v1';
-  static const String _countryCode = 'US';
+  final bool _hasAuth;
 
   /// [authRepository]가 있으면 [AuthInterceptor]가 모든 요청에 토큰을 붙이고 401이면 한 번 갱신해 재시도한다.
   TidalApiClient({TidalAuthRepository? authRepository, Dio? dio})
-      : _dio = dio ??
+      : _hasAuth = authRepository != null,
+        _dio = dio ??
             Dio(
               BaseOptions(
                 baseUrl: baseUrl,
@@ -71,7 +72,9 @@ class TidalApiClient {
   Future<dynamic> _get(String path, Map<String, dynamic> query) async {
     AppLogger.log('TIDAL_API', 'GET $path', type: LogType.network);
     try {
-      final response = await _dio.get(path, queryParameters: {'countryCode': _countryCode, ...query});
+      // 국가 코드는 AuthInterceptor가 계정 값으로 붙인다. 인증 없이 만든 클라이언트(테스트)만 기본값을 쓴다.
+      final params = _hasAuth ? query : {'countryCode': TidalAuthRepository.defaultCountryCode, ...query};
+      final response = await _dio.get(path, queryParameters: params);
       return response.data;
     } on DioException catch (e) {
       final failure = ApiFailure.fromDio(e);

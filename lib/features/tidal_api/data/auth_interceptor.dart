@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import '../../auth/data/tidal_auth_repository.dart';
 import 'api_failure.dart';
 
-/// 모든 TIDAL API 요청에 토큰을 붙인다.
+/// 모든 TIDAL API 요청에 토큰과 계정 국가 코드를 붙인다.
 ///
 /// 401을 받으면 토큰을 한 번 갱신해 같은 요청을 다시 보낸다. 다시 실패하면 오류를 그대로 넘긴다.
 class AuthInterceptor extends Interceptor {
@@ -24,6 +24,8 @@ class AuthInterceptor extends Interceptor {
       return;
     }
     options.headers['Authorization'] = 'Bearer $token';
+    // 토큰을 받은 뒤라 저장된 계정 정보가 로드되어 있다. 호출자가 정한 값이 있으면 그대로 둔다.
+    options.queryParameters.putIfAbsent('countryCode', () => _auth.countryCode);
     handler.next(options);
   }
 

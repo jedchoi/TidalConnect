@@ -16,6 +16,7 @@ void main() {
         refreshToken: 'refresh_1',
         expiresAt: DateTime.now().subtract(const Duration(minutes: 1)),
         userId: '42',
+        countryCode: 'KR',
       );
 
   TidalAuthRepository build(FakeAdapter adapter) {
@@ -35,6 +36,7 @@ void main() {
       refreshToken: 'ref',
       expiresAt: DateTime.now().add(const Duration(hours: 1)),
       userId: '42',
+      countryCode: 'KR',
     ));
     final adapter = FakeAdapter((_) async => throw StateError('no request expected'));
     final repo = build(adapter);
@@ -121,5 +123,58 @@ void main() {
     expect(repo.currentToken, isNull);
     expect(await storage.getUserToken(), isNull);
     expect(native.clearCount, 1);
+  });
+
+  group('국가 코드', () {
+    test('로그인 응답의 국가 코드를 토큰에 저장한다', () async {
+      final repo = build(FakeAdapter((_) async => jsonBody({
+            'access_token': 'acc',
+            'refresh_token': 'ref',
+            'expires_in': 3600,
+            'user': {'userId': 42, 'countryCode': 'KR'},
+          })));
+
+      final token = await repo.exchangeAuthorizationCode(code: 'c', codeVerifier: 'v', redirectUri: 'r');
+
+      expect(token!.countryCode, 'KR');
+      expect(repo.countryCode, 'KR');
+      expect((await storage.getUserToken())!.countryCode, 'KR');
+    });
+
+    test('응답에 국가 코드가 없으면 /sessions에서 얻는다', () async {
+      final adapter = FakeAdapter((options) async {
+        if (options.path.endsWith('/sessions')) return jsonBody({'userId': 42, 'countryCode': 'DE'});
+        return jsonBody({'access_token': 'acc', 'refresh_token': 'ref', 'expires_in': 3600, 'user_id': 42});
+      });
+      final repo = build(adapter);
+
+      final token = await repo.exchangeAuthorizationCode(code: 'c', codeVerifier: 'v', redirectUri: 'r');
+
+      expect(token!.userId, '42');
+      expect(token.countryCode, 'DE');
+      expect(adapter.requestCount, 2);
+    });
+
+    test('국가 코드 없이 저장된 토큰은 갱신할 때 채운다', () async {
+      await storage.saveUserToken(AuthToken(
+        accessToken: 'old',
+        refreshToken: 'ref',
+        expiresAt: DateTime.now().subtract(const Duration(minutes: 1)),
+        userId: '42',
+      ));
+      final repo = build(FakeAdapter((options) async {
+        if (options.path.endsWith('/sessions')) return jsonBody({'userId': 42, 'countryCode': 'JP'});
+        return jsonBody({'access_token': 'new', 'expires_in': 3600});
+      }));
+
+      await repo.getValidUserToken();
+
+      expect(repo.countryCode, 'JP');
+    });
+
+    test('로그아웃 상태면 기본 국가 코드를 쓴다', () {
+      final repo = build(FakeAdapter((_) async => throw StateError('no request expected')));
+      expect(repo.countryCode, TidalAuthRepository.defaultCountryCode);
+    });
   });
 }

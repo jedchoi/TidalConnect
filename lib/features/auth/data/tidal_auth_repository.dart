@@ -76,7 +76,16 @@ class TidalAuthRepository {
               ),
             );
 
+  /// 국가 코드를 알 수 없을 때(로그아웃 상태 등) 쓰는 값.
+  static const String defaultCountryCode = 'US';
+
   AuthToken? get currentToken => userToken.value;
+
+  /// 카탈로그 조회에 쓸 국가 코드. 로그인한 계정의 국가를 쓰고, 모르면 [defaultCountryCode].
+  String get countryCode {
+    final code = userToken.value?.countryCode ?? '';
+    return code.isEmpty ? defaultCountryCode : code;
+  }
   bool get isLoggedIn => userToken.value != null;
 
   /// 네이티브 SDK를 초기화한다. 앱 시작 시 `main()`에서 한 번만 호출한다.
@@ -144,7 +153,17 @@ class TidalAuthRepository {
     if (!stored.isExpired) {
       AppLogger.log('TIDAL_AUTH', '저장된 사용자 토큰 복원 (UserId: ${stored.userId})', type: LogType.success);
       await _pushToNative(stored);
+      if (stored.countryCode.isEmpty) await _backfillCountryCode(stored);
     }
+  }
+
+  /// 국가 코드 없이 저장된 토큰(이전 버전)에 국가 코드를 채운다.
+  Future<void> _backfillCountryCode(AuthToken token) async {
+    final code = (await _fetchSession(token.accessToken)).countryCode;
+    if (code.isEmpty || userToken.value != token) return;
+    final updated = token.copyWith(countryCode: code);
+    userToken.value = updated;
+    await _storageService.saveUserToken(updated);
   }
 
   // ──────────────────────────────────────────────
@@ -217,13 +236,19 @@ class TidalAuthRepository {
       final data = response.data;
       final accessToken = data['access_token'] as String;
       var userId = '';
-      if (data['user'] is Map && data['user']['userId'] != null) {
-        userId = data['user']['userId'].toString();
-      } else if (data['user_id'] != null) {
+      var countryCode = '';
+      final user = data['user'];
+      if (user is Map) {
+        userId = user['userId']?.toString() ?? '';
+        countryCode = user['countryCode']?.toString() ?? '';
+      }
+      if (userId.isEmpty && data['user_id'] != null) {
         userId = data['user_id'].toString();
       }
-      if (userId.isEmpty) {
-        userId = await _fetchUserIdFromSession(accessToken);
+      if (userId.isEmpty || countryCode.isEmpty) {
+        final session = await _fetchSession(accessToken);
+        if (userId.isEmpty) userId = session.userId;
+        if (countryCode.isEmpty) countryCode = session.countryCode;
       }
       if (userId.isEmpty) {
         AppLogger.log('TIDAL_AUTH', '사용자 ID를 확인할 수 없어 로그인 실패 처리', type: LogType.error);
@@ -235,9 +260,10 @@ class TidalAuthRepository {
         refreshToken: data['refresh_token'] as String? ?? '',
         expiresAt: DateTime.now().add(Duration(seconds: (data['expires_in'] as num?)?.toInt() ?? 86400)),
         userId: userId,
+        countryCode: countryCode,
       );
       await _setUserToken(token);
-      AppLogger.log('TIDAL_AUTH', '사용자 로그인 성공 (UserId: $userId)', type: LogType.success);
+      AppLogger.log('TIDAL_AUTH', '사용자 로그인 성공 (UserId: $userId, 국가: $countryCode)', type: LogType.success);
       return token;
     } catch (e) {
       _logError('인증 코드 교환 실패', e);
@@ -245,17 +271,21 @@ class TidalAuthRepository {
     }
   }
 
-  Future<String> _fetchUserIdFromSession(String accessToken) async {
+  /// GET /sessions로 사용자 ID와 국가 코드를 얻는다. 실패하면 빈 값.
+  Future<({String userId, String countryCode})> _fetchSession(String accessToken) async {
     try {
       final response = await _dio.get(
         '${TidalConfig.apiBaseUrl}/sessions',
         options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
       );
       final data = response.data;
-      return data['userId']?.toString() ?? data['user']?['userId']?.toString() ?? '';
+      return (
+        userId: data['userId']?.toString() ?? data['user']?['userId']?.toString() ?? '',
+        countryCode: data['countryCode']?.toString() ?? '',
+      );
     } catch (e) {
       _logError('세션 조회 실패', e);
-      return '';
+      return (userId: '', countryCode: '');
     }
   }
 
@@ -292,11 +322,18 @@ class TidalAuthRepository {
         ),
       );
       final data = response.data;
+      final accessToken = data['access_token'] as String;
+      var countryCode = current.countryCode;
+      if (countryCode.isEmpty) {
+        // 국가 코드를 저장하기 전 버전에서 로그인한 토큰은 갱신할 때 한 번 채운다.
+        countryCode = (await _fetchSession(accessToken)).countryCode;
+      }
       final token = AuthToken(
-        accessToken: data['access_token'] as String,
+        accessToken: accessToken,
         refreshToken: data['refresh_token'] as String? ?? current.refreshToken,
         expiresAt: DateTime.now().add(Duration(seconds: (data['expires_in'] as num?)?.toInt() ?? 86400)),
         userId: current.userId,
+        countryCode: countryCode,
       );
       await _setUserToken(token);
       AppLogger.log('TIDAL_AUTH', '사용자 토큰 갱신 성공', type: LogType.success);

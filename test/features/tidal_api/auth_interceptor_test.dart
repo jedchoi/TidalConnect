@@ -34,6 +34,14 @@ void main() {
     expect(auth.recoverCount, 0);
   });
 
+  test('계정 국가 코드를 붙이되 호출자가 정한 값은 바꾸지 않는다', () async {
+    final dio = build([200]);
+    final first = await dio.get('/x');
+    expect(first.requestOptions.queryParameters['countryCode'], auth.countryCode);
+    final second = await dio.get('/x', queryParameters: {'countryCode': 'SE'});
+    expect(second.requestOptions.queryParameters['countryCode'], 'SE');
+  });
+
   test('401이면 토큰을 갱신해 한 번 다시 보낸다', () async {
     final dio = build([401, 200]);
     final res = await dio.get('/x');
