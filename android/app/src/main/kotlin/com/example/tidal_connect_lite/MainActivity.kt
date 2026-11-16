@@ -81,39 +81,38 @@ class MainActivity : FlutterActivity() {
                         result.success(mapOf("status" to if (success) "authenticated" else "auth_failed"))
                     }
                 }
-                "playTrack" -> {
+                "playTrack" -> runPlayerAction(result) {
                     val trackId = call.argument<String>("trackId") ?: ""
-                    playerManager?.playTrack(trackId)
-                    TidalPlaybackService.startService(applicationContext, "Tidal Connect Lite", "트랙 ID: $trackId 재생 중")
-                    result.success(mapOf("status" to "playing", "trackId" to trackId))
-                }
-                "pauseTrack" -> {
-                    playerManager?.pause()
-                    result.success(mapOf("status" to "paused"))
-                }
-                "resumeTrack" -> {
-                    playerManager?.resume()
+                    requirePlayerManager().playTrack(trackId)
                     TidalPlaybackService.startService(applicationContext, "Tidal Connect Lite", "재생 중")
-                    result.success(mapOf("status" to "resumed"))
+                    mapOf("status" to "playing", "trackId" to trackId)
                 }
-                "seekTrack" -> {
+                "pauseTrack" -> runPlayerAction(result) {
+                    requirePlayerManager().pause()
+                    mapOf("status" to "paused")
+                }
+                "resumeTrack" -> runPlayerAction(result) {
+                    requirePlayerManager().resume()
+                    TidalPlaybackService.startService(applicationContext, "Tidal Connect Lite", "재생 중")
+                    mapOf("status" to "resumed")
+                }
+                "seekTrack" -> runPlayerAction(result) {
                     val positionMs = call.argument<Int>("positionMs") ?: 0
-                    playerManager?.seekTo(positionMs)
-                    result.success(mapOf("status" to "seeked", "positionMs" to positionMs))
+                    requirePlayerManager().seekTo(positionMs)
+                    mapOf("status" to "seeked", "positionMs" to positionMs)
                 }
-                "stopTrack" -> {
+                "stopTrack" -> runPlayerAction(result) {
                     playerManager?.stop()
-                    TidalPlaybackService.stopService(applicationContext)
-                    result.success(mapOf("status" to "stopped"))
+                    mapOf("status" to "stopped")
                 }
-                "skipToNext" -> {
-                    playerManager?.skipToNext()
-                    result.success(mapOf("status" to "skipped_to_next"))
+                "skipToNext" -> runPlayerAction(result) {
+                    requirePlayerManager().skipToNext()
+                    mapOf("status" to "skipped_to_next")
                 }
-                "setNextTrack" -> {
+                "setNextTrack" -> runPlayerAction(result) {
                     val nextTrackId = call.argument<String>("trackId") ?: ""
-                    playerManager?.setNextTrack(nextTrackId)
-                    result.success(mapOf("status" to "next_track_set", "trackId" to nextTrackId))
+                    requirePlayerManager().setNextTrack(nextTrackId)
+                    mapOf("status" to "next_track_set", "trackId" to nextTrackId)
                 }
                 "getPosition" -> {
                     val positionSec = playerManager?.getCurrentPosition() ?: 0f
@@ -165,6 +164,19 @@ class MainActivity : FlutterActivity() {
                     result.notImplemented()
                 }
             }
+        }
+    }
+
+    private fun requirePlayerManager(): TidalPlayerManager =
+        playerManager ?: throw IllegalStateException("TIDAL Player가 초기화되지 않았습니다")
+
+    /** 플레이어 동작을 실행하고, 실패하면 Flutter에 오류(PLAYER_ERROR)로 돌려준다. */
+    private inline fun runPlayerAction(result: MethodChannel.Result, action: () -> Map<String, Any?>) {
+        try {
+            result.success(action())
+        } catch (e: Exception) {
+            Log.e("TIDAL_NATIVE_SDK", "플레이어 동작 실패: ${e.message}", e)
+            result.error("PLAYER_ERROR", e.message ?: e.javaClass.simpleName, null)
         }
     }
 

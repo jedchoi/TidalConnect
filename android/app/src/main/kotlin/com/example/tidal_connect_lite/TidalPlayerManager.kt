@@ -27,7 +27,6 @@ class TidalPlayerManager(
     private val credentialsProvider: CredentialsProvider?
 ) {
     private var tidalPlayer: Player? = null
-    private var isCurrentlyPlaying = false
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     /**
@@ -155,130 +154,71 @@ class TidalPlayerManager(
         onEvent?.invoke(event)
     }
 
-    /**
-     * TIDAL 공식 Player SDK로 Track 재생
-     */
+    private fun requirePlayer(): Player =
+        tidalPlayer ?: throw IllegalStateException("TIDAL Player가 초기화되지 않았습니다")
+
+    // 아래 동작들은 실패하면 예외를 던진다. 호출하는 쪽(MainActivity)이 Flutter에 오류로 돌려준다.
+
+    /** TIDAL 공식 Player SDK로 트랙을 재생한다. */
     fun playTrack(trackId: String) {
-        if (trackId.isEmpty()) {
-            Log.e("TidalPlayerManager", "playTrack: trackId is empty")
-            return
-        }
-
-        val player = tidalPlayer
-        if (player == null) {
-            Log.e("TidalPlayerManager", "playTrack: TIDAL Player is not initialized")
-            return
-        }
-
-        try {
-            Log.i("TidalPlayerManager", "Loading TIDAL track: $trackId")
-
-            val mediaProduct = MediaProduct(
-                productType = ProductType.TRACK,
-                productId = trackId
-            )
-
-            player.playbackEngine.load(mediaProduct)
-            Log.i("TidalPlayerManager", "MediaProduct loaded: $trackId")
-
-            player.playbackEngine.play()
-            isCurrentlyPlaying = true
-            Log.i("TidalPlayerManager", "TIDAL playback started: $trackId")
-        } catch (e: Exception) {
-            isCurrentlyPlaying = false
-            Log.e("TidalPlayerManager", "Failed to play TIDAL track $trackId: ${e.message}", e)
-        }
+        require(trackId.isNotEmpty()) { "trackId가 비어 있습니다" }
+        val player = requirePlayer()
+        Log.i(TAG, "Loading TIDAL track: $trackId")
+        player.playbackEngine.load(MediaProduct(productType = ProductType.TRACK, productId = trackId))
+        player.playbackEngine.play()
     }
 
-    /**
-     * 다음 트랙을 큐에 미리 등록 (TIDAL SDK setNext API)
-     * skipToNext() 호출 시 이 트랙으로 넘어감.
-     */
+    /** 다음 트랙을 미리 등록한다(SDK setNext). 빈 값이면 등록을 지운다. */
     fun setNextTrack(trackId: String) {
-        val player = tidalPlayer ?: return
-        try {
-            if (trackId.isEmpty()) {
-                player.playbackEngine.setNext(null)
-                Log.i("TidalPlayerManager", "setNext(null) - 다음 트랙 초기화")
-            } else {
-                val mediaProduct = MediaProduct(
-                    productType = ProductType.TRACK,
-                    productId = trackId
-                )
-                player.playbackEngine.setNext(mediaProduct)
-                Log.i("TidalPlayerManager", "setNext: $trackId")
-            }
-        } catch (e: Exception) {
-            Log.e("TidalPlayerManager", "setNextTrack 실패: ${e.message}")
-        }
+        val player = requirePlayer()
+        player.playbackEngine.setNext(
+            if (trackId.isEmpty()) null else MediaProduct(productType = ProductType.TRACK, productId = trackId)
+        )
     }
 
-    /**
-     * 다음 트랙으로 즉시 이동 (setNextTrack으로 등록된 트랙으로 전환)
-     */
     fun skipToNext() {
-        val player = tidalPlayer ?: run {
-            Log.e("TidalPlayerManager", "skipToNext: Player not initialized")
-            return
-        }
-        try {
-            player.playbackEngine.skipToNext()
-            isCurrentlyPlaying = true
-            Log.i("TidalPlayerManager", "skipToNext() called")
-        } catch (e: Exception) {
-            Log.e("TidalPlayerManager", "skipToNext 실패: ${e.message}")
-        }
+        requirePlayer().playbackEngine.skipToNext()
     }
 
-    /**
-     * 현재 재생 위치 반환 (초 단위)
-     */
-    fun getCurrentPosition(): Float {
-        return try {
-            tidalPlayer?.playbackEngine?.assetPosition ?: 0f
-        } catch (e: Exception) {
-            0f
-        }
-    }
+    /** 현재 재생 위치(초). */
+    fun getCurrentPosition(): Float = tidalPlayer?.playbackEngine?.assetPosition ?: 0f
 
     fun pause() {
-        try {
-            tidalPlayer?.playbackEngine?.pause()
-            isCurrentlyPlaying = false
-            Log.i("TidalPlayerManager", "Playback paused")
-        } catch (e: Exception) {
-            Log.e("TidalPlayerManager", "Failed to pause playback", e)
-        }
+        requirePlayer().playbackEngine.pause()
     }
 
     fun resume() {
-        try {
-            val player = tidalPlayer
-            if (player == null) {
-                Log.e("TidalPlayerManager", "resume: Player is not initialized")
-                return
-            }
-
-            player.playbackEngine.play()
-            isCurrentlyPlaying = true
-            Log.i("TidalPlayerManager", "Playback resumed")
-        } catch (e: Exception) {
-            Log.e("TidalPlayerManager", "Failed to resume playback", e)
-        }
+        requirePlayer().playbackEngine.play()
     }
 
+    /** SDK의 seek(time)은 내부에서 ExoPlayer.seekTo(time.toLong())을 호출하므로 밀리초 단위다. */
     fun seekTo(msec: Int) {
+        requirePlayer().playbackEngine.seek(msec.toFloat())
+    }
+
+    fun stop() {
+        val player = tidalPlayer ?: return
+        stopPositionTicker()
+        player.playbackEngine.pause()
+        player.playbackEngine.reset()
+    }
+
+    fun release() {
         try {
-            // TIDAL SDK PlaybackEngine.seek(time: Float) 내부 구현:
-            // extendedExoPlayer.seekTo(time.toLong()) -> 즉 밀리초(ms) 단위 Long을 요구함!
-            tidalPlayer?.playbackEngine?.seek(msec.toFloat())
-            Log.i("TidalPlayerManager", "Seek: ${msec}ms (passed ${msec.toFloat()} to SDK seek)")
+            stopPositionTicker()
+            eventsJob?.cancel()
+            tidalPlayer?.playbackEngine?.reset()
+            tidalPlayer?.release()
         } catch (e: Exception) {
-            Log.e("TidalPlayerManager", "Failed to seek", e)
+            Log.e(TAG, "Failed to release TIDAL Player", e)
+        } finally {
+            tidalPlayer = null
+            if (activeInstance == this) activeInstance = null
         }
     }
 
     companion object {
+        private const val TAG = "TidalPlayerManager"
         private const val POSITION_INTERVAL_MS = 500L
 
         @Volatile
@@ -290,7 +230,7 @@ class TidalPlayerManager(
                 activeInstance?.release()
                 activeInstance = null
             } catch (e: Exception) {
-                Log.w("TidalPlayerManager", "stopAll 예외: ${e.message}")
+                Log.w(TAG, "stopAll 예외: ${e.message}")
             }
         }
     }
@@ -298,32 +238,5 @@ class TidalPlayerManager(
     init {
         activeInstance?.release()
         activeInstance = this
-    }
-
-    fun stop() {
-        try {
-            tidalPlayer?.playbackEngine?.pause()
-            tidalPlayer?.playbackEngine?.reset()
-            isCurrentlyPlaying = false
-            Log.i("TidalPlayerManager", "Playback fully stopped & reset")
-        } catch (e: Exception) {
-            Log.e("TidalPlayerManager", "Failed to stop playback", e)
-        }
-    }
-
-    fun release() {
-        try {
-            tidalPlayer?.playbackEngine?.pause()
-            tidalPlayer?.playbackEngine?.reset()
-            stopPositionTicker()
-            eventsJob?.cancel()
-            tidalPlayer?.release()
-            tidalPlayer = null
-            isCurrentlyPlaying = false
-            if (activeInstance == this) activeInstance = null
-            Log.i("TidalPlayerManager", "TIDAL Player fully released")
-        } catch (e: Exception) {
-            Log.e("TidalPlayerManager", "Failed to release TIDAL Player", e)
-        }
     }
 }

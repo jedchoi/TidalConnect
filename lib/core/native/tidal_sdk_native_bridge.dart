@@ -127,6 +127,7 @@ class TidalSdkNativeBridge {
       AppLogger.log('TIDAL_NATIVE_SDK', '스마트폰 스피커 일시정지 완료', type: LogType.info);
       return true;
     } catch (e) {
+      AppLogger.log('TIDAL_NATIVE_SDK', '일시정지 실패: $e', type: LogType.error);
       return false;
     }
   }
@@ -138,6 +139,7 @@ class TidalSdkNativeBridge {
       AppLogger.log('TIDAL_NATIVE_SDK', '스마트폰 스피커 재생 재개 완료', type: LogType.info);
       return true;
     } catch (e) {
+      AppLogger.log('TIDAL_NATIVE_SDK', '재생 재개 실패: $e', type: LogType.error);
       return false;
     }
   }
@@ -148,6 +150,7 @@ class TidalSdkNativeBridge {
       await _channel.invokeMethod('seekTrack', {'positionMs': positionMs});
       return true;
     } catch (e) {
+      AppLogger.log('TIDAL_NATIVE_SDK', '탐색 실패: $e', type: LogType.error);
       return false;
     }
   }
