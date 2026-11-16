@@ -154,6 +154,39 @@ class UPnPSoapClient {
 </s:Envelope>''';
   }
 
+  static String buildGetTransportInfoXml() {
+    return '''<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+  <s:Body>
+    <u:GetTransportInfo xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
+      <InstanceID>0</InstanceID>
+    </u:GetTransportInfo>
+  </s:Body>
+</s:Envelope>''';
+  }
+
+  /// 스피커의 전송 상태(PLAYING, PAUSED_PLAYBACK, STOPPED, TRANSITIONING, NO_MEDIA_PRESENT). 실패하면 null.
+  Future<String?> getTransportInfo(String controlUrl) async {
+    try {
+      final response = await _dio.post(
+        controlUrl,
+        data: buildGetTransportInfoXml(),
+        options: Options(
+          headers: {
+            'Content-Type': 'text/xml; charset="utf-8"',
+            'SOAPACTION': '"urn:schemas-upnp-org:service:AVTransport:1#GetTransportInfo"',
+          },
+          sendTimeout: const Duration(seconds: 3),
+          receiveTimeout: const Duration(seconds: 3),
+        ),
+      );
+      if (response.statusCode == 200) {
+        return _extractXmlTag(response.data.toString(), 'CurrentTransportState');
+      }
+    } catch (_) {}
+    return null;
+  }
+
   static String buildGetVolumeXml() {
     return '''<?xml version="1.0" encoding="utf-8"?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">

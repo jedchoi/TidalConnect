@@ -15,6 +15,19 @@ class DlnaBackend implements PlaybackBackend {
 
   final _events = StreamController<BackendEvent>.broadcast();
 
+  // 스피커 상태 확인(1초 간격)
+  static const _pollInterval = Duration(seconds: 1);
+  static const _endTolerance = Duration(seconds: 3);
+  static const _maxFailures = 3;
+
+  Timer? _pollTimer;
+  bool _polling = false;
+  String? _trackId;
+  Duration? _duration;
+  Duration _lastPosition = Duration.zero;
+  bool _sawPlaying = false;
+  int _failures = 0;
+
   DlnaBackend({required TidalAuthRepository auth, required TidalApiClient api, required DlnaManager dlna})
       : _auth = auth,
         _api = api,
@@ -28,6 +41,7 @@ class DlnaBackend implements PlaybackBackend {
 
   @override
   Future<void> play(MediaTrack track, {Duration startPosition = Duration.zero, required IsCancelled isCancelled}) async {
+    _stopPolling();
     // 폰 스피커와 동시에 소리가 나지 않게 폰 재생을 멈춘다.
     await TidalSdkNativeBridge.stopTrack();
 
@@ -70,7 +84,78 @@ class DlnaBackend implements PlaybackBackend {
     if (startPosition > Duration.zero) {
       await _dlna.seek(startPosition.inSeconds);
     }
-    _events.add(const BackendStateChanged(playing: true));
+    _startPolling(track);
+    _events.add(const BackendStateChanged(playing: true, buffering: true));
+  }
+
+  void _startPolling(MediaTrack track) {
+    _stopPolling();
+    _trackId = track.id;
+    _duration = track.durationSeconds > 0 ? Duration(seconds: track.durationSeconds) : null;
+    _lastPosition = Duration.zero;
+    _sawPlaying = false;
+    _failures = 0;
+    _pollTimer = Timer.periodic(_pollInterval, (_) => _poll());
+  }
+
+  void _stopPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+  }
+
+  /// GetTransportInfo와 GetPositionInfo로 스피커 상태를 읽어 이벤트로 바꾼다.
+  Future<void> _poll() async {
+    if (_polling) return;
+    _polling = true;
+    try {
+      final trackId = _trackId;
+      final state = await _dlna.getTransportState();
+      final pos = await _dlna.syncPosition();
+      if (_pollTimer == null || trackId != _trackId) return; // 그 사이 정지되었거나 곡이 바뀜
+
+      if (state == null && pos == null) {
+        _failures++;
+        if (_failures >= _maxFailures) {
+          _stopPolling();
+          _events.add(const BackendStateChanged(playing: false));
+          _events.add(const BackendError('DLNA_UNREACHABLE', '스피커가 응답하지 않습니다. 전원과 네트워크를 확인하세요.'));
+        }
+        return;
+      }
+      _failures = 0;
+
+      if (pos != null) {
+        final position = Duration(seconds: pos['progress'] ?? 0);
+        final durationSec = pos['duration'] ?? 0;
+        if (durationSec > 0) _duration = Duration(seconds: durationSec);
+        if (position > Duration.zero) _lastPosition = position;
+        _events.add(BackendPositionChanged(position, duration: _duration));
+      }
+
+      switch (state) {
+        case 'PLAYING':
+          _sawPlaying = true;
+          _events.add(const BackendStateChanged(playing: true));
+        case 'TRANSITIONING':
+          _events.add(const BackendStateChanged(playing: true, buffering: true));
+        case 'PAUSED_PLAYBACK':
+          _events.add(const BackendStateChanged(playing: false));
+        case 'STOPPED':
+        case 'NO_MEDIA_PRESENT':
+          if (!_sawPlaying) return; // 재생 시작 전의 일시적인 STOPPED
+          _stopPolling();
+          final duration = _duration;
+          final nearEnd = duration == null || _lastPosition >= duration - _endTolerance;
+          if (nearEnd && trackId != null) {
+            _events.add(BackendTrackEnded(trackId));
+          } else {
+            // 스피커 쪽에서 직접 정지함
+            _events.add(const BackendStateChanged(playing: false));
+          }
+      }
+    } finally {
+      _polling = false;
+    }
   }
 
   @override
@@ -96,11 +181,14 @@ class DlnaBackend implements PlaybackBackend {
 
   @override
   Future<void> stop() async {
+    _stopPolling();
+    _trackId = null;
     await _dlna.stopCurrent();
     _events.add(const BackendStateChanged(playing: false));
   }
 
   void dispose() {
+    _stopPolling();
     _events.close();
   }
 }

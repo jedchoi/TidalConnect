@@ -130,6 +130,15 @@ class DlnaManager {
     return null;
   }
 
+  /// 스피커의 전송 상태. 응답이 없으면 null.
+  Future<String?> getTransportState() async {
+    final device = selectedDevice;
+    if (device.isLocalSpeaker) return null;
+    final targetControlUrl = device.avTransportControlUrl.isNotEmpty ? device.avTransportControlUrl : device.locationUrl;
+    if (targetControlUrl.isEmpty) return null;
+    return _soapClient.getTransportInfo(targetControlUrl);
+  }
+
   int _parseDurationToSeconds(String timeStr) {
     if (timeStr.isEmpty || timeStr == 'NOT_IMPLEMENTED') return 0;
     final parts = timeStr.split(':');
