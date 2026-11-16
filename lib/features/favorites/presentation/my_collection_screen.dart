@@ -84,6 +84,11 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 로그인·로그아웃·계정 변경 시 즐겨찾기를 자동으로 다시 불러온다.
+    ref.listen<String?>(loggedInUserIdProvider, (previous, next) {
+      if (previous != next) _loadCollectionData();
+    });
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(

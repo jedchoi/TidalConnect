@@ -16,32 +16,9 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _isAuthenticating = false;
-  String _authStatusText = '로그인 필요 (Tidal 계정 미인증)';
-  bool _isLoggedIn = false;
 
   final DlnaManager _dlnaManager = DlnaManager.instance;
   TidalAuthRepository get _authRepo => ref.read(authRepositoryProvider);
-
-  @override
-  void initState() {
-    super.initState();
-    _checkCurrentAuthStatus();
-  }
-
-  Future<void> _checkCurrentAuthStatus() async {
-    final token = await _authRepo.autoLogin();
-    if (mounted) {
-      setState(() {
-        if (token != null && !token.isExpired) {
-          _isLoggedIn = true;
-          _authStatusText = 'Tidal 사용자 OAuth 로그인 완료';
-        } else {
-          _isLoggedIn = false;
-          _authStatusText = '로그인 필요 (Tidal 계정 미인증)';
-        }
-      });
-    }
-  }
 
   Future<void> _handleTidalLogin() async {
     setState(() => _isAuthenticating = true);
@@ -54,10 +31,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (!mounted) return;
 
       if (authToken != null) {
-        setState(() {
-          _isLoggedIn = true;
-          _authStatusText = 'Tidal 사용자 계정 로그인 완료!';
-        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Tidal 계정 로그인 성공! 이제 내 즐겨찾기 및 모든 음악을 가져올 수 있습니다.'),
@@ -84,10 +57,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _handleLogout() async {
     await _authRepo.logout();
     if (mounted) {
-      setState(() {
-        _isLoggedIn = false;
-        _authStatusText = '로그아웃 완료';
-      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('로그아웃 되었습니다.')),
       );
@@ -101,6 +70,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 로그인 표시는 인증 저장소의 사용자 토큰만 따른다(앱 토큰은 로그인으로 보지 않는다).
+    final isLoggedIn = ref.watch(loggedInUserIdProvider) != null;
+    final authStatusText = isLoggedIn ? 'Tidal 사용자 OAuth 로그인 완료' : '로그인 필요 (Tidal 계정 미인증)';
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('앱 설정', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -130,9 +103,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 children: [
                   ListTile(
                     leading: const Icon(Icons.account_circle, color: AppColors.cyanAccent, size: 36),
-                    title: Text(_authStatusText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    title: Text(authStatusText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     subtitle: Text(
-                      _isLoggedIn ? '사용자 OAuth 인증 토큰 활성화됨' : '앱 내부에서 ID/PW만 입력하여 바로 로그인',
+                      isLoggedIn ? '사용자 OAuth 인증 토큰 활성화됨' : '앱 내부에서 ID/PW만 입력하여 바로 로그인',
                       style: const TextStyle(color: AppColors.textSecondary),
                     ),
                   ),
@@ -153,11 +126,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
                                 )
                               : const Icon(Icons.login),
-                          label: Text(_isLoggedIn ? '로그인 상태 재인증' : 'Tidal 계정 로그인'),
+                          label: Text(isLoggedIn ? '로그인 상태 재인증' : 'Tidal 계정 로그인'),
                           onPressed: _isAuthenticating ? null : _handleTidalLogin,
                         ),
                       ),
-                      if (_isLoggedIn) ...[
+                      if (isLoggedIn) ...[
                         const SizedBox(width: 8),
                         OutlinedButton(
                           style: OutlinedButton.styleFrom(
