@@ -8,6 +8,7 @@ import '../../../core/widgets/load_more_indicator.dart';
 import '../../../core/widgets/track_tile.dart';
 import '../../tidal_api/data/tidal_api_client.dart';
 import '../../tidal_api/domain/models/media_item.dart';
+import '../../artist/presentation/artist_detail_screen.dart';
 import 'album_detail_screen.dart';
 import 'playlist_artwork_widget.dart';
 import 'playlist_detail_screen.dart';
@@ -28,6 +29,8 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
   String _userId = '';
   late final Paginator<MediaAlbum> _albums =
       Paginator((offset) => _apiClient.getFavoriteAlbums(userId: _userId, offset: offset));
+  late final Paginator<MediaArtist> _artists =
+      Paginator((offset) => _apiClient.getFavoriteArtists(userId: _userId, offset: offset));
   late final Paginator<MediaPlaylist> _playlists =
       Paginator((offset) => _apiClient.getFavoritePlaylists(userId: _userId, offset: offset));
   late final Paginator<MediaTrack> _tracks =
@@ -42,6 +45,7 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
   @override
   void dispose() {
     _albums.dispose();
+    _artists.dispose();
     _playlists.dispose();
     _tracks.dispose();
     super.dispose();
@@ -57,6 +61,7 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
 
       if (userToken == null || userToken.userId.isEmpty) {
         _albums.clear();
+        _artists.clear();
         _playlists.clear();
         _tracks.clear();
         if (mounted) {
@@ -72,7 +77,7 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
       _isLoggedIn = true;
       _userId = userToken.userId;
 
-      await Future.wait([_albums.refresh(), _playlists.refresh(), _tracks.refresh()]);
+      await Future.wait([_albums.refresh(), _artists.refresh(), _playlists.refresh(), _tracks.refresh()]);
 
       if (mounted) setState(() => _isLoading = false);
     } catch (e) {
@@ -151,16 +156,17 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
     }
 
     return ListenableBuilder(
-      listenable: Listenable.merge([_albums, _playlists, _tracks]),
+      listenable: Listenable.merge([_albums, _artists, _playlists, _tracks]),
       builder: (context, _) => _buildCollection(),
     );
   }
 
   Widget _buildCollection() {
     final albums = _albums.items;
+    final artists = _artists.items;
     final playlists = _playlists.items;
     final tracks = _tracks.items;
-    final bool isEmpty = albums.isEmpty && playlists.isEmpty && tracks.isEmpty;
+    final bool isEmpty = albums.isEmpty && artists.isEmpty && playlists.isEmpty && tracks.isEmpty;
     if (isEmpty) {
       return Center(
         child: Column(
@@ -283,7 +289,38 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
             const SizedBox(height: 24),
           ],
 
-          // 2. 내 플레이리스트 섹션
+          // 2. 내 아티스트 섹션
+          if (artists.isNotEmpty) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  '내 아티스트',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                ),
+                Text('${_artists.totalCount}명', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 120,
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (n) => _artists.onScroll(n, axis: Axis.horizontal),
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: artists.length + (_artists.hasMore ? 1 : 0),
+                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  itemBuilder: (context, index) {
+                    if (index == artists.length) return LoadMoreIndicator(paginator: _artists, width: 60);
+                    return _ArtistAvatar(artist: artists[index]);
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+
+          // 3. 내 플레이리스트 섹션
           if (playlists.isNotEmpty) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -332,7 +369,7 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
             const SizedBox(height: 24),
           ],
 
-          // 3. 내 트랙 섹션
+          // 4. 내 트랙 섹션
           if (tracks.isNotEmpty) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -354,6 +391,49 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
           const SizedBox(height: 80),
         ],
       ),
+      ),
+    );
+  }
+}
+
+class _ArtistAvatar extends StatelessWidget {
+  final MediaArtist artist;
+  const _ArtistAvatar({required this.artist});
+
+  @override
+  Widget build(BuildContext context) {
+    const fallback = CircleAvatar(
+      radius: 40,
+      backgroundColor: AppColors.surfaceCard,
+      child: Icon(Icons.person, size: 36, color: AppColors.cyanAccent),
+    );
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ArtistDetailScreen(artist: artist))),
+      child: SizedBox(
+        width: 84,
+        child: Column(
+          children: [
+            artist.pictureUrl.isEmpty
+                ? fallback
+                : ClipOval(
+                    child: Image.network(
+                      artist.pictureUrl,
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => fallback,
+                    ),
+                  ),
+            const SizedBox(height: 6),
+            Text(
+              artist.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+            ),
+          ],
+        ),
       ),
     );
   }

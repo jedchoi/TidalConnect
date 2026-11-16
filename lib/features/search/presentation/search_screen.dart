@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/error_retry_view.dart';
 import '../../../core/widgets/track_tile.dart';
 import '../../tidal_api/data/tidal_api_client.dart';
+import '../../artist/presentation/artist_detail_screen.dart';
 import '../../favorites/presentation/album_detail_screen.dart';
 import '../../favorites/presentation/playlist_artwork_widget.dart';
 import '../../favorites/presentation/playlist_detail_screen.dart';
@@ -336,7 +337,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               leading: _Thumb(url: artist.pictureUrl, icon: Icons.person, circle: true),
               title: artist.name,
               subtitle: '아티스트',
-              onTap: null,
+              onTap: () {
+                _remember();
+                Navigator.push(context, MaterialPageRoute(builder: (_) => ArtistDetailScreen(artist: artist)));
+              },
             );
           },
         );

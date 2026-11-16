@@ -117,6 +117,10 @@ class TidalApiClient {
       _page(await _get('/users/$userId/favorites/tracks', _paging(offset, limit, newestFirst: true)), MediaTrack.fromJson,
           offset: offset, limit: limit);
 
+  Future<PageResult<MediaArtist>> getFavoriteArtists({required String userId, int offset = 0, int limit = pageSize}) async =>
+      _page(await _get('/users/$userId/favorites/artists', _paging(offset, limit, newestFirst: true)),
+          MediaArtist.fromJson, offset: offset, limit: limit);
+
   static Map<String, dynamic> _paging(int offset, int limit, {bool newestFirst = false}) => {
         'offset': offset,
         'limit': limit,
@@ -143,6 +147,19 @@ class TidalApiClient {
     return _page(await _get('/playlists/$playlistId/items', _paging(offset, limit)), MediaTrack.fromJson,
         offset: offset, limit: limit);
   }
+
+  // ──────────────────────────────────────────────
+  // 아티스트
+  // ──────────────────────────────────────────────
+
+  /// 아티스트의 인기 트랙.
+  Future<List<MediaTrack>> getArtistTopTracks(String artistId, {int limit = 20}) async =>
+      _items(await _get('/artists/$artistId/toptracks', {'limit': limit}), MediaTrack.fromJson);
+
+  /// 아티스트의 앨범(정규 앨범). 최신순.
+  Future<PageResult<MediaAlbum>> getArtistAlbums(String artistId, {int offset = 0, int limit = pageSize}) async =>
+      _page(await _get('/artists/$artistId/albums', _paging(offset, limit)), MediaAlbum.fromJson,
+          offset: offset, limit: limit);
 
   // ──────────────────────────────────────────────
   // 재생 정보

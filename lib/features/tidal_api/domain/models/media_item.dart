@@ -217,7 +217,9 @@ class MediaArtist {
     required this.pictureUrl,
   });
 
-  factory MediaArtist.fromJson(Map<String, dynamic> json) {
+  factory MediaArtist.fromJson(Map<String, dynamic> rawJson) {
+    // 즐겨찾기 응답은 {created, item: {...}} 형태로 감싸서 온다.
+    final json = rawJson['item'] is Map<String, dynamic> ? rawJson['item'] as Map<String, dynamic> : rawJson;
     final picUuid = json['picture'] as String? ?? '';
     final picPath = tidalImageUrl(picUuid, size: 320);
     return MediaArtist(

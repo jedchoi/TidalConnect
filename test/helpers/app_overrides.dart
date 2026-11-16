@@ -31,6 +31,9 @@ class FakeApiClient extends TidalApiClient {
   Future<PageResult<MediaAlbum>> getFavoriteAlbums({required String userId, int offset = 0, int limit = 50}) =>
       _emptyPage('getFavoriteAlbums', offset);
   @override
+  Future<PageResult<MediaArtist>> getFavoriteArtists({required String userId, int offset = 0, int limit = 50}) =>
+      _emptyPage('getFavoriteArtists', offset);
+  @override
   Future<PageResult<MediaPlaylist>> getFavoritePlaylists({required String userId, int offset = 0, int limit = 50}) =>
       _emptyPage('getFavoritePlaylists', offset);
   @override
@@ -53,6 +56,20 @@ class FakeApiClient extends TidalApiClient {
   Future<List<MediaTrack>> searchTracks(String query, {int limit = 20}) async {
     calls.add('searchTracks:$query');
     return tracks;
+  }
+
+  List<MediaAlbum> artistAlbums = const [];
+
+  @override
+  Future<List<MediaTrack>> getArtistTopTracks(String artistId, {int limit = 20}) async {
+    calls.add('getArtistTopTracks:$artistId');
+    return tracks;
+  }
+
+  @override
+  Future<PageResult<MediaAlbum>> getArtistAlbums(String artistId, {int offset = 0, int limit = 50}) async {
+    calls.add('getArtistAlbums:$artistId:$offset');
+    return PageResult(items: artistAlbums, offset: offset, total: artistAlbums.length, hasMore: false);
   }
 
   @override
