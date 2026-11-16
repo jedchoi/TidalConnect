@@ -1,14 +1,13 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/error_retry_view.dart';
 import '../../../core/widgets/track_tile.dart';
 import '../../tidal_api/data/tidal_api_client.dart';
 import '../../tidal_api/domain/models/media_item.dart';
+import '../data/search_history_store.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -20,12 +19,11 @@ class SearchScreen extends ConsumerStatefulWidget {
 class _SearchScreenState extends ConsumerState<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   TidalApiClient get _apiClient => ref.read(apiClientProvider);
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
-
-  static const String _historyKey = 'search_history_list';
+  final SearchHistoryStore _historyStore = SearchHistoryStore();
   List<String> _history = [];
 
   Timer? _debounce;
+  int _searchSeq = 0;
   bool _isSearching = false;
   List<MediaTrack> _searchTracks = [];
   String? _searchError;
@@ -45,48 +43,33 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   Future<void> _loadSearchHistory() async {
     try {
-      final jsonStr = await _storage.read(key: _historyKey);
-      if (jsonStr != null && jsonStr.isNotEmpty) {
-        final List list = jsonDecode(jsonStr);
-        if (mounted) {
-          setState(() {
-            _history = list.map((e) => e.toString()).toList();
-          });
-        }
-      }
+      final list = await _historyStore.load();
+      if (mounted) setState(() => _history = list);
     } catch (_) {}
   }
 
+  /// 입력 중 디바운스 검색은 기록하지 않고, 제출하거나 결과를 고를 때만 남긴다.
   Future<void> _saveSearchHistory(String query) async {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return;
-
-    _history.remove(trimmed);
-    _history.insert(0, trimmed);
-    if (_history.length > 15) {
-      _history = _history.sublist(0, 15);
-    }
-    setState(() {});
+    setState(() => _history = SearchHistoryStore.addToHistory(_history, trimmed));
     try {
-      await _storage.write(key: _historyKey, value: jsonEncode(_history));
+      await _historyStore.add(_history, trimmed);
     } catch (_) {}
   }
 
   Future<void> _removeHistoryItem(String item) async {
-    setState(() {
-      _history.remove(item);
-    });
+    final before = _history;
+    setState(() => _history = [...before]..remove(item));
     try {
-      await _storage.write(key: _historyKey, value: jsonEncode(_history));
+      await _historyStore.remove(before, item);
     } catch (_) {}
   }
 
   Future<void> _clearAllHistory() async {
-    setState(() {
-      _history.clear();
-    });
+    setState(() => _history = []);
     try {
-      await _storage.delete(key: _historyKey);
+      await _historyStore.clear();
     } catch (_) {}
   }
 
@@ -97,27 +80,40 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     });
   }
 
+  void _submitSearch(String query) {
+    _debounce?.cancel();
+    _saveSearchHistory(query);
+    _performSearch(query);
+  }
+
   Future<void> _performSearch(String query) async {
+    // 늦게 도착한 이전 검색 결과가 최신 결과를 덮어쓰지 않도록 요청 번호로 거른다.
+    final seq = ++_searchSeq;
     if (query.trim().isEmpty) {
-      if (mounted) setState(() => _searchTracks = []);
+      if (mounted) {
+        setState(() {
+          _searchTracks = [];
+          _searchError = null;
+          _isSearching = false;
+        });
+      }
       return;
     }
-    _saveSearchHistory(query);
     setState(() {
       _isSearching = true;
       _searchError = null;
     });
     try {
       final tracks = await _apiClient.searchTracks(query);
-      if (mounted) {
+      if (mounted && seq == _searchSeq) {
         setState(() => _searchTracks = tracks);
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted && seq == _searchSeq) {
         setState(() => _searchError = e is ApiFailure ? e.message : '검색하지 못했습니다.');
       }
     } finally {
-      if (mounted) {
+      if (mounted && seq == _searchSeq) {
         setState(() => _isSearching = false);
       }
     }
@@ -125,7 +121,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   void _searchWithQuery(String query) {
     _searchController.text = query;
-    _performSearch(query);
+    _submitSearch(query);
   }
 
   @override
@@ -146,7 +142,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             TextField(
               controller: _searchController,
               onChanged: _onSearchChanged,
-              onSubmitted: (val) => _performSearch(val),
+              onSubmitted: _submitSearch,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: '아티스트, 곡, 앨범 검색 (예: Queen, Jazz)',
@@ -156,6 +152,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     ? IconButton(
                         icon: const Icon(Icons.clear, color: Colors.white54),
                         onPressed: () {
+                          _debounce?.cancel();
                           _searchController.clear();
                           _performSearch('');
                         },
@@ -256,7 +253,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       itemCount: _searchTracks.length,
       itemBuilder: (context, index) {
         final track = _searchTracks[index];
-        return TrackTile(track: track, queue: _searchTracks, index: index);
+        return TrackTile(
+          track: track,
+          queue: _searchTracks,
+          index: index,
+          onPlay: () => _saveSearchHistory(_searchController.text),
+        );
       },
     );
   }

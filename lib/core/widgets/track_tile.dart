@@ -22,6 +22,9 @@ class TrackTile extends ConsumerWidget {
   final bool showDuration;
   final EdgeInsetsGeometry margin;
 
+  /// 이 행에서 재생을 시작할 때 함께 호출된다(예: 검색 기록 저장).
+  final VoidCallback? onPlay;
+
   const TrackTile({
     super.key,
     required this.track,
@@ -31,6 +34,7 @@ class TrackTile extends ConsumerWidget {
     this.subtitle,
     this.showDuration = false,
     this.margin = const EdgeInsets.only(bottom: 8),
+    this.onPlay,
   });
 
   @override
@@ -42,7 +46,10 @@ class TrackTile extends ConsumerWidget {
         final isCurrent = player.currentTrack?.id == track.id;
         final isPlayingThis = isCurrent && player.isPlaying;
 
-        void play() => player.playTrack(track, queue: queue, index: index);
+        void play() {
+          onPlay?.call();
+          player.playTrack(track, queue: queue, index: index);
+        }
 
         return Container(
           margin: margin,
