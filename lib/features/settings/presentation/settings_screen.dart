@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../auth/data/tidal_auth_repository.dart';
 import '../../auth/presentation/tidal_webview_login_modal.dart';
 import '../../dlna/data/dlna_manager.dart';
+import '../../player/data/player_manager.dart';
 import 'debug_log_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -55,6 +56,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _handleLogout() async {
+    // 순서: 재생 정지 -> 네이티브 자격 증명·저장 토큰 삭제(logout 내부) -> Provider로 상태 전파
+    PlayerManager.instance.stop();
     await _authRepo.logout();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
