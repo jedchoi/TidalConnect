@@ -1,0 +1,31 @@
+name: check
+
+# 푸시와 PR마다 tool/check.sh와 같은 점검(포맷, analyze, flutter test, Kotlin 단위 테스트)을 실행한다.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # gradlew와 local.properties는 저장소에 없으므로(.gitignore) Gradle 설정 파일만 생성한다.
+      - name: Android Gradle 설정 생성
+        run: flutter build apk --debug --config-only
+
+      - name: 점검
+        run: tool/check.sh
