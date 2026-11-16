@@ -22,9 +22,6 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         authManager = TidalAuthManager(applicationContext)
 
-        // 로컬 스트림 프록시 서버 시작 (DLNA relay용)
-        startProxyServer()
-
         val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
@@ -128,14 +125,19 @@ class MainActivity : FlutterActivity() {
                     val manifestXml = call.argument<String>("manifestXml") ?: ""
                     val allowedHost = call.argument<String>("allowedHost") ?: ""
 
-                    val shortUrl = proxyServer?.registerTrackStream(trackId, directUrl, manifestXml, allowedHost) ?: ""
+                    val server = ensureProxyServer()
+                    if (server == null) {
+                        result.error("NO_WIFI", "Wi-Fi에 연결되어 있지 않아 스피커로 스트리밍할 수 없습니다.", null)
+                        return@setMethodCallHandler
+                    }
+                    val shortUrl = server.registerTrackStream(trackId, directUrl, manifestXml, allowedHost)
                     TidalPlaybackService.startService(applicationContext, "DLNA 스트리밍", "Track ID: $trackId")
                     Log.i("PROXY", "registerTrackStream: TrackID=$trackId")
                     result.success(mapOf("proxyUrl" to shortUrl))
                 }
                 "getProxyServerStatus" -> {
                     val isAlive = proxyServer?.isAlive ?: false
-                    val lanIp = TidalStreamProxyServer.getLanIpAddress()
+                    val lanIp = proxyServer?.boundHost ?: ""
                     result.success(mapOf(
                         "isRunning" to isAlive,
                         "lanIp" to lanIp,
@@ -172,18 +174,28 @@ class MainActivity : FlutterActivity() {
             }
         }
 
-    private fun startProxyServer() {
-        try {
-            if (proxyServer == null) {
-                proxyServer = TidalStreamProxyServer()
-            }
-            if (!proxyServer!!.isAlive) {
-                proxyServer!!.start(30_000, false)
-                val lanIp = TidalStreamProxyServer.getLanIpAddress()
-                Log.i("PROXY", "로컬 스트림 프록시 서버 시작: http://$lanIp:${TidalStreamProxyServer.PROXY_PORT}")
+    /**
+     * 현재 Wi-Fi 주소에 바인딩된 프록시 서버를 돌려준다. 주소가 바뀌었으면 새로 띄운다.
+     * Wi-Fi가 없으면 null.
+     */
+    private fun ensureProxyServer(): TidalStreamProxyServer? {
+        val wifiIp = TidalStreamProxyServer.getWifiIpv4Address(applicationContext)
+        if (wifiIp == null) {
+            Log.w("PROXY", "Wi-Fi 주소 없음 - 프록시를 시작하지 않음")
+            return null
+        }
+        val current = proxyServer
+        if (current != null && current.boundHost == wifiIp && current.isAlive) return current
+        return try {
+            current?.stop()
+            TidalStreamProxyServer(wifiIp).also {
+                it.start(30_000, false)
+                proxyServer = it
+                Log.i("PROXY", "로컬 스트림 프록시 시작: $wifiIp:${TidalStreamProxyServer.PROXY_PORT}")
             }
         } catch (e: Exception) {
             Log.e("PROXY", "프록시 서버 시작 실패: ${e.message}", e)
+            null
         }
     }
 

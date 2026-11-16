@@ -6,9 +6,11 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.InputStream
 import java.io.SequenceInputStream
-import java.net.NetworkInterface
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import java.net.Inet4Address
 import java.security.SecureRandom
-import java.util.Collections
 import java.util.Enumeration
 import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
@@ -22,35 +24,32 @@ import java.util.regex.Pattern
  * 지연 로딩(Lazy Chunk Stream)을 적용하여 전체 곡(100+ 세그먼트)이 스피커 재생 속도에 맞춰
  * 끊김 없이 자연스럽게 스트리밍되도록 지원합니다.
  */
-class TidalStreamProxyServer : NanoHTTPD(PROXY_PORT) {
+/** @param boundHost 서버가 바인딩할 Wi-Fi 주소. 다른 인터페이스에서는 접근할 수 없다. */
+class TidalStreamProxyServer(val boundHost: String) : NanoHTTPD(boundHost, PROXY_PORT) {
 
     companion object {
         const val PROXY_PORT = 8765
         private const val MAX_REGISTERED = 3
         private const val TAG = "TidalStreamProxy"
 
-        fun getLanIpAddress(): String {
-            try {
-                val interfaces = NetworkInterface.getNetworkInterfaces()
-                while (interfaces.hasMoreElements()) {
-                    val networkInterface = interfaces.nextElement()
-                    if (networkInterface.isLoopback || !networkInterface.isUp) continue
-
-                    val addresses = networkInterface.inetAddresses
-                    while (addresses.hasMoreElements()) {
-                        val addr = addresses.nextElement()
-                        if (addr.isLoopbackAddress) continue
-                        val hostAddress = addr.hostAddress ?: continue
-                        if (!hostAddress.contains(':')) {
-                            Log.i(TAG, "LAN IP: $hostAddress (interface: ${networkInterface.displayName})")
-                            return hostAddress
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to get LAN IP: ${e.message}")
+        /**
+         * Wi-Fi(또는 유선 LAN) 네트워크의 IPv4 주소. 없으면 null.
+         * 모바일 데이터나 VPN 인터페이스의 주소는 스피커가 접근할 수 없으므로 고르지 않는다.
+         */
+        fun getWifiIpv4Address(context: Context): String? {
+            val cm = context.getSystemService(ConnectivityManager::class.java) ?: return null
+            @Suppress("DEPRECATION")
+            for (network in cm.allNetworks) {
+                val caps = cm.getNetworkCapabilities(network) ?: continue
+                val isLan = caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                    caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+                if (!isLan || caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) continue
+                val address = cm.getLinkProperties(network)?.linkAddresses
+                    ?.map { it.address }
+                    ?.firstOrNull { it is Inet4Address && !it.isLoopbackAddress }
+                if (address != null) return address.hostAddress
             }
-            return "127.0.0.1"
+            return null
         }
     }
 
@@ -86,7 +85,7 @@ class TidalStreamProxyServer : NanoHTTPD(PROXY_PORT) {
             streamRegistry[token] = StreamInfo(trackId, directUrl, manifestXml, allowedHost)
         }
         Log.i(TAG, "트랙 스트림 등록: TrackID=$trackId, direct=${directUrl.isNotEmpty()}, manifestLen=${manifestXml.length}")
-        return "http://${getLanIpAddress()}:$PROXY_PORT/audio/$token.mp4"
+        return "http://$boundHost:$PROXY_PORT/audio/$token.mp4"
     }
 
     private fun newToken(): String {
