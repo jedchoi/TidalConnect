@@ -93,6 +93,7 @@ class PlayerManager {
     _dlna.events.listen((e) => _onBackendEvent(_dlna, e));
 
     _dlnaManager.selectedDeviceNotifier.addListener(_onOutputDeviceChanged);
+    _dlnaManager.isPlaybackActive = () => isPlaying;
     TidalSdkNativeBridge.phoneVolumeChanges.listen(onPhoneVolumeChanged, onError: (_) {});
     syncVolumeFromDevice();
   }

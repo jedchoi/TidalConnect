@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/utils/app_logger.dart';
 import '../domain/models/dlna_device.dart';
 import 'ssdp_discovery_service.dart';
@@ -18,8 +19,17 @@ class DlnaManager {
   List<DlnaDevice> get devices => devicesNotifier.value;
   DlnaDevice get selectedDevice => selectedDeviceNotifier.value;
 
+  static const _selectedUdnKey = 'selected_speaker_udn';
+
+  /// 재생 중인지 알려주는 함수. 재생 중에는 탐색 결과로 출력 기기를 자동으로 바꾸지 않는다.
+  bool Function()? isPlaybackActive;
+
+  /// 사용자에게 알릴 안내 문구(예: 선택한 스피커를 찾지 못함).
+  final ValueNotifier<String?> messageNotifier = ValueNotifier(null);
+
   void selectDevice(DlnaDevice device) {
     selectedDeviceNotifier.value = device;
+    _saveSelection(device);
     AppLogger.log('DLNA_UI', '오디오 출력 기기 변경: "${device.friendlyName}" (${device.locationUrl})', type: LogType.success);
   }
 
@@ -172,6 +182,7 @@ class DlnaManager {
       );
       devicesNotifier.value = List.unmodifiable(newDevices);
       
+      await _reconcileSelection(newDevices);
       final remoteCount = newDevices.where((d) => !d.isLocalSpeaker).length;
       AppLogger.log('DLNA_UI', '전역 DLNA 탐색 완료. 총 ${newDevices.length}개 기기 (원격 스피커: $remoteCount개)', type: LogType.success);
       return newDevices;
@@ -180,6 +191,45 @@ class DlnaManager {
       return devices;
     } finally {
       isSearchingNotifier.value = false;
+    }
+  }
+
+  Future<void> _saveSelection(DlnaDevice device) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (device.isLocalSpeaker) {
+        await prefs.remove(_selectedUdnKey);
+      } else {
+        await prefs.setString(_selectedUdnKey, device.udn);
+      }
+    } catch (_) {}
+  }
+
+  /// 탐색 결과에 맞춰 선택 기기를 정리한다.
+  /// - 마지막에 쓴 스피커가 다시 보이면 그 스피커를 선택한다.
+  /// - 선택된 스피커가 사라졌으면 재생 중이 아닐 때만 폰 스피커로 되돌리고 안내한다.
+  Future<void> _reconcileSelection(List<DlnaDevice> found) async {
+    if (isPlaybackActive?.call() == true) return;
+    final current = selectedDevice;
+    if (current.isLocalSpeaker) {
+      String? savedUdn;
+      try {
+        savedUdn = (await SharedPreferences.getInstance()).getString(_selectedUdnKey);
+      } catch (_) {}
+      if (savedUdn == null) return;
+      for (final device in found) {
+        if (device.udn == savedUdn) {
+          selectedDeviceNotifier.value = device;
+          AppLogger.log('DLNA_UI', '마지막에 쓴 스피커 자동 선택: "${device.friendlyName}"', type: LogType.info);
+          return;
+        }
+      }
+      return;
+    }
+    if (!found.any((d) => d.udn == current.udn)) {
+      // 저장된 선택은 남겨 두어 다음 탐색에서 다시 보이면 복원한다.
+      selectedDeviceNotifier.value = DlnaDevice.localSpeaker;
+      messageNotifier.value = '"${current.friendlyName}"을(를) 찾지 못해 폰 스피커로 전환했습니다.';
     }
   }
 }

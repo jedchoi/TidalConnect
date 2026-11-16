@@ -33,6 +33,14 @@ class _MainScreenState extends State<MainScreen> {
     DlnaManager.instance.discoverDevices();
 
     PlayerManager.instance.errorNotifier.addListener(_showPlayerError);
+    DlnaManager.instance.messageNotifier.addListener(_showDlnaMessage);
+  }
+
+  void _showDlnaMessage() {
+    final message = DlnaManager.instance.messageNotifier.value;
+    if (message == null || !mounted) return;
+    DlnaManager.instance.messageNotifier.value = null;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showPlayerError() {
@@ -50,6 +58,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void dispose() {
     PlayerManager.instance.errorNotifier.removeListener(_showPlayerError);
+    DlnaManager.instance.messageNotifier.removeListener(_showDlnaMessage);
     super.dispose();
   }
 
