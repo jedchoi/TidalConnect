@@ -8,6 +8,7 @@ import '../../dlna/data/dlna_manager.dart';
 import '../../dlna/domain/models/dlna_device.dart';
 import '../../tidal_api/data/tidal_api_client.dart';
 import '../../tidal_api/domain/models/media_item.dart';
+import '../../volume/data/hardware_volume_service.dart';
 
 enum PlaybackRepeatMode { off, all, one }
 
@@ -20,6 +21,34 @@ class PlayerManager {
   /// 앱 시작 시 공유 인증 저장소를 주입한다.
   void configure({required TidalAuthRepository authRepository}) {
     _authRepo = authRepository;
+    _dlnaManager.selectedDeviceNotifier.addListener(_onOutputDeviceChanged);
+  }
+
+  /// 원격 스피커의 실제 볼륨을 읽기 전에는 SetVolume을 보내지 않는다(볼륨 급변 방지).
+  bool _remoteVolumeKnown = false;
+
+  void _onOutputDeviceChanged() {
+    _remoteVolumeKnown = false;
+    syncVolumeFromDevice();
+  }
+
+  /// 현재 출력 기기의 볼륨을 읽어 [volumeNotifier]에 반영한다.
+  Future<void> syncVolumeFromDevice() async {
+    final device = _dlnaManager.selectedDevice;
+    if (device.isLocalSpeaker) {
+      final phone = await HardwareVolumeService.getPhoneVolume();
+      if (phone != null) volumeNotifier.value = phone;
+      return;
+    }
+    final volume = await _dlnaManager.fetchVolume();
+    if (_dlnaManager.selectedDevice.udn != device.udn) return; // 그 사이 기기가 바뀜
+    if (volume != null) {
+      volumeNotifier.value = volume;
+      _remoteVolumeKnown = true;
+      AppLogger.log('PLAYER', '스피커 현재 볼륨 동기화: $volume', type: LogType.info);
+    } else {
+      AppLogger.log('PLAYER', '스피커 볼륨을 읽지 못해 볼륨 제어를 보류', type: LogType.warning);
+    }
   }
   final TidalApiClient _apiClient = TidalApiClient();
   final DlnaManager _dlnaManager = DlnaManager.instance;
@@ -139,9 +168,15 @@ class PlayerManager {
   /// 볼륨 설정 (스마트폰 또는 DLNA 스피커)
   void setVolume(int volumePercent) {
     final clamped = volumePercent.clamp(0, 100);
-    volumeNotifier.value = clamped;
     if (!_dlnaManager.selectedDevice.isLocalSpeaker) {
+      if (!_remoteVolumeKnown) {
+        syncVolumeFromDevice();
+        return;
+      }
+      volumeNotifier.value = clamped;
       _dlnaManager.setVolume(clamped);
+    } else {
+      volumeNotifier.value = clamped;
     }
   }
 

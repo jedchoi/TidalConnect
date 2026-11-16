@@ -90,11 +90,18 @@ class DlnaManager {
     return await _soapClient.seek(targetControlUrl, relTime);
   }
 
-  final ValueNotifier<int> volumeNotifier = ValueNotifier(50);
+  /// 선택된 스피커의 현재 볼륨(0~100)을 읽는다. 읽지 못하면 null.
+  Future<int?> fetchVolume() async {
+    final device = selectedDevice;
+    if (device.isLocalSpeaker) return null;
+    final targetRenderingUrl = device.renderingControlUrl.isNotEmpty ? device.renderingControlUrl : device.locationUrl;
+    if (targetRenderingUrl.isEmpty) return null;
+    final volume = await _soapClient.getVolume(targetRenderingUrl);
+    return volume?.clamp(0, 100);
+  }
 
   Future<bool> setVolume(int volumePercent) async {
     final clamped = volumePercent.clamp(0, 100);
-    volumeNotifier.value = clamped;
 
     final device = selectedDevice;
     if (device.isLocalSpeaker) return true;
