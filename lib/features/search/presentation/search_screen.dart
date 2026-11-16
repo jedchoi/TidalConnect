@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/error_retry_view.dart';
 import '../../player/data/player_manager.dart';
 import '../../tidal_api/data/tidal_api_client.dart';
 import '../../tidal_api/domain/models/media_item.dart';
@@ -28,6 +29,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Timer? _debounce;
   bool _isSearching = false;
   List<MediaTrack> _searchTracks = [];
+  String? _searchError;
 
   @override
   void initState() {
@@ -102,13 +104,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       return;
     }
     _saveSearchHistory(query);
-    setState(() => _isSearching = true);
+    setState(() {
+      _isSearching = true;
+      _searchError = null;
+    });
     try {
       final tracks = await _apiClient.searchTracks(query);
       if (mounted) {
         setState(() => _searchTracks = tracks);
       }
-    } catch (_) {
+    } catch (e) {
+      if (mounted) {
+        setState(() => _searchError = e is ApiFailure ? e.message : '검색하지 못했습니다.');
+      }
     } finally {
       if (mounted) {
         setState(() => _isSearching = false);
@@ -233,6 +241,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Widget _buildSearchResults() {
+    if (_searchError != null) {
+      return ErrorRetryView(message: _searchError!, onRetry: () => _performSearch(_searchController.text));
+    }
     if (_searchTracks.isEmpty) {
       return const Center(
         child: Text(

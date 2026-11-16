@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/error_retry_view.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../player/data/player_manager.dart';
 import '../../player/presentation/mini_player_widget.dart';
@@ -22,6 +23,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
   PlayerManager get _playerManager => ref.read(playerManagerProvider);
 
   bool _isLoading = true;
+  String? _errorMessage;
   List<MediaTrack> _tracks = [];
 
   @override
@@ -31,7 +33,10 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
   }
 
   Future<void> _loadAlbumTracks() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     try {
       final tracks = await _apiClient.getAlbumTracks(widget.album.id);
       if (mounted) {
@@ -42,7 +47,12 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
       }
     } catch (e) {
       AppLogger.log('ALBUM_DETAIL', '앨범 트랙 로딩 오류: $e', type: LogType.error);
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = e is ApiFailure ? e.message : '앨범 트랙을 불러오지 못했습니다.';
+        });
+      }
     }
   }
 
@@ -72,7 +82,9 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
       bottomNavigationBar: const MiniPlayerWidget(autoStartDiscovery: false, useSafeArea: true),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.cyanAccent))
-          : CustomScrollView(
+          : _errorMessage != null
+              ? ErrorRetryView(message: _errorMessage!, onRetry: _loadAlbumTracks)
+              : CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(
                   child: Padding(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/error_retry_view.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../favorites/presentation/album_detail_screen.dart';
 import '../../favorites/presentation/playlist_artwork_widget.dart';
@@ -22,6 +23,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
   PlayerManager get _playerManager => ref.read(playerManagerProvider);
 
   bool _isLoading = true;
+  String? _errorMessage;
   List<MediaAlbum> _featuredAlbums = [];
   List<MediaPlaylist> _featuredPlaylists = [];
   List<MediaTrack> _featuredTracks = [];
@@ -33,7 +35,10 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
   }
 
   Future<void> _loadExploreData() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     try {
       final results = await Future.wait([
         _apiClient.getFeaturedAlbums(),
@@ -51,7 +56,12 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
       }
     } catch (e) {
       AppLogger.log('EXPLORE', '추천 데이터 로딩 오류: $e', type: LogType.error);
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = e is ApiFailure ? e.message : '추천 목록을 불러오지 못했습니다.';
+        });
+      }
     }
   }
 
@@ -73,7 +83,9 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.cyanAccent))
-          : RefreshIndicator(
+          : _errorMessage != null
+              ? ErrorRetryView(message: _errorMessage!, onRetry: _loadExploreData)
+              : RefreshIndicator(
               onRefresh: _loadExploreData,
               color: AppColors.cyanAccent,
               child: ListView(

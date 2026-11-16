@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/error_retry_view.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../player/data/player_manager.dart';
 import '../../player/presentation/mini_player_widget.dart';
@@ -23,6 +24,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
   PlayerManager get _playerManager => ref.read(playerManagerProvider);
 
   bool _isLoading = true;
+  String? _errorMessage;
   List<MediaTrack> _tracks = [];
 
   @override
@@ -32,7 +34,10 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
   }
 
   Future<void> _loadPlaylistTracks() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     try {
       final tracks = await _apiClient.getPlaylistTracks(widget.playlist.id);
       if (mounted) {
@@ -43,7 +48,12 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
       }
     } catch (e) {
       AppLogger.log('PLAYLIST_DETAIL', '플레이리스트 트랙 로딩 오류: $e', type: LogType.error);
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = e is ApiFailure ? e.message : '플레이리스트 트랙을 불러오지 못했습니다.';
+        });
+      }
     }
   }
 
@@ -75,7 +85,9 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
       bottomNavigationBar: const MiniPlayerWidget(autoStartDiscovery: false, useSafeArea: true),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.cyanAccent))
-          : CustomScrollView(
+          : _errorMessage != null
+              ? ErrorRetryView(message: _errorMessage!, onRetry: _loadPlaylistTracks)
+              : CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(
                   child: Padding(
