@@ -5,6 +5,7 @@ import '../../dlna/data/dlna_manager.dart';
 import '../../tidal_api/domain/models/media_item.dart';
 import '../data/player_manager.dart';
 import 'now_playing_screen.dart';
+import 'speaker_selector_modal.dart';
 
 class MiniPlayerWidget extends StatefulWidget {
   final bool autoStartDiscovery;
@@ -168,76 +169,9 @@ class _MiniPlayerWidgetState extends State<MiniPlayerWidget> {
   }
 
   void _showSpeakerSelectorModal(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.surfaceCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) {
-        return ValueListenableBuilder<List<DlnaDevice>>(
-          valueListenable: _dlnaManager.devicesNotifier,
-          builder: (context, devices, child) {
-            return Container(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        '오디오 재생 출력 기기 선택',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.refresh, color: AppColors.cyanAccent),
-                        onPressed: () => _dlnaManager.discoverDevices(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Flexible(
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: devices.length,
-                      itemBuilder: (context, index) {
-                        final device = devices[index];
-                        final isSelected = device.udn == _dlnaManager.selectedDevice.udn;
-                        return ListTile(
-                          leading: Icon(
-                            device.isLocalSpeaker ? Icons.phone_android : Icons.speaker,
-                            color: isSelected ? AppColors.cyanAccent : Colors.white70,
-                          ),
-                          title: Text(
-                            device.friendlyName,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                            ),
-                          ),
-                          subtitle: Text(
-                            device.isLocalSpeaker ? '스마트폰 내장 스피커' : device.locationUrl,
-                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                          ),
-                          trailing: isSelected
-                              ? const Icon(Icons.check_circle, color: AppColors.cyanAccent)
-                              : null,
-                          onTap: () {
-                            _dlnaManager.selectDevice(device);
-                            Navigator.pop(context);
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+    SpeakerSelectorModal.show(
+      context,
+      onSelectDevice: (device) => _playerManager.switchPlaybackDevice(device),
     );
   }
 }

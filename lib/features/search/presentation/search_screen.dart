@@ -275,14 +275,36 @@ class _SearchScreenState extends State<SearchScreen> {
                         )
                       : const Icon(Icons.music_note, color: AppColors.cyanAccent),
                 ),
-                title: Text(
-                  track.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: isCurrent ? AppColors.cyanAccent : Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        track.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: isCurrent ? AppColors.cyanAccent : Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: track.isMax ? Colors.amber.withOpacity(0.2) : AppColors.surfaceLight,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        track.qualityBadgeText,
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          color: track.isMax ? Colors.amberAccent : AppColors.cyanAccent,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 subtitle: Text(
                   '${track.artistName} • ${track.albumTitle}',
@@ -299,12 +321,14 @@ class _SearchScreenState extends State<SearchScreen> {
                     if (isCurrent) {
                       _playerManager.togglePlayPause();
                     } else {
-                      _playerManager.playTrack(track);
+                      final idx = _searchTracks.indexOf(track);
+                      _playerManager.playTrack(track, queue: _searchTracks, index: idx != -1 ? idx : 0);
                     }
                   },
                 ),
                 onTap: () {
-                  _playerManager.playTrack(track);
+                  final idx = _searchTracks.indexOf(track);
+                  _playerManager.playTrack(track, queue: _searchTracks, index: idx != -1 ? idx : 0);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('"${track.title}" 재생을 시작합니다.'),

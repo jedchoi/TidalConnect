@@ -338,14 +338,36 @@ class _MyCollectionScreenState extends State<MyCollectionScreen> {
                             ? Image.network(track.coverUrl, width: 44, height: 44, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.music_note, color: AppColors.cyanAccent))
                             : const Icon(Icons.music_note, color: AppColors.cyanAccent),
                       ),
-                      title: Text(
-                        track.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: isCurrent ? AppColors.cyanAccent : Colors.white,
-                        ),
+                      title: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              track.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: isCurrent ? AppColors.cyanAccent : Colors.white,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: track.isMax ? Colors.amber.withOpacity(0.2) : AppColors.surfaceLight,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              track.qualityBadgeText,
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                color: track.isMax ? Colors.amberAccent : AppColors.cyanAccent,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       subtitle: Text(
                         '${track.artistName} • ${track.albumTitle}',
@@ -362,12 +384,14 @@ class _MyCollectionScreenState extends State<MyCollectionScreen> {
                           if (isCurrent) {
                             _playerManager.togglePlayPause();
                           } else {
-                            _playerManager.playTrack(track);
+                            final idx = _tracks.indexOf(track);
+                            _playerManager.playTrack(track, queue: _tracks, index: idx != -1 ? idx : 0);
                           }
                         },
                       ),
                       onTap: () {
-                        _playerManager.playTrack(track);
+                        final idx = _tracks.indexOf(track);
+                        _playerManager.playTrack(track, queue: _tracks, index: idx != -1 ? idx : 0);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text('"${track.title}" 재생을 시작합니다.'),

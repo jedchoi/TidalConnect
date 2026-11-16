@@ -94,21 +94,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _runDeviceDiscovery() async {
-    final devices = await _dlnaManager.discoverDevices();
-    if (!mounted) return;
-
-    final remoteDevices = devices.where((d) => !d.isLocalSpeaker).toList();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          remoteDevices.isEmpty
-              ? 'Wi-Fi 네트워크에서 발견된 DLNA 스피커가 없습니다. "실시간 네트워크 로그"에서 UDP 수신을 확인하세요.'
-              : '${remoteDevices.length}개의 DLNA 스피커를 발견했습니다: ${remoteDevices.map((d) => "${d.friendlyName} (${d.locationUrl})").join(', ')}',
-        ),
-        backgroundColor: AppColors.surfaceCard,
-        duration: const Duration(seconds: 4),
-      ),
-    );
+    // 설정 화면의 ValueListenableBuilder가 실시간으로 목록을 갱신하므로 불필요한 UI 모달이나 SnackBar를 띄우지 않습니다.
+    await _dlnaManager.discoverDevices();
   }
 
   @override
@@ -210,10 +197,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           height: 24,
                           child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.cyanAccent),
                         )
-                      : IconButton(
-                          icon: const Icon(Icons.refresh, color: AppColors.cyanAccent),
-                          onPressed: _runDeviceDiscovery,
-                        ),
+                      : const Icon(Icons.refresh, color: AppColors.cyanAccent),
+                  onTap: isSearching ? null : _runDeviceDiscovery,
                 ),
               );
             },

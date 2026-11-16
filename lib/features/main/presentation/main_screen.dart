@@ -7,6 +7,9 @@ import '../../player/presentation/mini_player_widget.dart';
 import '../../dlna/data/dlna_manager.dart';
 import '../../../core/theme/app_colors.dart';
 
+import '../../volume/data/hardware_volume_service.dart';
+import '../../player/data/player_manager.dart';
+
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
@@ -16,6 +19,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
+  final HardwareVolumeService _volumeService = HardwareVolumeService();
 
   final List<Widget> _screens = const [
     MyCollectionScreen(),
@@ -29,6 +33,17 @@ class _MainScreenState extends State<MainScreen> {
     super.initState();
     // 앱 시작 시 주변 DLNA 스피커 자동 검색 및 목록 구성
     DlnaManager.instance.discoverDevices();
+
+    // 물리 볼륨 키 리스너 등록 -> PlayerManager 통합 볼륨 제어
+    _volumeService.listenPhysicalVolumeKeys((volumePercent) {
+      PlayerManager.instance.setVolume(volumePercent);
+    });
+  }
+
+  @override
+  void dispose() {
+    _volumeService.dispose();
+    super.dispose();
   }
 
   @override
