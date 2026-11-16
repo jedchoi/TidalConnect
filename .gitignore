@@ -7,3 +7,14 @@
 .packages
 .pub/
 build/
+
+# IDE / OS / 도구 생성물
+.idea/
+*.iml
+.DS_Store
+.kotlin/
+.flutter-plugins-dependencies
+.flutter-plugins
+.dartServer/
+.dart-tool/
+.superpowers/
