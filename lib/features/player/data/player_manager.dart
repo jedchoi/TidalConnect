@@ -22,6 +22,8 @@ class PlayerManager {
   void configure({required TidalAuthRepository authRepository}) {
     _authRepo = authRepository;
     _dlnaManager.selectedDeviceNotifier.addListener(_onOutputDeviceChanged);
+    HardwareVolumeService.setShowSystemUI(_dlnaManager.selectedDevice.isLocalSpeaker);
+    syncVolumeFromDevice();
   }
 
   /// 원격 스피커의 실제 볼륨을 읽기 전에는 SetVolume을 보내지 않는다(볼륨 급변 방지).
@@ -29,6 +31,7 @@ class PlayerManager {
 
   void _onOutputDeviceChanged() {
     _remoteVolumeKnown = false;
+    HardwareVolumeService.setShowSystemUI(_dlnaManager.selectedDevice.isLocalSpeaker);
     syncVolumeFromDevice();
   }
 
@@ -187,18 +190,29 @@ class PlayerManager {
 
   static const int remoteVolumeStep = 2;
 
-  void setVolume(int volumePercent) {
+  DateTime _lastRemoteVolumeSentAt = DateTime.fromMillisecondsSinceEpoch(0);
+  static const _remoteVolumeInterval = Duration(milliseconds: 200);
+
+  /// 볼륨 설정 (0~100).
+  ///
+  /// 폰 출력이면 폰 미디어 볼륨을 바꾼다. 스피커 출력이면 슬라이더를 끄는 동안
+  /// 200ms에 한 번만 보내고, [isFinal]이 true(손을 뗐을 때)면 마지막 값을 반드시 보낸다.
+  void setVolume(int volumePercent, {bool isFinal = true}) {
     final clamped = volumePercent.clamp(0, 100);
-    if (!_dlnaManager.selectedDevice.isLocalSpeaker) {
-      if (!_remoteVolumeKnown) {
-        syncVolumeFromDevice();
-        return;
-      }
+    if (_dlnaManager.selectedDevice.isLocalSpeaker) {
       volumeNotifier.value = clamped;
-      _dlnaManager.setVolume(clamped);
-    } else {
-      volumeNotifier.value = clamped;
+      HardwareVolumeService.setPhoneVolume(clamped);
+      return;
     }
+    if (!_remoteVolumeKnown) {
+      syncVolumeFromDevice();
+      return;
+    }
+    volumeNotifier.value = clamped;
+    final now = DateTime.now();
+    if (!isFinal && now.difference(_lastRemoteVolumeSentAt) < _remoteVolumeInterval) return;
+    _lastRemoteVolumeSentAt = now;
+    _dlnaManager.setVolume(clamped);
   }
 
   /// 곡 재생. 현재 선택된 출력 기기에 따라 TIDAL SDK(폰) 또는 DLNA로 라우팅.

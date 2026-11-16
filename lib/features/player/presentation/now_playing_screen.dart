@@ -316,7 +316,10 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                                 activeColor: AppColors.cyanAccent,
                                 inactiveColor: AppColors.surfaceLight,
                                 onChanged: (val) {
-                                  _playerManager.setVolume(val.toInt());
+                                  _playerManager.setVolume(val.round(), isFinal: false);
+                                },
+                                onChangeEnd: (val) {
+                                  _playerManager.setVolume(val.round());
                                 },
                               ),
                             ),
