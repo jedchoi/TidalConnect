@@ -66,6 +66,8 @@ class TidalStreamProxyServer(val boundHost: String) : NanoHTTPD(boundHost, PROXY
         val manifestXml: String = "",
         /** 이 주소에 접근할 수 있는 스피커 IP. 비어 있으면 제한하지 않는다. */
         val allowedHost: String = "",
+        /** 실제 오디오 MIME. DASH는 fMP4이므로 audio/mp4. */
+        val mimeType: String = "audio/mp4",
     )
 
     // 토큰 -> 곡 정보. 최근 MAX_REGISTERED곡만 남긴다(삽입 순서 유지).
@@ -79,13 +81,28 @@ class TidalStreamProxyServer(val boundHost: String) : NanoHTTPD(boundHost, PROXY
      * 곡을 등록하고 스피커가 접근할 주소를 돌려준다.
      * 예: http://192.168.0.10:8765/audio/3f9c0a1b2d4e5f60.mp4
      */
-    fun registerTrackStream(trackId: String, directUrl: String, manifestXml: String, allowedHost: String): String {
+    fun registerTrackStream(
+        trackId: String,
+        directUrl: String,
+        manifestXml: String,
+        allowedHost: String,
+        mimeType: String,
+    ): String {
         val token = newToken()
+        val mime = if (manifestXml.isNotEmpty() && directUrl.isEmpty()) "audio/mp4" else mimeType.ifEmpty { "audio/mp4" }
         synchronized(streamRegistry) {
-            streamRegistry[token] = StreamInfo(trackId, directUrl, manifestXml, allowedHost)
+            streamRegistry[token] = StreamInfo(trackId, directUrl, manifestXml, allowedHost, mime)
         }
-        Log.i(TAG, "트랙 스트림 등록: TrackID=$trackId, direct=${directUrl.isNotEmpty()}, manifestLen=${manifestXml.length}")
-        return "http://$boundHost:$PROXY_PORT/audio/$token.mp4"
+        Log.i(TAG, "트랙 스트림 등록: TrackID=$trackId, mime=$mime, direct=${directUrl.isNotEmpty()}")
+        return "http://$boundHost:$PROXY_PORT/audio/$token.${extensionFor(mime)}"
+    }
+
+    /** 렌더러가 확장자로 형식을 추측하는 경우가 있어 MIME에 맞는 확장자를 붙인다. */
+    private fun extensionFor(mime: String): String = when {
+        mime.contains("flac") -> "flac"
+        mime.contains("mp4") || mime.contains("m4a") || mime.contains("aac") -> "m4a"
+        mime.contains("mpeg") -> "mp3"
+        else -> "m4a"
     }
 
     private fun newToken(): String {
@@ -124,9 +141,11 @@ class TidalStreamProxyServer(val boundHost: String) : NanoHTTPD(boundHost, PROXY
         }
         val trackId = info.trackId
 
+        if (session.method == Method.HEAD) return headResponse(info)
+
         return if (info.directUrl.isNotEmpty()) {
             Log.i(TAG, "🚀 Direct CDN 스트림 중계 시작: TrackID=$trackId")
-            proxyDirectCdn(session, info.directUrl)
+            proxyDirectCdn(session, info.directUrl, info.mimeType)
         } else {
             Log.i(TAG, "🚀 DASH 매니페스트 세그먼트 중계 시작: TrackID=$trackId")
             proxyDashManifest(session, info.manifestXml)
@@ -136,7 +155,27 @@ class TidalStreamProxyServer(val boundHost: String) : NanoHTTPD(boundHost, PROXY
     /**
      * TIDAL Direct CDN URL을 스피커로 투명하게 릴레이 (Range 및 Content-Type 완벽 지원)
      */
-    private fun proxyDirectCdn(session: IHTTPSession, cdnUrl: String): Response {
+    /** HEAD 요청에는 본문 없이 형식과 길이만 알려준다. */
+    private fun headResponse(info: StreamInfo): Response {
+        var length = -1L
+        if (info.directUrl.isNotEmpty()) {
+            try {
+                httpClient.newCall(Request.Builder().url(info.directUrl).head().build()).execute().use {
+                    length = it.header("Content-Length")?.toLongOrNull() ?: -1L
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "HEAD 길이 조회 실패: ${e.message}")
+            }
+        }
+        // 본문은 보내지 않지만 Content-Length는 실제 파일 길이로 알린다.
+        val response = newFixedLengthResponse(
+            Response.Status.OK, info.mimeType, java.io.ByteArrayInputStream(ByteArray(0)), length.coerceAtLeast(0)
+        )
+        if (info.directUrl.isNotEmpty()) response.addHeader("Accept-Ranges", "bytes")
+        return response
+    }
+
+    private fun proxyDirectCdn(session: IHTTPSession, cdnUrl: String, mimeType: String): Response {
         if (cdnUrl.isEmpty()) {
             return newFixedLengthResponse(Response.Status.BAD_REQUEST, "text/plain", "CDN URL required")
         }
@@ -158,7 +197,8 @@ class TidalStreamProxyServer(val boundHost: String) : NanoHTTPD(boundHost, PROXY
                 return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "CDN error: ${response.code}")
             }
 
-            val contentType = response.header("Content-Type") ?: "audio/mp4"
+            // CDN이 octet-stream으로 보내는 경우가 있어 등록된 MIME을 우선한다.
+            val contentType = mimeType.ifEmpty { response.header("Content-Type") ?: "audio/mp4" }
             val contentLength = response.header("Content-Length")?.toLongOrNull() ?: -1L
             val contentRange = response.header("Content-Range")
 

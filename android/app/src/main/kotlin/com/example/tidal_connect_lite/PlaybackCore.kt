@@ -222,13 +222,14 @@ object PlaybackCore {
                 val directUrl = call.argument<String>("directUrl") ?: ""
                 val manifestXml = call.argument<String>("manifestXml") ?: ""
                 val allowedHost = call.argument<String>("allowedHost") ?: ""
+                val mimeType = call.argument<String>("mimeType") ?: "audio/mp4"
 
                 val server = ensureProxyServer()
                 if (server == null) {
                     result.error("NO_WIFI", "Wi-Fi에 연결되어 있지 않아 스피커로 스트리밍할 수 없습니다.", null)
                     return
                 }
-                val shortUrl = server.registerTrackStream(trackId, directUrl, manifestXml, allowedHost)
+                val shortUrl = server.registerTrackStream(trackId, directUrl, manifestXml, allowedHost, mimeType)
                 Log.i("PROXY", "registerTrackStream: TrackID=$trackId")
                 result.success(mapOf("proxyUrl" to shortUrl))
             }

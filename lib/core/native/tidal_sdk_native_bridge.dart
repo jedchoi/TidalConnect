@@ -240,6 +240,7 @@ class TidalSdkNativeBridge {
     String directUrl = '',
     String manifestXml = '',
     required String allowedHost,
+    String mimeType = 'audio/mp4',
   }) async {
     try {
       final result = await _channel.invokeMethod<Map>('registerTrackStream', {
@@ -247,6 +248,7 @@ class TidalSdkNativeBridge {
         'directUrl': directUrl,
         'manifestXml': manifestXml,
         'allowedHost': allowedHost,
+        'mimeType': mimeType,
       });
       final proxyUrl = result?['proxyUrl']?.toString() ?? '';
       AppLogger.log('TIDAL_NATIVE_SDK', 'DLNA 프록시 등록 완료', type: LogType.success);

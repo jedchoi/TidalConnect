@@ -67,6 +67,7 @@ class DlnaBackend implements PlaybackBackend {
       directUrl: info.streamUrl,
       manifestXml: info.manifest,
       allowedHost: Uri.tryParse(device.locationUrl)?.host ?? '',
+      mimeType: info.mimeType,
     );
     if (isCancelled()) return;
     if (proxyUrl.isEmpty) {
