@@ -181,9 +181,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             },
           ),
           const SizedBox(height: 8),
-          ValueListenableBuilder<List<dynamic>>(
-            valueListenable: _dlnaManager.devicesNotifier,
-            builder: (context, devices, child) {
+          ListenableBuilder(
+            listenable: Listenable.merge([_dlnaManager.devicesNotifier, _dlnaManager.selectedDeviceNotifier]),
+            builder: (context, child) {
+              final devices = _dlnaManager.devices;
               return Column(
                 children: devices.map((device) {
                   final isSelected = device.udn == _dlnaManager.selectedDevice.udn;
@@ -214,9 +215,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 side: const BorderSide(color: AppColors.cyanAccent),
                               ),
                               onPressed: () {
-                                setState(() {
-                                  _dlnaManager.selectDevice(device);
-                                });
+                                // 재생 중이면 새 기기로 이어서 재생하도록 PlayerManager를 거친다.
+                                PlayerManager.instance.switchPlaybackDevice(device);
                               },
                               child: const Text('선택'),
                             ),

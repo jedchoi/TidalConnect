@@ -167,6 +167,7 @@ class PlayerManager {
 
   Future<bool> _start(MediaTrack track, {Duration startPosition = Duration.zero}) async {
     final seq = ++_requestSeq;
+    _pendingResumePosition = null;
     bool isCancelled() => seq != _requestSeq;
 
     currentTrackNotifier.value = track;
@@ -239,6 +240,12 @@ class PlayerManager {
   Future<void> resume() async {
     final track = currentTrack;
     if (track == null) return;
+    final pending = _pendingResumePosition;
+    if (pending != null) {
+      _pendingResumePosition = null;
+      await _start(track, startPosition: pending);
+      return;
+    }
     try {
       await _backend.resume();
       isPlayingNotifier.value = true;
@@ -340,12 +347,24 @@ class PlayerManager {
 
     final track = currentTrack;
     final wasPlaying = isPlaying;
+    final position = Duration(seconds: progressSecondsNotifier.value);
+    _requestSeq++; // 이전 기기로 진행 중이던 재생 요청 취소
     await _backend.stop();
     _dlnaManager.selectDevice(newDevice);
-    if (wasPlaying && track != null) {
-      await _start(track);
+    if (track == null) return;
+    if (wasPlaying) {
+      // 같은 위치에서 새 기기로 이어서 재생
+      await _start(track, startPosition: position);
+    } else {
+      // 일시정지 중 전환: 다음 재생 때 새 기기에 곡을 다시 올린다.
+      _pendingResumePosition = position;
+      isPlayingNotifier.value = false;
+      progressSecondsNotifier.value = position.inSeconds;
     }
   }
+
+  /// 일시정지 중 출력 기기를 바꿨을 때, 다음 재생에서 이어갈 위치.
+  Duration? _pendingResumePosition;
 
   // ──────────────────────────────────────────────
   // 볼륨
