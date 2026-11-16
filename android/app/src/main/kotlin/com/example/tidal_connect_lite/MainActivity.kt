@@ -45,11 +45,15 @@ class MainActivity : FlutterActivity() {
                 "updateUserCredentials" -> {
                     val userId = call.argument<String>("userId") ?: ""
                     val accessToken = call.argument<String>("accessToken") ?: ""
-                    val expiresInSeconds = (call.argument<Int>("expiresInSeconds") ?: 86400).toLong()
+                    val expiresInSeconds = (call.argument<Number>("expiresInSeconds") ?: 3600).toLong()
 
                     authManager.updateUserCredentials(userId, accessToken, expiresInSeconds)
                     Log.i("TIDAL_NATIVE_SDK", "updateUserCredentials 호출됨 (UserId: $userId, Token length: ${accessToken.length})")
                     result.success(mapOf("status" to "updated", "userId" to userId))
+                }
+                "clearUserCredentials" -> {
+                    authManager.clearUserCredentials()
+                    result.success(mapOf("status" to "cleared"))
                 }
                 "authenticateUser" -> {
                     CoroutineScope(Dispatchers.Main).launch {
