@@ -141,12 +141,23 @@ class TidalAuthRepository {
     return (await _getClientToken())?.accessToken;
   }
 
-  Future<void> _ensureLoaded() async {
+  /// 저장소에서 토큰을 한 번만 읽는다. 동시에 여러 곳에서 불러도 같은 읽기를 기다린다
+  /// (먼저 끝난 호출이 아직 복원되지 않은 상태를 '로그아웃'으로 오해하지 않도록).
+  Future<void> _ensureLoaded() {
+    if (_loaded) return Future.value();
+    return _loading ??= _load().whenComplete(() => _loading = null);
+  }
+
+  Future<void>? _loading;
+
+  Future<void> _load() async {
+    await _storageService.migrateLegacyToken();
+    final client = await _storageService.getClientToken();
+    final stored = await _storageService.getUserToken();
+    // 읽는 사이 로그인·로그아웃으로 상태가 정해졌으면 저장소 값으로 덮어쓰지 않는다.
     if (_loaded) return;
     _loaded = true;
-    await _storageService.migrateLegacyToken();
-    _clientToken = await _storageService.getClientToken();
-    final stored = await _storageService.getUserToken();
+    _clientToken ??= client;
     if (stored == null) {
       AppLogger.log('TIDAL_AUTH', '저장된 사용자 토큰 없음 (로그인 필요)', type: LogType.warning);
       return;
