@@ -61,20 +61,6 @@ class TidalStreamProxyServer : NanoHTTPD(PROXY_PORT) {
             val cleanId = trackId.ifEmpty { "current" }
             return "http://$lanIp:$PROXY_PORT/audio/$cleanId.mp4"
         }
-
-        @Deprecated("Use buildShortAudioUrl")
-        fun buildProxyUrl(tidalStreamUrl: String): String {
-            val lanIp = getLanIpAddress()
-            val encoded = java.net.URLEncoder.encode(tidalStreamUrl, "UTF-8")
-            return "http://$lanIp:$PROXY_PORT/stream?url=$encoded"
-        }
-
-        @Deprecated("Use buildShortAudioUrl")
-        fun buildDashProxyUrl(manifestXml: String): String {
-            val lanIp = getLanIpAddress()
-            val encoded = java.net.URLEncoder.encode(manifestXml, "UTF-8")
-            return "http://$lanIp:$PROXY_PORT/dash_stream?manifest=$encoded"
-        }
     }
 
     private val httpClient = OkHttpClient.Builder()
@@ -97,16 +83,6 @@ class TidalStreamProxyServer : NanoHTTPD(PROXY_PORT) {
         Log.i(TAG, "🎵 트랙 스트림 등록 완료: ID=$id, directUrl=${directUrl.take(40)}..., manifestLen=${manifestXml.length}")
     }
 
-    fun setCurrentStreamUrl(url: String) {
-        streamRegistry["current"] = StreamInfo(directUrl = url)
-        Log.i(TAG, "프록시 대상 Direct URL 설정: $url")
-    }
-
-    fun setCurrentManifest(manifest: String) {
-        streamRegistry["current"] = StreamInfo(manifestXml = manifest)
-        Log.i(TAG, "프록시 대상 DASH 매니페스트 설정 (${manifest.length}자)")
-    }
-
     override fun serve(session: IHTTPSession): Response {
         val uri = session.uri
         val method = session.method
@@ -115,8 +91,6 @@ class TidalStreamProxyServer : NanoHTTPD(PROXY_PORT) {
 
         return when {
             uri.startsWith("/audio/") -> handleAudioRequest(session, uri)
-            uri == "/stream"           -> handleLegacyStreamRequest(session)
-            uri == "/dash_stream"      -> handleLegacyDashRequest(session)
             uri == "/ping"             -> newFixedLengthResponse(Response.Status.OK, "text/plain", "pong")
             else                       -> newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Not Found")
         }
@@ -127,7 +101,7 @@ class TidalStreamProxyServer : NanoHTTPD(PROXY_PORT) {
      */
     private fun handleAudioRequest(session: IHTTPSession, uri: String): Response {
         val trackId = uri.removePrefix("/audio/").removeSuffix(".mp4").ifEmpty { lastTrackId }
-        val info = streamRegistry[trackId] ?: streamRegistry[lastTrackId] ?: streamRegistry["current"]
+        val info = streamRegistry[trackId] ?: streamRegistry[lastTrackId]
 
         if (info == null || (info.directUrl.isEmpty() && info.manifestXml.isEmpty())) {
             Log.e(TAG, "등록된 트랙 음원 정보 없음: ID=$trackId")
@@ -141,20 +115,6 @@ class TidalStreamProxyServer : NanoHTTPD(PROXY_PORT) {
             Log.i(TAG, "🚀 DASH 매니페스트 세그먼트 중계 시작: TrackID=$trackId")
             proxyDashManifest(session, info.manifestXml)
         }
-    }
-
-    private fun handleLegacyStreamRequest(session: IHTTPSession): Response {
-        val url = session.parameters["url"]?.firstOrNull()?.let {
-            java.net.URLDecoder.decode(it, "UTF-8")
-        } ?: streamRegistry["current"]?.directUrl ?: ""
-        return proxyDirectCdn(session, url)
-    }
-
-    private fun handleLegacyDashRequest(session: IHTTPSession): Response {
-        val manifest = session.parameters["manifest"]?.firstOrNull()?.let {
-            java.net.URLDecoder.decode(it, "UTF-8")
-        } ?: streamRegistry["current"]?.manifestXml ?: ""
-        return proxyDashManifest(session, manifest)
     }
 
     /**

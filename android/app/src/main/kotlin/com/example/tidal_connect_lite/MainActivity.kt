@@ -133,24 +133,6 @@ class MainActivity : FlutterActivity() {
                     Log.i("PROXY", "✅ registerTrackStream: TrackID=$trackId → Short URL: $shortUrl")
                     result.success(mapOf("proxyUrl" to shortUrl))
                 }
-                "buildProxyUrl" -> {
-                    val tidalStreamUrl = call.argument<String>("tidalStreamUrl") ?: ""
-                    if (tidalStreamUrl.isNotEmpty()) {
-                        proxyServer?.setCurrentStreamUrl(tidalStreamUrl)
-                    }
-                    val proxyUrl = TidalStreamProxyServer.buildShortAudioUrl("current")
-                    Log.i("PROXY", "buildProxyUrl: $tidalStreamUrl → $proxyUrl")
-                    result.success(mapOf("proxyUrl" to proxyUrl))
-                }
-                "buildDashProxyUrl" -> {
-                    val manifestXml = call.argument<String>("manifestXml") ?: ""
-                    if (manifestXml.isNotEmpty()) {
-                        proxyServer?.setCurrentManifest(manifestXml)
-                    }
-                    val proxyUrl = TidalStreamProxyServer.buildShortAudioUrl("current")
-                    Log.i("PROXY", "buildDashProxyUrl: (${manifestXml.length}자) → $proxyUrl")
-                    result.success(mapOf("proxyUrl" to proxyUrl))
-                }
                 "getProxyServerStatus" -> {
                     val isAlive = proxyServer?.isAlive ?: false
                     val lanIp = TidalStreamProxyServer.getLanIpAddress()

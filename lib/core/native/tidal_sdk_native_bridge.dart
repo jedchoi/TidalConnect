@@ -226,39 +226,6 @@ class TidalSdkNativeBridge {
     }
   }
 
-  /// TIDAL CDN signed URL을 Android 로컬 프록시 URL로 변환합니다.
-  /// DLNA 스피커는 이 프록시 URL을 통해 스트림에 접근합니다.
-  /// 반환값 예: "http://192.168.45.100:8765/stream?url=https%3A%2F%2F..."
-  static Future<String> buildProxyUrl(String tidalStreamUrl) async {
-    try {
-      final result = await _channel.invokeMethod<Map>('buildProxyUrl', {
-        'tidalStreamUrl': tidalStreamUrl,
-      });
-      final proxyUrl = result?['proxyUrl']?.toString() ?? '';
-      AppLogger.log('TIDAL_NATIVE_SDK', '프록시 URL 생성: $proxyUrl', type: LogType.info);
-      return proxyUrl;
-    } catch (e) {
-      AppLogger.log('TIDAL_NATIVE_SDK', '프록시 URL 생성 실패: $e', type: LogType.error);
-      return '';
-    }
-  }
-
-  /// MPEG-DASH MPD 매니페스트를 로컬 세그먼트 프록시 스트림 URL로 변환합니다.
-  /// 반환값 예: "http://192.168.45.100:8765/dash_stream?manifest=..."
-  static Future<String> buildDashProxyUrl(String manifestXml) async {
-    try {
-      final result = await _channel.invokeMethod<Map>('buildDashProxyUrl', {
-        'manifestXml': manifestXml,
-      });
-      final proxyUrl = result?['proxyUrl']?.toString() ?? '';
-      AppLogger.log('TIDAL_NATIVE_SDK', 'DASH 프록시 URL 생성: $proxyUrl', type: LogType.info);
-      return proxyUrl;
-    } catch (e) {
-      AppLogger.log('TIDAL_NATIVE_SDK', 'DASH 프록시 URL 생성 실패: $e', type: LogType.error);
-      return '';
-    }
-  }
-
   /// 로컬 프록시 서버 상태 조회
   static Future<Map<String, dynamic>> getProxyServerStatus() async {
     try {
