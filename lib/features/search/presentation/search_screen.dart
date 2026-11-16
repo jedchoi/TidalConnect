@@ -250,9 +250,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       itemCount: _searchTracks.length,
       itemBuilder: (context, index) {
         final track = _searchTracks[index];
-        return ValueListenableBuilder<MediaTrack?>(
-          valueListenable: _playerManager.currentTrackNotifier,
-          builder: (context, currentTrack, _) {
+        return ListenableBuilder(
+          // 현재 곡과 재생 상태가 바뀔 때마다 아이콘을 다시 그린다.
+          listenable: Listenable.merge([_playerManager.currentTrackNotifier, _playerManager.isPlayingNotifier]),
+          builder: (context, _) {
+            final currentTrack = _playerManager.currentTrack;
             final isCurrent = currentTrack?.id == track.id;
             return Card(
               color: isCurrent ? AppColors.cyanAccent.withOpacity(0.1) : AppColors.surfaceCard,

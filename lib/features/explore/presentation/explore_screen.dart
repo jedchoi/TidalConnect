@@ -230,9 +230,11 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                     const SizedBox(height: 12),
                     ...List.generate(_featuredTracks.length, (index) {
                       final track = _featuredTracks[index];
-                      return ValueListenableBuilder<MediaTrack?>(
-                        valueListenable: _playerManager.currentTrackNotifier,
-                        builder: (context, currentTrack, _) {
+                      return ListenableBuilder(
+                        // 현재 곡과 재생 상태가 바뀔 때마다 아이콘을 다시 그린다.
+                        listenable: Listenable.merge([_playerManager.currentTrackNotifier, _playerManager.isPlayingNotifier]),
+                        builder: (context, _) {
+                          final currentTrack = _playerManager.currentTrack;
                           final isCurrent = currentTrack?.id == track.id;
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 8),
