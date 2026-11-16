@@ -36,4 +36,19 @@ void main() {
     expect(local.isLocalSpeaker, true);
     expect(local.friendlyName, contains('스마트폰 내장 스피커'));
   });
+
+  test('SetNextAVTransportURI는 NextURI와 메타데이터를 담고, 빈 주소면 등록을 지운다', () {
+    final xml = UPnPSoapClient.buildSetNextAVTransportURIXml(
+      'http://192.168.0.10:8765/audio/next.flac?t=a&b=c',
+      DidlMetadata(title: 'Next', artist: 'A', album: 'B', albumArtUri: '', durationSeconds: 60, mimeType: 'audio/flac'),
+    );
+    expect(xml, contains('u:SetNextAVTransportURI'));
+    expect(xml, contains('<NextURI>http://192.168.0.10:8765/audio/next.flac?t=a&amp;b=c</NextURI>'));
+    expect(xml, contains('<NextURIMetaData>&lt;DIDL-Lite'));
+    expect(xml, isNot(contains('CurrentURI')));
+
+    final clear = UPnPSoapClient.buildSetNextAVTransportURIXml('', null);
+    expect(clear, contains('<NextURI></NextURI>'));
+    expect(clear, contains('<NextURIMetaData></NextURIMetaData>'));
+  });
 }

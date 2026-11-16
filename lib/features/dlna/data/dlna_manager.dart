@@ -127,8 +127,8 @@ class DlnaManager {
     return await _soapClient.setVolume(targetRenderingUrl, clamped);
   }
 
-  /// 스피커의 실제 재생 위치(초)와 전체 길이(초)를 가져옵니다.
-  Future<Map<String, int>?> syncPosition() async {
+  /// 스피커의 실제 재생 위치, 전체 길이, 재생 중인 주소를 가져옵니다.
+  Future<DlnaPosition?> syncPosition() async {
     final device = selectedDevice;
     if (device.isLocalSpeaker) return null;
 
@@ -136,12 +136,22 @@ class DlnaManager {
     if (targetControlUrl.isEmpty) return null;
 
     final info = await _soapClient.getPositionInfo(targetControlUrl);
-    if (info != null) {
-      final relSec = _parseDurationToSeconds(info['RelTime'] ?? '');
-      final durSec = _parseDurationToSeconds(info['TrackDuration'] ?? '');
-      return {'progress': relSec, 'duration': durSec};
-    }
-    return null;
+    if (info == null) return null;
+    return DlnaPosition(
+      progressSeconds: _parseDurationToSeconds(info['RelTime'] ?? ''),
+      durationSeconds: _parseDurationToSeconds(info['TrackDuration'] ?? ''),
+      trackUri: info['TrackURI'] ?? '',
+    );
+  }
+
+  /// 갭리스: 지금 곡 다음에 이어 재생할 주소를 스피커에 등록한다.
+  /// 렌더러가 지원하지 않으면(SOAP 오류) false. [streamUrl]이 비어 있으면 등록을 지운다.
+  Future<bool> setNextOnSelectedDevice({required String streamUrl, DidlMetadata? metadata}) async {
+    final device = selectedDevice;
+    if (device.isLocalSpeaker) return false;
+    final targetControlUrl = device.avTransportControlUrl.isNotEmpty ? device.avTransportControlUrl : device.locationUrl;
+    if (targetControlUrl.isEmpty) return false;
+    return _soapClient.setNextAVTransportURI(targetControlUrl, streamUrl, metadata);
   }
 
   /// 스피커의 전송 상태. 응답이 없으면 null.
@@ -236,4 +246,15 @@ class DlnaManager {
       messageNotifier.value = '"${current.friendlyName}"을(를) 찾지 못해 폰 스피커로 전환했습니다.';
     }
   }
+}
+
+/// GetPositionInfo 결과.
+class DlnaPosition {
+  final int progressSeconds;
+  final int durationSeconds;
+
+  /// 렌더러가 지금 재생 중인 주소. 갭리스로 다음 곡에 넘어갔는지 판단하는 데 쓴다.
+  final String trackUri;
+
+  const DlnaPosition({required this.progressSeconds, required this.durationSeconds, this.trackUri = ''});
 }

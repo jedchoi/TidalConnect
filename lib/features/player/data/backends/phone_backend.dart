@@ -70,6 +70,10 @@ class PhoneBackend implements PlaybackBackend {
   @override
   Future<void> setAudioQuality(String quality) => TidalSdkNativeBridge.setAudioQuality(quality);
 
+  /// SDK setNext로 다음 곡을 미리 불러 둔다. SDK가 넘어가면 transition 이벤트가 온다.
+  @override
+  Future<void> setNext(MediaTrack? track) => TidalSdkNativeBridge.setNextTrack(track?.id ?? '');
+
   @override
   Future<void> play(MediaTrack track, {Duration startPosition = Duration.zero, required IsCancelled isCancelled}) async {
     _currentTrackId = track.id;

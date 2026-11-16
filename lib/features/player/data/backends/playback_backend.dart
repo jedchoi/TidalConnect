@@ -93,6 +93,11 @@ abstract class PlaybackBackend {
 
   /// 스트리밍 음질(LOW, HIGH, LOSSLESS, HI_RES_LOSSLESS). 다음에 재생하는 곡부터 적용된다.
   Future<void> setAudioQuality(String quality);
+
+  /// 지금 곡이 끝나면 끊김 없이 이어 재생할 곡을 미리 등록한다(갭리스). null이면 등록을 지운다.
+  /// 출력 기기가 미리 등록한 곡으로 넘어가면 그 곡의 [BackendTrackStarted]를 보낸다.
+  /// 지원하지 않는 기기는 아무 일도 하지 않고, 곡이 끝나면 [BackendTrackEnded]를 보낸다.
+  Future<void> setNext(MediaTrack? track);
 }
 
 /// 실패를 화면에 보여줄 수 있는 메시지와 함께 전달하는 예외.

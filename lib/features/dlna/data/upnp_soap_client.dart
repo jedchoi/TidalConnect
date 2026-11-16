@@ -37,7 +37,26 @@ class UPnPSoapClient {
   }
 
   /// DIDL-Lite 메타데이터를 담아 SetAVTransportURI 요청을 만든다.
-  static String buildSetAVTransportURIXml(String streamUrl, DidlMetadata meta) {
+  static String buildSetAVTransportURIXml(String streamUrl, DidlMetadata meta) =>
+      _buildUriXml('SetAVTransportURI', 'CurrentURI', streamUrl, meta);
+
+  /// 갭리스용 다음 곡 등록. [streamUrl]이 비어 있으면 등록을 지운다.
+  static String buildSetNextAVTransportURIXml(String streamUrl, DidlMetadata? meta) =>
+      _buildUriXml('SetNextAVTransportURI', 'NextURI', streamUrl, meta);
+
+  static String _buildUriXml(String action, String uriTag, String streamUrl, DidlMetadata? meta) {
+    if (meta == null || streamUrl.isEmpty) {
+      return '''<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+  <s:Body>
+    <u:$action xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
+      <InstanceID>0</InstanceID>
+      <$uriTag>${_escapeXml(streamUrl)}</$uriTag>
+      <${uriTag}MetaData></${uriTag}MetaData>
+    </u:$action>
+  </s:Body>
+</s:Envelope>''';
+    }
     final escapedStreamUrl = _escapeXml(streamUrl);
     final title = _escapeXml(meta.title.isNotEmpty ? meta.title : 'Tidal Music');
     final mime = meta.mimeType.isNotEmpty ? meta.mimeType : '*';
@@ -68,11 +87,11 @@ class UPnPSoapClient {
     return '''<?xml version="1.0" encoding="utf-8"?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
   <s:Body>
-    <u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
+    <u:$action xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
       <InstanceID>0</InstanceID>
-      <CurrentURI>$escapedStreamUrl</CurrentURI>
-      <CurrentURIMetaData>$escapedMetaData</CurrentURIMetaData>
-    </u:SetAVTransportURI>
+      <$uriTag>$escapedStreamUrl</$uriTag>
+      <${uriTag}MetaData>$escapedMetaData</${uriTag}MetaData>
+    </u:$action>
   </s:Body>
 </s:Envelope>''';
   }
@@ -150,6 +169,15 @@ class UPnPSoapClient {
       controlUrl: controlUrl,
       soapAction: 'urn:schemas-upnp-org:service:AVTransport:1#SetAVTransportURI',
       xmlPayload: buildSetAVTransportURIXml(streamUrl, meta),
+    );
+  }
+
+  /// 렌더러가 SetNextAVTransportURI를 지원하지 않으면(SOAP 오류) false.
+  Future<bool> setNextAVTransportURI(String controlUrl, String streamUrl, DidlMetadata? meta) async {
+    return await _sendSoapRequest(
+      controlUrl: controlUrl,
+      soapAction: 'urn:schemas-upnp-org:service:AVTransport:1#SetNextAVTransportURI',
+      xmlPayload: buildSetNextAVTransportURIXml(streamUrl, meta),
     );
   }
 
@@ -259,7 +287,8 @@ class UPnPSoapClient {
         final xml = response.data.toString();
         final relTime = _extractXmlTag(xml, 'RelTime') ?? '00:00:00';
         final trackDuration = _extractXmlTag(xml, 'TrackDuration') ?? '00:00:00';
-        return {'RelTime': relTime, 'TrackDuration': trackDuration};
+        final trackUri = _extractXmlTag(xml, 'TrackURI') ?? '';
+        return {'RelTime': relTime, 'TrackDuration': trackDuration, 'TrackURI': trackUri};
       }
     } catch (_) {}
     return null;

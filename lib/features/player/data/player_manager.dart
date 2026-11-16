@@ -130,11 +130,17 @@ class PlayerManager {
         if (duration != null && duration > Duration.zero) {
           durationSecondsNotifier.value = duration.inSeconds;
         }
-      case BackendTrackStarted(:final duration, :final quality):
+      case BackendTrackStarted(:final trackId, :final duration, :final quality):
+        if (trackId != currentTrack?.id) {
+          // 미리 등록한 다음 곡으로 출력 기기가 스스로 넘어간 경우(갭리스). 다시 불러오지 않고 대기열만 옮긴다.
+          if (!_advanceToPreparedNext(trackId)) return;
+        }
+        _trackStarted = true;
         if (duration != null && duration > Duration.zero) {
           durationSecondsNotifier.value = duration.inSeconds;
         }
         if (quality != null) _updateQualityBadge(quality);
+        _prepareNext();
       case BackendTrackEnded(:final trackId):
         if (trackId.isEmpty || trackId == currentTrack?.id) _onTrackEnded();
       case BackendError(:final code, :final message):
@@ -143,6 +149,51 @@ class PlayerManager {
         isBufferingNotifier.value = false;
         _reportError(message);
     }
+  }
+
+  // ──────────────────────────────────────────────
+  // 갭리스: 다음 곡 미리 등록
+  // ──────────────────────────────────────────────
+
+  /// 현재 곡이 출력 기기에서 실제로 시작되었는지. 시작 전에는 다음 곡을 등록하지 않는다
+  /// (곡을 불러오는 중에 등록하면 SDK가 새 곡을 불러오며 지운다).
+  bool _trackStarted = false;
+
+  /// 출력 기기에 다음 곡으로 등록해 둔 곡.
+  MediaTrack? _preparedNext;
+
+  /// 대기열 기준으로 이어질 곡을 출력 기기에 등록한다. 이미 같은 곡이 등록되어 있으면 건너뛴다.
+  void _prepareNext() {
+    if (!_configured || !_trackStarted || currentTrack == null) return;
+    // 대기열은 이미 다른 곡으로 옮겨졌는데 아직 재생 요청 전인 경우(_start 직전)
+    if (_queue.current?.id != currentTrack!.id) return;
+    final next = _queue.peekNext();
+    if (next?.id == _preparedNext?.id) return;
+    _preparedNext = next;
+    AppLogger.log('PLAYER', '다음 곡 미리 등록: ${next?.title ?? '(없음)'}', type: LogType.info);
+    _backend.setNext(next).catchError((Object e) {
+      AppLogger.log('PLAYER', '다음 곡 등록 실패: $e', type: LogType.warning);
+    });
+  }
+
+  /// 출력 기기가 [trackId]로 넘어갔을 때, 그것이 등록해 둔 다음 곡이면 대기열을 한 칸 옮긴다.
+  bool _advanceToPreparedNext(String trackId) {
+    final prepared = _preparedNext;
+    if (prepared == null || prepared.id != trackId) return false;
+    final next = _queue.next(auto: true);
+    if (next?.id != trackId) {
+      // 그 사이 대기열이 바뀌었다면 실제 재생 중인 곡으로 맞춘다.
+      if (_queue.jumpToTrack(trackId) == null) return false;
+    }
+    AppLogger.log('PLAYER', '끊김 없이 다음 곡으로 넘어감: "${prepared.title}"', type: LogType.info);
+    _preparedNext = null;
+    _requestSeq++; // 진행 중이던 재생 요청이 있으면 무효
+    currentTrackNotifier.value = _queue.current ?? prepared;
+    progressSecondsNotifier.value = 0;
+    durationSecondsNotifier.value = prepared.durationSeconds;
+    isPlayingNotifier.value = true;
+    _notifyQueue();
+    return true;
   }
 
   Future<void> _onTrackEnded() async {
@@ -204,6 +255,8 @@ class PlayerManager {
     _pendingResumePosition = null;
     bool isCancelled() => seq != _requestSeq;
 
+    _trackStarted = false;
+    _preparedNext = null;
     currentTrackNotifier.value = track;
     progressSecondsNotifier.value = startPosition.inSeconds;
     durationSecondsNotifier.value = track.durationSeconds;
@@ -304,6 +357,8 @@ class PlayerManager {
 
   Future<void> stop() async {
     _requestSeq++; // 진행 중인 재생 요청 취소
+    _trackStarted = false;
+    _preparedNext = null;
     isPlayingNotifier.value = false;
     isBufferingNotifier.value = false;
     progressSecondsNotifier.value = 0;
@@ -351,11 +406,14 @@ class PlayerManager {
 
   void toggleRepeat() {
     repeatModeNotifier.value = _queue.cycleRepeat();
+    _prepareNext();
   }
 
   void _notifyQueue() {
     queueNotifier.value = _queue.tracks;
     queueIndexNotifier.value = _queue.index;
+    // 셔플·대기열 변경으로 이어질 곡이 바뀌었으면 다시 등록한다.
+    _prepareNext();
   }
 
   /// 출력 기기가 알려준 실제 스트림 음질로 배지를 만든다.
@@ -378,6 +436,8 @@ class PlayerManager {
     final wasPlaying = isPlaying;
     final position = Duration(seconds: progressSecondsNotifier.value);
     _requestSeq++; // 이전 기기로 진행 중이던 재생 요청 취소
+    _trackStarted = false;
+    _preparedNext = null; // 다음 곡 등록은 새 기기에서 곡이 시작된 뒤 다시 한다
     await _backend.stop();
     _dlnaManager.selectDevice(newDevice);
     if (track == null) return;

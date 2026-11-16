@@ -74,6 +74,15 @@ class PlayQueue {
     return null;
   }
 
+  /// 곡이 끝났을 때 이어서 재생될 곡을 미리 본다(대기열은 바꾸지 않는다).
+  /// 한 곡 반복이면 null — 같은 곡 반복은 미리 등록하지 않고 끝난 뒤 다시 재생한다.
+  MediaTrack? peekNext() {
+    if (_order.isEmpty || repeatMode == PlaybackRepeatMode.one) return null;
+    if (_index < _order.length - 1) return _order[_index + 1];
+    if (repeatMode == PlaybackRepeatMode.all) return _order.first;
+    return null;
+  }
+
   /// 이전 곡. 처음이면 전체 반복일 때만 마지막 곡으로 간다.
   MediaTrack? previous() {
     if (_order.isEmpty) return null;

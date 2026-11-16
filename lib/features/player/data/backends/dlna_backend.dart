@@ -27,6 +27,13 @@ class DlnaBackend implements PlaybackBackend {
   Duration? _duration;
   Duration _lastPosition = Duration.zero;
   bool _sawPlaying = false;
+
+  /// 지금 스피커에 보낸 주소와, 갭리스로 미리 등록한 다음 곡.
+  String? _currentUrl;
+  _PreparedNext? _next;
+
+  /// SetNextAVTransportURI를 거부한 스피커(UDN). 이후 이 스피커에는 등록을 시도하지 않는다.
+  final Set<String> _noGaplessDevices = {};
   int _failures = 0;
 
   DlnaBackend({required TidalAuthRepository auth, required TidalApiClient api, required DlnaManager dlna})
@@ -67,6 +74,7 @@ class DlnaBackend implements PlaybackBackend {
   @override
   Future<void> play(MediaTrack track, {Duration startPosition = Duration.zero, required IsCancelled isCancelled}) async {
     _stopPolling();
+    _next = null; // SetAVTransportURI가 스피커의 다음 곡 등록도 지운다
     // 폰 스피커와 동시에 소리가 나지 않게 폰 재생을 멈춘다.
     await TidalSdkNativeBridge.stopTrack();
 
@@ -138,6 +146,7 @@ class DlnaBackend implements PlaybackBackend {
     if (!ok) {
       throw PlaybackException('DLNA_PLAY_FAILED', '"${device.friendlyName}"에 재생 명령을 보내지 못했습니다.');
     }
+    _currentUrl = proxyUrl;
     if (startPosition > Duration.zero && _canSeek) {
       await _dlna.seek(startPosition.inSeconds);
     }
@@ -172,8 +181,9 @@ class DlnaBackend implements PlaybackBackend {
       // 스피커가 꺼지면 3회 연속 실패까지 약 6~7초 안에 오류를 보고한다.
       final results = await Future.wait([_dlna.getTransportState(), _dlna.syncPosition()]);
       final state = results[0] as String?;
-      final pos = results[1] as Map<String, int>?;
+      final pos = results[1] as DlnaPosition?;
       if (_pollTimer == null || trackId != _trackId) return; // 그 사이 정지되었거나 곡이 바뀜
+      if (pos != null && _checkGaplessTransition(pos.trackUri)) return; // 다음 확인부터 새 곡 기준
 
       if (state == null && pos == null) {
         _failures++;
@@ -187,8 +197,8 @@ class DlnaBackend implements PlaybackBackend {
       _failures = 0;
 
       if (pos != null) {
-        final position = Duration(seconds: pos['progress'] ?? 0);
-        final durationSec = pos['duration'] ?? 0;
+        final position = Duration(seconds: pos.progressSeconds);
+        final durationSec = pos.durationSeconds;
         if (durationSec > 0) _duration = Duration(seconds: durationSec);
         if (position > Duration.zero) _lastPosition = position;
         _events.add(BackendPositionChanged(position, duration: _duration));
@@ -220,6 +230,89 @@ class DlnaBackend implements PlaybackBackend {
     }
   }
 
+  // ──────────────────────────────────────────────
+  // 갭리스(SetNextAVTransportURI)
+  // ──────────────────────────────────────────────
+
+  @override
+  Future<void> setNext(MediaTrack? track) => _serialize(() => _setNextOnSpeaker(track));
+
+  Future<void> _setNextOnSpeaker(MediaTrack? track) async {
+    final device = _dlna.selectedDevice;
+    if (device.isLocalSpeaker || _noGaplessDevices.contains(device.udn)) return;
+    if (track == null) {
+      if (_next == null) return;
+      _next = null;
+      await _dlna.setNextOnSelectedDevice(streamUrl: '');
+      return;
+    }
+    if (_next?.track.id == track.id) return;
+
+    final info = await _api.getPlaybackInfo(track.id, quality: preferredQuality);
+    if (info == null) return;
+    final proxyUrl = await TidalSdkNativeBridge.registerTrackStream(
+      trackId: track.id,
+      directUrl: info.streamUrl,
+      manifestXml: info.manifest,
+      allowedHost: Uri.tryParse(device.locationUrl)?.host ?? '',
+      mimeType: info.mimeType,
+    );
+    if (proxyUrl.isEmpty || _dlna.selectedDevice.udn != device.udn) return;
+
+    final ok = await _dlna.setNextOnSelectedDevice(
+      streamUrl: proxyUrl,
+      metadata: DidlMetadata(
+        title: track.title,
+        artist: track.artistName,
+        album: track.albumTitle,
+        albumArtUri: track.coverUrl,
+        durationSeconds: track.durationSeconds,
+        mimeType: info.mimeType,
+      ),
+    );
+    if (ok) {
+      _next = _PreparedNext(track, proxyUrl, info);
+      AppLogger.log('DLNA_BACKEND', '다음 곡 미리 등록: "${track.title}"', type: LogType.info);
+    } else {
+      // 지원하지 않는 렌더러. 곡이 끝나면 기존처럼 STOPPED를 보고 다음 곡을 보낸다.
+      _noGaplessDevices.add(device.udn);
+      _next = null;
+      AppLogger.log('DLNA_BACKEND', '"${device.friendlyName}"은 SetNextAVTransportURI를 지원하지 않음', type: LogType.warning);
+    }
+  }
+
+  /// 스피커가 재생 중인 주소가 미리 등록한 다음 곡이면, 그 곡으로 넘어간 것으로 처리한다.
+  bool _checkGaplessTransition(String trackUri) {
+    final next = _next;
+    if (next == null || trackUri.isEmpty || trackUri == _currentUrl) return false;
+    if (!_sameStreamUrl(trackUri, next.url)) return false;
+    _next = null;
+    _currentUrl = next.url;
+    _trackId = next.track.id;
+    _duration = next.track.durationSeconds > 0 ? Duration(seconds: next.track.durationSeconds) : null;
+    _lastPosition = Duration.zero;
+    _canSeek = !next.info.isDash;
+    AppLogger.log('DLNA_BACKEND', '스피커가 다음 곡으로 넘어감: "${next.track.title}"', type: LogType.info);
+    _events.add(BackendTrackStarted(
+      next.track.id,
+      duration: _duration,
+      quality: StreamQuality(
+        audioQuality: next.info.audioQuality,
+        bitDepth: next.info.bitDepth,
+        sampleRate: next.info.sampleRate,
+      ),
+    ));
+    return true;
+  }
+
+  /// 렌더러가 주소의 호스트 표기를 바꿔 돌려주는 경우가 있어 경로와 쿼리로 비교한다.
+  static bool _sameStreamUrl(String a, String b) {
+    final ua = Uri.tryParse(a.trim());
+    final ub = Uri.tryParse(b.trim());
+    if (ua == null || ub == null) return a.trim() == b.trim();
+    return ua.path == ub.path && ua.query == ub.query;
+  }
+
   @override
   Future<void> pause() async {
     if (!await _dlna.pauseCurrent()) {
@@ -245,6 +338,8 @@ class DlnaBackend implements PlaybackBackend {
   Future<void> stop() async {
     _stopPolling();
     _trackId = null;
+    _next = null;
+    _currentUrl = null;
     await _dlna.stopCurrent();
     _events.add(const BackendStateChanged(playing: false));
   }
@@ -253,4 +348,11 @@ class DlnaBackend implements PlaybackBackend {
     _stopPolling();
     _events.close();
   }
+}
+
+class _PreparedNext {
+  final MediaTrack track;
+  final String url;
+  final TidalPlaybackInfo info;
+  const _PreparedNext(this.track, this.url, this.info);
 }

@@ -44,6 +44,10 @@ class FakeBackend implements PlaybackBackend {
   @override
   Future<void> stop() async {}
 
+  final nextRequests = <String?>[];
+  @override
+  Future<void> setNext(MediaTrack? track) async => nextRequests.add(track?.id);
+
   String? quality;
   @override
   Future<void> setAudioQuality(String quality) async {
@@ -79,6 +83,50 @@ void main() {
     ));
     expect(player.qualityBadgeNotifier.value, 'Hi-Res FLAC · 24-bit / 192kHz');
     expect(player.isHiResNotifier.value, isTrue);
+  });
+
+  group('갭리스', () {
+    test('곡이 시작되면 다음 곡을 미리 등록한다', () async {
+      final tracks = [t('1'), t('2'), t('3')];
+      await player.playTrack(tracks[0], queue: tracks, index: 0);
+      expect(phone.nextRequests, isEmpty); // 시작 전에는 등록하지 않는다
+
+      phone.controller.add(const BackendTrackStarted('1'));
+      expect(phone.nextRequests, ['2']);
+    });
+
+    test('출력 기기가 다음 곡으로 넘어가면 다시 불러오지 않고 대기열만 옮긴다', () async {
+      final tracks = [t('1'), t('2'), t('3')];
+      await player.playTrack(tracks[0], queue: tracks, index: 0);
+      phone.controller.add(const BackendTrackStarted('1'));
+
+      phone.controller.add(const BackendTrackStarted('2'));
+
+      expect(player.currentTrack!.id, '2');
+      expect(player.queueIndex, 1);
+      expect(phone.played, ['1']); // play를 다시 부르지 않음
+      expect(phone.nextRequests, ['2', '3']);
+    });
+
+    test('셔플·반복을 바꾸면 이어질 곡을 다시 등록한다', () async {
+      final tracks = [t('1'), t('2')];
+      await player.playTrack(tracks[1], queue: tracks, index: 1);
+      phone.controller.add(const BackendTrackStarted('2'));
+      expect(phone.nextRequests, isEmpty); // 마지막 곡, 반복 없음 → 등록할 곡 없음
+
+      player.toggleRepeat(); // 전체 반복
+      expect(phone.nextRequests, ['1']);
+
+      player.toggleRepeat(); // 한 곡 반복은 끝난 뒤 다시 재생하므로 등록을 지운다
+      expect(phone.nextRequests, ['1', null]);
+    });
+
+    test('등록하지 않은 곡의 시작 이벤트는 무시한다', () async {
+      await player.playTrack(t('1'), queue: [t('1'), t('2')], index: 0);
+      phone.controller.add(const BackendTrackStarted('1'));
+      phone.controller.add(const BackendTrackStarted('zzz'));
+      expect(player.currentTrack!.id, '1');
+    });
   });
 
   test('음질 설정은 폰과 스피커 출력 모두에 전달된다', () async {
