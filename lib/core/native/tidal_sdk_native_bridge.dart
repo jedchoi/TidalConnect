@@ -189,6 +189,13 @@ class TidalSdkNativeBridge {
     }
   }
 
+  /// DLNA 스트리밍 중 Wi-Fi 절전을 막는 WifiLock을 잡거나 놓는다.
+  static Future<void> setStreamingLock(bool enabled) async {
+    try {
+      await _channel.invokeMethod('setStreamingLock', {'enabled': enabled});
+    } catch (_) {}
+  }
+
   /// Releases native Tidal SDK Player
   static Future<bool> releasePlayer() async {
     try {

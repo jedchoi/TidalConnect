@@ -2,6 +2,7 @@ package com.example.tidal_connect_lite
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.net.wifi.WifiManager
 import android.util.Log
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.BinaryMessenger
@@ -34,6 +35,7 @@ object PlaybackCore {
     private var eventSink: EventChannel.EventSink? = null
     private var channel: MethodChannel? = null
     private var attachedMessenger: BinaryMessenger? = null
+    private var wifiLock: WifiManager.WifiLock? = null
 
     /** Flutter 엔진에 채널을 연결한다. 같은 엔진에 다시 붙으면 아무것도 하지 않는다. */
     fun attach(engine: FlutterEngine, context: Context) {
@@ -146,6 +148,10 @@ object PlaybackCore {
                 playerManager = null
                 result.success(mapOf("status" to "released"))
             }
+            "setStreamingLock" -> {
+                setWifiLock(call.argument<Boolean>("enabled") == true)
+                result.success(null)
+            }
             // ── DLNA 프록시 관련 채널 ──────────────────────────────────────
             "registerTrackStream" -> {
                 val trackId = call.argument<String>("trackId") ?: ""
@@ -212,6 +218,25 @@ object PlaybackCore {
                 }
             }
         }
+
+    /**
+     * DLNA 재생 중에만 WifiLock을 잡아 화면이 꺼져도 Wi-Fi가 절전으로 끊기지 않게 한다.
+     * CPU 유지는 audio_service의 서비스가 재생 중 WakeLock으로 처리한다.
+     */
+    private fun setWifiLock(enabled: Boolean) {
+        try {
+            if (enabled) {
+                val lock = wifiLock ?: appContext.getSystemService(WifiManager::class.java)
+                    ?.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "WaveConnect:DlnaStreaming")
+                    ?.also { it.setReferenceCounted(false); wifiLock = it }
+                if (lock != null && !lock.isHeld) lock.acquire()
+            } else {
+                wifiLock?.takeIf { it.isHeld }?.release()
+            }
+        } catch (e: Exception) {
+            Log.w("PlaybackCore", "WifiLock 처리 실패: ${e.message}")
+        }
+    }
 
     /**
      * 현재 Wi-Fi 주소에 바인딩된 프록시 서버를 돌려준다. 주소가 바뀌었으면 새로 띄운다.

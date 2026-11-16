@@ -85,6 +85,7 @@ class DlnaBackend implements PlaybackBackend {
       await _dlna.seek(startPosition.inSeconds);
     }
     _startPolling(track);
+    TidalSdkNativeBridge.setStreamingLock(true);
     _events.add(const BackendStateChanged(playing: true, buffering: true));
   }
 
@@ -99,6 +100,7 @@ class DlnaBackend implements PlaybackBackend {
   }
 
   void _stopPolling() {
+    if (_pollTimer != null) TidalSdkNativeBridge.setStreamingLock(false);
     _pollTimer?.cancel();
     _pollTimer = null;
   }
