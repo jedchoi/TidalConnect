@@ -32,9 +32,13 @@ class TidalAuthManager(private val context: Context) {
         }
     }
 
-    fun updateUserCredentials(userId: String, accessToken: String, expiresInSeconds: Long = 86400L * 30) {
+    fun updateUserCredentials(userId: String, accessToken: String, expiresInSeconds: Long) {
         customCredentialsProvider?.setUserCredentials(userId, accessToken, expiresInSeconds)
         Log.i("TidalAuthManager", "사용자 인증 정보 업데이트 완료 (UserId: $userId)")
+    }
+
+    fun clearUserCredentials() {
+        customCredentialsProvider?.clearUserCredentials()
     }
 
     suspend fun authenticateUser(): Boolean {
