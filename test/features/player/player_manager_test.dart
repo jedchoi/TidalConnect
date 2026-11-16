@@ -6,8 +6,7 @@ import 'package:tidal_connect_lite/features/auth/data/tidal_auth_repository.dart
 import 'package:tidal_connect_lite/features/player/data/backends/playback_backend.dart';
 import 'package:tidal_connect_lite/features/player/data/player_manager.dart';
 import 'package:tidal_connect_lite/features/tidal_api/domain/models/media_item.dart';
-import '../auth/secure_storage_service_test.dart' show FakeFlutterSecureStorage;
-import '../auth/tidal_auth_repository_test.dart' show FakeAdapter, FakeNativeSink;
+import '../../helpers/fakes.dart';
 
 MediaTrack t(String id) => MediaTrack(
       id: id,

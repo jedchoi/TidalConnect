@@ -48,4 +48,5 @@ dependencies {
     implementation("com.tidal.sdk:player:0.0.70")
     implementation("org.nanohttpd:nanohttpd:2.3.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    testImplementation("junit:junit:4.13.2")
 }

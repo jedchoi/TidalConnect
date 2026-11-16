@@ -1,7 +1,26 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tidal_connect_lite/features/main/presentation/main_screen.dart';
+import 'package:tidal_connect_lite/features/main/presentation/splash_screen.dart';
+
+import 'helpers/app_overrides.dart';
 
 void main() {
-  // 앱 전체를 띄우면 스플래시가 보안 저장소·SSDP 소켓·네이티브 채널을 초기화하므로
-  // 위젯 테스트 환경에서는 실행할 수 없다. 6단계(의존성 주입)에서 가짜 구현으로 대체해 복구한다.
-  testWidgets('App renders brand title', (tester) async {}, skip: true);
+  testWidgets('스플래시가 자동 로그인·스피커 탐색 후 메인 화면으로 넘어간다', (tester) async {
+    final app = TestApp();
+    await tester.pumpWidget(ProviderScope(
+      overrides: app.overrides,
+      child: const MaterialApp(home: SplashScreen()),
+    ));
+
+    expect(find.text('WAVECONNECT'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 1300));
+    await tester.pump(const Duration(milliseconds: 700));
+
+    expect(find.byType(MainScreen), findsOneWidget);
+    expect(find.byType(SplashScreen), findsNothing);
+    expect(app.ssdp.callCount, greaterThanOrEqualTo(1));
+  });
 }

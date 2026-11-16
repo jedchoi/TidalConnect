@@ -1,55 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tidal_connect_lite/features/auth/data/secure_storage_service.dart';
 import 'package:tidal_connect_lite/features/auth/data/tidal_auth_repository.dart';
 import 'package:tidal_connect_lite/features/auth/domain/models/auth_token.dart';
-import 'secure_storage_service_test.dart' show FakeFlutterSecureStorage;
-
-/// 요청 수를 세고 미리 정한 응답을 돌려주는 Dio 어댑터.
-class FakeAdapter implements HttpClientAdapter {
-  int requestCount = 0;
-  final Future<ResponseBody> Function(RequestOptions options) handler;
-  FakeAdapter(this.handler);
-
-  @override
-  Future<ResponseBody> fetch(RequestOptions options, Stream<Uint8List>? requestStream, Future<void>? cancelFuture) {
-    requestCount++;
-    return handler(options);
-  }
-
-  @override
-  void close({bool force = false}) {}
-}
-
-ResponseBody jsonBody(Object body, {int status = 200}) => ResponseBody.fromString(
-      jsonEncode(body),
-      status,
-      headers: {
-        Headers.contentTypeHeader: [Headers.jsonContentType],
-      },
-    );
-
-class FakeNativeSink implements NativeCredentialsSink {
-  final List<String> pushedTokens = [];
-  int clearCount = 0;
-
-  @override
-  Future<bool> initialize() async => true;
-
-  @override
-  Future<void> setUserCredentials({required String userId, required String accessToken, required int expiresInSeconds}) async {
-    pushedTokens.add(accessToken);
-  }
-
-  @override
-  Future<void> clearUserCredentials() async => clearCount++;
-
-  @override
-  void setTokenRefresher(Future<Map<String, Object>?> Function() refresher) {}
-}
+import '../../helpers/fakes.dart';
 
 void main() {
   late FakeFlutterSecureStorage fakeStorage;

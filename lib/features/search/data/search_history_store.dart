@@ -5,19 +5,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// 최근 검색어를 저장한다. 민감 정보가 아니므로 shared_preferences에 둔다.
 class SearchHistoryStore {
-  SearchHistoryStore({SharedPreferencesAsync? prefs, FlutterSecureStorage? legacyStorage})
-      : _prefs = prefs ?? SharedPreferencesAsync(),
-        _legacyStorage = legacyStorage ?? const FlutterSecureStorage();
+  SearchHistoryStore({FlutterSecureStorage? legacyStorage})
+      : _legacyStorage = legacyStorage ?? const FlutterSecureStorage();
 
   static const String key = 'search_history';
   static const String _legacyKey = 'search_history_list';
   static const int maxItems = 15;
 
-  final SharedPreferencesAsync _prefs;
   final FlutterSecureStorage _legacyStorage;
 
+  Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
+
   Future<List<String>> load() async {
-    final stored = await _prefs.getStringList(key);
+    final stored = (await _prefs).getStringList(key);
     if (stored != null) return stored;
     return _migrateLegacy();
   }
@@ -27,17 +27,19 @@ class SearchHistoryStore {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return current;
     final next = addToHistory(current, trimmed);
-    await _prefs.setStringList(key, next);
+    await (await _prefs).setStringList(key, next);
     return next;
   }
 
   Future<List<String>> remove(List<String> current, String query) async {
     final next = [...current]..remove(query);
-    await _prefs.setStringList(key, next);
+    await (await _prefs).setStringList(key, next);
     return next;
   }
 
-  Future<void> clear() => _prefs.remove(key);
+  Future<void> clear() async {
+    await (await _prefs).remove(key);
+  }
 
   static List<String> addToHistory(List<String> current, String query) {
     final next = [query, ...current.where((e) => e != query)];
@@ -50,7 +52,7 @@ class SearchHistoryStore {
       final jsonStr = await _legacyStorage.read(key: _legacyKey);
       if (jsonStr == null || jsonStr.isEmpty) return const [];
       final list = (jsonDecode(jsonStr) as List).map((e) => e.toString()).toList();
-      await _prefs.setStringList(key, list);
+      await (await _prefs).setStringList(key, list);
       await _legacyStorage.delete(key: _legacyKey);
       return list;
     } catch (_) {
