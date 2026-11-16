@@ -9,7 +9,12 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import java.lang.ref.WeakReference
 import android.content.Context
+import android.database.ContentObserver
+import android.media.AudioManager
 import android.net.wifi.WifiManager
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
 import android.util.Log
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.BinaryMessenger
@@ -67,6 +72,47 @@ object PlaybackCore {
             }
         )
         channel = MethodChannel(messenger, CHANNEL).also { it.setMethodCallHandler(::onMethodCall) }
+        registerPhoneVolumeObserver()
+    }
+
+    // ── 폰 미디어 볼륨 ─────────────────────────────────────────────
+
+    private var volumeObserverRegistered = false
+    private var lastPhoneVolume = -1
+
+    private fun audioManager(): AudioManager = appContext.getSystemService(AudioManager::class.java)
+
+    private fun phoneVolumePercent(): Int {
+        val am = audioManager()
+        val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+        return am.getStreamVolume(AudioManager.STREAM_MUSIC) * 100 / max
+    }
+
+    private fun setPhoneVolumePercent(percent: Int) {
+        val am = audioManager()
+        val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val index = Math.round(percent.coerceIn(0, 100) * max / 100f)
+        am.setStreamVolume(AudioManager.STREAM_MUSIC, index, 0)
+    }
+
+    /** 폰 미디어 볼륨이 바뀌면(볼륨 키 포함) {type: phoneVolume, percent}를 보낸다. */
+    private fun registerPhoneVolumeObserver() {
+        if (volumeObserverRegistered) return
+        volumeObserverRegistered = true
+        lastPhoneVolume = phoneVolumePercent()
+        appContext.contentResolver.registerContentObserver(
+            Settings.System.CONTENT_URI,
+            true,
+            object : ContentObserver(Handler(Looper.getMainLooper())) {
+                override fun onChange(selfChange: Boolean) {
+                    val percent = phoneVolumePercent()
+                    if (percent != lastPhoneVolume) {
+                        lastPhoneVolume = percent
+                        emit(mapOf("type" to "phoneVolume", "percent" to percent))
+                    }
+                }
+            }
+        )
     }
 
     /** Flutter로 이벤트를 보낸다. 메인 스레드에서 호출해야 한다. */
@@ -157,6 +203,11 @@ object PlaybackCore {
                 playerManager?.release()
                 playerManager = null
                 result.success(mapOf("status" to "released"))
+            }
+            "getPhoneVolume" -> result.success(phoneVolumePercent())
+            "setPhoneVolume" -> {
+                setPhoneVolumePercent(call.argument<Int>("percent") ?: 0)
+                result.success(null)
             }
             "requestNotificationPermission" -> {
                 result.success(requestNotificationPermission())

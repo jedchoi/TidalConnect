@@ -7,7 +7,6 @@ import '../../dlna/data/dlna_manager.dart';
 import '../../dlna/domain/models/dlna_device.dart';
 import '../../tidal_api/data/tidal_api_client.dart';
 import '../../tidal_api/domain/models/media_item.dart';
-import '../../volume/data/hardware_volume_service.dart';
 import '../domain/play_queue.dart';
 import 'backends/dlna_backend.dart';
 import 'backends/phone_backend.dart';
@@ -94,7 +93,7 @@ class PlayerManager {
     _dlna.events.listen((e) => _onBackendEvent(_dlna, e));
 
     _dlnaManager.selectedDeviceNotifier.addListener(_onOutputDeviceChanged);
-    HardwareVolumeService.setShowSystemUI(_dlnaManager.selectedDevice.isLocalSpeaker);
+    TidalSdkNativeBridge.phoneVolumeChanges.listen(onPhoneVolumeChanged, onError: (_) {});
     syncVolumeFromDevice();
   }
 
@@ -391,14 +390,12 @@ class PlayerManager {
 
   /// 원격 스피커의 실제 볼륨을 읽기 전에는 SetVolume을 보내지 않는다(볼륨 급변 방지).
   bool _remoteVolumeKnown = false;
-  int? _lastPhoneVolume;
   DateTime _lastRemoteVolumeSentAt = DateTime.fromMillisecondsSinceEpoch(0);
   static const _remoteVolumeInterval = Duration(milliseconds: 200);
   static const int remoteVolumeStep = 2;
 
   void _onOutputDeviceChanged() {
     _remoteVolumeKnown = false;
-    HardwareVolumeService.setShowSystemUI(_dlnaManager.selectedDevice.isLocalSpeaker);
     syncVolumeFromDevice();
   }
 
@@ -406,7 +403,7 @@ class PlayerManager {
   Future<void> syncVolumeFromDevice() async {
     final device = _dlnaManager.selectedDevice;
     if (device.isLocalSpeaker) {
-      final phone = await HardwareVolumeService.getPhoneVolume();
+      final phone = await TidalSdkNativeBridge.getPhoneVolume();
       if (phone != null) volumeNotifier.value = phone;
       return;
     }
@@ -421,21 +418,18 @@ class PlayerManager {
     }
   }
 
-  /// 폰 미디어 볼륨이 바뀌었을 때(볼륨 키) 호출된다.
-  ///
-  /// 폰으로 재생 중이면 그 값을 그대로 쓴다. 스피커로 재생 중이면 폰 볼륨의 절대값을 보내지 않고
-  /// 올라갔는지 내려갔는지만 보고 스피커 볼륨을 [remoteVolumeStep]씩 바꾼다.
-  /// 폰 볼륨이 0이나 100에 닿으면 더 움직이지 않는 한계가 있다(4단계에서 미디어 세션으로 대체).
+  /// 폰 미디어 볼륨이 바뀌었을 때 호출된다. 폰으로 재생 중일 때만 화면 볼륨에 반영한다.
+  /// 스피커로 재생 중일 때의 볼륨 키는 미디어 세션의 원격 볼륨([adjustRemoteVolume])으로 들어온다.
   void onPhoneVolumeChanged(int phonePercent) {
-    final previous = _lastPhoneVolume;
-    _lastPhoneVolume = phonePercent;
     if (_dlnaManager.selectedDevice.isLocalSpeaker) {
       volumeNotifier.value = phonePercent;
-      return;
     }
-    if (previous == null || previous == phonePercent) return;
-    final direction = phonePercent > previous ? 1 : -1;
-    setVolume(volumeNotifier.value + direction * remoteVolumeStep);
+  }
+
+  /// 원격(스피커) 볼륨을 한 단계 올리거나(1) 내린다(-1).
+  void adjustRemoteVolume(int direction) {
+    if (direction == 0) return;
+    setVolume(volumeNotifier.value + direction.sign * remoteVolumeStep);
   }
 
   /// 볼륨 설정 (0~100).
@@ -446,7 +440,7 @@ class PlayerManager {
     final clamped = volumePercent.clamp(0, 100);
     if (_dlnaManager.selectedDevice.isLocalSpeaker) {
       volumeNotifier.value = clamped;
-      HardwareVolumeService.setPhoneVolume(clamped);
+      TidalSdkNativeBridge.setPhoneVolume(clamped);
       return;
     }
     if (!_remoteVolumeKnown) {

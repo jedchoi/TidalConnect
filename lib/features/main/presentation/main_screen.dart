@@ -7,7 +7,6 @@ import '../../player/presentation/mini_player_widget.dart';
 import '../../dlna/data/dlna_manager.dart';
 import '../../../core/theme/app_colors.dart';
 
-import '../../volume/data/hardware_volume_service.dart';
 import '../../player/data/player_manager.dart';
 
 class MainScreen extends StatefulWidget {
@@ -19,7 +18,6 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
-  final HardwareVolumeService _volumeService = HardwareVolumeService();
 
   final List<Widget> _screens = const [
     MyCollectionScreen(),
@@ -33,9 +31,6 @@ class _MainScreenState extends State<MainScreen> {
     super.initState();
     // 앱 시작 시 주변 DLNA 스피커 자동 검색 및 목록 구성
     DlnaManager.instance.discoverDevices();
-
-    // 물리 볼륨 키 -> 폰 재생이면 폰 볼륨, 스피커 재생이면 스피커 볼륨을 한 단계씩 조절
-    _volumeService.listenPhysicalVolumeKeys(PlayerManager.instance.onPhoneVolumeChanged);
 
     PlayerManager.instance.errorNotifier.addListener(_showPlayerError);
   }
@@ -55,7 +50,6 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void dispose() {
     PlayerManager.instance.errorNotifier.removeListener(_showPlayerError);
-    _volumeService.dispose();
     super.dispose();
   }
 

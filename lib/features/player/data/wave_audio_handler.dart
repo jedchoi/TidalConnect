@@ -1,4 +1,5 @@
 import 'package:audio_service/audio_service.dart';
+import '../../dlna/data/dlna_manager.dart';
 import 'player_manager.dart';
 
 /// 시스템 미디어 세션(잠금화면, 알림, 블루투스·이어폰 버튼)과 [PlayerManager]를 잇는다.
@@ -26,8 +27,36 @@ class WaveAudioHandler extends BaseAudioHandler {
     _player.currentTrackNotifier.addListener(_broadcastMediaItem);
     _player.durationSecondsNotifier.addListener(_broadcastMediaItem);
     _player.queueNotifier.addListener(_broadcastQueue);
+    DlnaManager.instance.selectedDeviceNotifier.addListener(_broadcastPlaybackInfo);
+    _player.volumeNotifier.addListener(_broadcastPlaybackInfo);
     _broadcastState();
+    _broadcastPlaybackInfo();
   }
+
+  /// DLNA 출력이면 세션을 원격 재생으로 알린다. 그러면 화면이 꺼져 있어도 볼륨 키가
+  /// 폰 볼륨 대신 [androidAdjustRemoteVolume]·[androidSetRemoteVolume]으로 들어온다.
+  void _broadcastPlaybackInfo() {
+    final isLocal = DlnaManager.instance.selectedDevice.isLocalSpeaker;
+    androidPlaybackInfo.add(isLocal
+        ? LocalAndroidPlaybackInfo()
+        : RemoteAndroidPlaybackInfo(
+            volumeControlType: AndroidVolumeControlType.absolute,
+            maxVolume: 100,
+            volume: _player.volumeNotifier.value,
+          ));
+  }
+
+  @override
+  Future<void> androidAdjustRemoteVolume(AndroidVolumeDirection direction) async {
+    if (direction == AndroidVolumeDirection.raise) {
+      _player.adjustRemoteVolume(1);
+    } else if (direction == AndroidVolumeDirection.lower) {
+      _player.adjustRemoteVolume(-1);
+    }
+  }
+
+  @override
+  Future<void> androidSetRemoteVolume(int volumeIndex) async => _player.setVolume(volumeIndex);
 
   void _broadcastState() {
     final playing = _player.isPlaying;

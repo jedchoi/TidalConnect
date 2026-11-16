@@ -189,6 +189,25 @@ class TidalSdkNativeBridge {
     }
   }
 
+  /// 폰 미디어 볼륨(0~100) 변화. 볼륨 키로 바뀐 경우도 포함한다.
+  static Stream<int> get phoneVolumeChanges => playerEvents
+      .where((e) => e['type'] == 'phoneVolume')
+      .map((e) => (e['percent'] as num).toInt());
+
+  static Future<int?> getPhoneVolume() async {
+    try {
+      return await _channel.invokeMethod<int>('getPhoneVolume');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> setPhoneVolume(int percent) async {
+    try {
+      await _channel.invokeMethod('setPhoneVolume', {'percent': percent.clamp(0, 100)});
+    } catch (_) {}
+  }
+
   /// Android 13 이상에서 재생 알림 권한을 요청한다.
   static Future<void> requestNotificationPermission() async {
     try {
