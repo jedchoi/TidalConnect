@@ -4,23 +4,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tidal_connect_lite/features/player/presentation/mini_player_widget.dart';
 
 void main() {
-  testWidgets('MiniPlayerWidget renders controls and titles', (WidgetTester tester) async {
+  testWidgets('MiniPlayerWidget renders placeholder title and controls', (WidgetTester tester) async {
     await tester.pumpWidget(
       const ProviderScope(
         child: MaterialApp(
           home: Scaffold(
-            bottomNavigationBar: MiniPlayerWidget(
-              title: 'Test Tidal Song',
-              artist: 'Test Artist Name',
-              autoStartDiscovery: false,
-            ),
+            bottomNavigationBar: MiniPlayerWidget(autoStartDiscovery: false),
           ),
         ),
       ),
     );
 
-    expect(find.text('Test Tidal Song'), findsOneWidget);
-    expect(find.textContaining('Test Artist Name'), findsOneWidget);
+    expect(find.text('Tidal 음원 선택 안됨'), findsOneWidget);
     expect(find.byIcon(Icons.play_circle_filled), findsOneWidget);
     expect(find.byIcon(Icons.phone_android), findsWidgets);
   });

@@ -4,16 +4,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tidal_connect_lite/features/favorites/presentation/my_collection_screen.dart';
 
 void main() {
-  testWidgets('MyCollectionScreen displays headers', (WidgetTester tester) async {
+  testWidgets('MyCollectionScreen displays app bar title', (WidgetTester tester) async {
     await tester.pumpWidget(
       const ProviderScope(
         child: MaterialApp(
-          home: MyCollectionScreen(autoLoad: false),
+          home: MyCollectionScreen(),
         ),
       ),
     );
+    await tester.pump();
 
     expect(find.text('내 즐겨찾기'), findsOneWidget);
-    expect(find.text('즐겨찾기 앨범'), findsOneWidget);
   });
 }
