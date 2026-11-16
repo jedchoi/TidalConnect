@@ -24,7 +24,8 @@ class DidlMetadata {
 class UPnPSoapClient {
   final Dio _dio;
 
-  UPnPSoapClient({Dio? dio}) : _dio = dio ?? Dio();
+  /// 스피커 전원이 꺼지면 연결 자체가 오래 걸리므로 연결 타임아웃을 짧게 둔다.
+  UPnPSoapClient({Dio? dio}) : _dio = dio ?? Dio(BaseOptions(connectTimeout: const Duration(seconds: 2)));
 
   static String _escapeXml(String input) {
     return input
@@ -217,8 +218,8 @@ class UPnPSoapClient {
             'Content-Type': 'text/xml; charset="utf-8"',
             'SOAPACTION': '"urn:schemas-upnp-org:service:AVTransport:1#GetTransportInfo"',
           },
-          sendTimeout: const Duration(seconds: 3),
-          receiveTimeout: const Duration(seconds: 3),
+          sendTimeout: const Duration(seconds: 2),
+          receiveTimeout: const Duration(seconds: 2),
         ),
       );
       if (response.statusCode == 200) {
@@ -250,8 +251,8 @@ class UPnPSoapClient {
             'Content-Type': 'text/xml; charset="utf-8"',
             'SOAPACTION': '"urn:schemas-upnp-org:service:AVTransport:1#GetPositionInfo"',
           },
-          sendTimeout: const Duration(seconds: 3),
-          receiveTimeout: const Duration(seconds: 3),
+          sendTimeout: const Duration(seconds: 2),
+          receiveTimeout: const Duration(seconds: 2),
         ),
       );
       if (response.statusCode == 200) {
@@ -274,8 +275,8 @@ class UPnPSoapClient {
             'Content-Type': 'text/xml; charset="utf-8"',
             'SOAPACTION': '"urn:schemas-upnp-org:service:RenderingControl:1#GetVolume"',
           },
-          sendTimeout: const Duration(seconds: 3),
-          receiveTimeout: const Duration(seconds: 3),
+          sendTimeout: const Duration(seconds: 2),
+          receiveTimeout: const Duration(seconds: 2),
         ),
       );
       if (response.statusCode == 200) {

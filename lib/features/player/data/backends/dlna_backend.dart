@@ -143,8 +143,11 @@ class DlnaBackend implements PlaybackBackend {
     _polling = true;
     try {
       final trackId = _trackId;
-      final state = await _dlna.getTransportState();
-      final pos = await _dlna.syncPosition();
+      // 두 요청을 동시에 보내 한 번의 확인이 2초(타임아웃)를 넘지 않게 한다.
+      // 스피커가 꺼지면 3회 연속 실패까지 약 6~7초 안에 오류를 보고한다.
+      final results = await Future.wait([_dlna.getTransportState(), _dlna.syncPosition()]);
+      final state = results[0] as String?;
+      final pos = results[1] as Map<String, int>?;
       if (_pollTimer == null || trackId != _trackId) return; // 그 사이 정지되었거나 곡이 바뀜
 
       if (state == null && pos == null) {
