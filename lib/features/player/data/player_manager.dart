@@ -166,6 +166,27 @@ class PlayerManager {
   }
 
   /// 볼륨 설정 (스마트폰 또는 DLNA 스피커)
+  int? _lastPhoneVolume;
+
+  /// 폰 미디어 볼륨이 바뀌었을 때(볼륨 키) 호출된다.
+  ///
+  /// 폰으로 재생 중이면 그 값을 그대로 쓴다. 스피커로 재생 중이면 폰 볼륨의 절대값을 보내지 않고
+  /// 올라갔는지 내려갔는지만 보고 스피커 볼륨을 [remoteVolumeStep]씩 바꾼다.
+  /// 폰 볼륨이 0이나 100에 닿으면 더 움직이지 않는 한계가 있다(4단계에서 미디어 세션으로 대체).
+  void onPhoneVolumeChanged(int phonePercent) {
+    final previous = _lastPhoneVolume;
+    _lastPhoneVolume = phonePercent;
+    if (_dlnaManager.selectedDevice.isLocalSpeaker) {
+      volumeNotifier.value = phonePercent;
+      return;
+    }
+    if (previous == null || previous == phonePercent) return;
+    final direction = phonePercent > previous ? 1 : -1;
+    setVolume(volumeNotifier.value + direction * remoteVolumeStep);
+  }
+
+  static const int remoteVolumeStep = 2;
+
   void setVolume(int volumePercent) {
     final clamped = volumePercent.clamp(0, 100);
     if (!_dlnaManager.selectedDevice.isLocalSpeaker) {

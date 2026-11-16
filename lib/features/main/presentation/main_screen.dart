@@ -34,10 +34,8 @@ class _MainScreenState extends State<MainScreen> {
     // 앱 시작 시 주변 DLNA 스피커 자동 검색 및 목록 구성
     DlnaManager.instance.discoverDevices();
 
-    // 물리 볼륨 키 리스너 등록 -> PlayerManager 통합 볼륨 제어
-    _volumeService.listenPhysicalVolumeKeys((volumePercent) {
-      PlayerManager.instance.setVolume(volumePercent);
-    });
+    // 물리 볼륨 키 -> 폰 재생이면 폰 볼륨, 스피커 재생이면 스피커 볼륨을 한 단계씩 조절
+    _volumeService.listenPhysicalVolumeKeys(PlayerManager.instance.onPhoneVolumeChanged);
   }
 
   @override
