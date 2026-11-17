@@ -29,7 +29,7 @@
 `lib/features/player/data/backends/phone_backend.dart` 에 대해 다음을 자동 테스트로 검증한다:
 - `play`, `pause`, `resume`, `seek`, `stop`, `setAudioQuality`, `setNext` 가 대응하는 MethodChannel 메서드 (`playTrack`, `pauseTrack`, `resumeTrack`, `seekTrack`, `stopTrack`, `setAudioQuality`, `setNextTrack`) 를 올바른 인자로 호출한다
 - EventChannel `player_events` 의 `state`, `position`, `transition`, `ended`, `error` 이벤트가 각각 `BackendStateChanged`, `BackendPositionChanged`, `BackendTrackStarted` (+ `StreamQuality`), `BackendTrackEnded`, `BackendError` 로 변환된다 (변환 규칙은 `aidlc-docs/inception/reverse-engineering/api-documentation.md` C절 표 기준)
-- 네이티브 호출이 실패하면 `PlaybackException(code, message)` 로 전달된다
+- `play` · `pause` · `resume` 의 네이티브 호출이 실패하면 `PlaybackException(code, message)` 로 전달된다. `seek` · `stop` · `setNext` · `setAudioQuality` 는 실패해도 예외를 내지 않는다 (2026-11-17 정정: Functional Design 계획 Q2=A, 지금 동작을 규칙으로 확정)
 - `isCancelled` 가 true 가 된 재생 요청은 이후 상태를 바꾸지 않는다
 
 ### FR-02: `DlnaBackend` 테스트

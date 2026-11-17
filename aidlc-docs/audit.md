@@ -176,3 +176,35 @@
 
 ---
 
+## Functional Design (dart-playback-tests) - 계획 · 질문 제시
+**Timestamp**: 2026-11-17T00:09:04Z
+**User Input**: (없음)
+**AI Response**: "dart-playback-tests-functional-design-plan.md 생성 (실행 단계 7개, 질문 3개: 버그 판단 기준, PhoneBackend 예외 범위, PBT 입력 범위). 답변 대기"
+**Context**: CONSTRUCTION - Functional Design (dart-playback-tests), Step 4~5
+
+---
+
+## Functional Design (dart-playback-tests) - 답변 수신
+**Timestamp**: 2026-11-17T00:14:10Z
+**User Input**: "추천대로 진행해줘"
+**AI Response**: "Q1~Q3 [Answer] 에 권장안 A 기입 (기입 주체 표시). 모호성 분석: 단일 선택지 3개, 모순 없음 (Q1 A 의 '좁게' 기준과 Q2 A · Q3 A 의 '지금 동작 고정' 이 일치). 후속 질문 없음. 산출물 생성 시작"
+**Context**: CONSTRUCTION - Functional Design (dart-playback-tests), Step 5
+
+---
+
+## Functional Design (dart-playback-tests) - 산출물 생성 · 승인 요청
+**Timestamp**: 2026-11-17T00:17:43Z
+**User Input**: (없음)
+**AI Response**: "functional-design/ 에 business-rules.md (규칙 PB 26개, DM 29개, DB 49개, WA 23개, 오류 코드 표, 요구사항 대응, 관찰 사항 7건), business-logic-model.md (흐름 · 상태 기계 · 테스트 가능한 속성 18개), domain-entities.md (기존 엔티티, 생성기 범위) 생성. 계획 체크박스 전부 완료. requirements.md FR-01 예외 범위 정정 (Q2=A). 확장 준수: PBT-01 compliant (속성 절, 분류 참조, 속성 없는 부분 명시), PBT-02~10 N/A (코드 stage) / Resiliency N/A (새 외부 호출 · 인프라 없음). 승인 요청 문구: '기능 설계 산출물을 검토해 주세요: aidlc-docs/construction/dart-playback-tests/functional-design/ - 변경 요청 (Request Changes) / 다음 Stage 로 진행 (Continue to Next Stage) - NFR Requirements'"
+**Context**: CONSTRUCTION - Functional Design (dart-playback-tests), 완료 메시지 제시 · 승인 대기
+**AI 점검**: ✅ 4 · ⚠️ 1 · ❌ 0
+
+---
+
+## 커밋 요청 (stage 별 커밋)
+**Timestamp**: 2026-11-17T00:23:30Z
+**User Input**: "지금까지 한것을 각 단계별로 commit 으로 남겨줘"
+**AI Response**: "브랜치 aidlc/test-reinforcement 를 만들고 stage 별로 커밋 (설정, Workspace Detection, Reverse Engineering, Requirements Analysis, Workflow Planning, Application Design, Units Generation, Functional Design). audit.md 는 stage 경계에서 잘라 각 커밋에 포함, 나중 stage 에서 고친 requirements.md · execution-plan.md 는 해당 stage 커밋에서 변경분으로 기록, aidlc-state.md 는 마지막 커밋에 현재 상태로 포함. Functional Design (dart-playback-tests) 은 승인 대기 상태로 커밋"
+**Context**: CONSTRUCTION - Functional Design (dart-playback-tests) 승인 대기 중, 워크플로우 진행 없음
+
+---
