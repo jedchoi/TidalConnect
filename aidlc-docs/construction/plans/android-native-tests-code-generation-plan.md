@@ -98,7 +98,7 @@
     - `TidalPlayerManager` 에 `PlayerControls` 구현 선언 (`: PlayerControls`, `override`)
     - `PlaybackCore.onMethodCall` 의 `when` 분기 → router 위임. 같은 규칙 (메서드 분배) 이 `PlaybackCore` 와 router 두 곳에 있게 된 것을 한 곳으로. 협력 인터페이스의 운영 구현 3개를 기존 private 함수에 연결 (PC-04 ~ PC-06)
     - GREEN 에서 생긴 중복 (있으면)
-  - [ ] 6.2 **사람 승인 대기 (관문 3)**: 후보 표를 보여 주고 승인받는다. 정리할 것이 없으면 "대상 없음"
+  - [x] 6.2 **사람 승인 대기 (관문 3)**: 후보 표를 보여 주고 승인받는다. 정리할 것이 없으면 "대상 없음"
   - [ ] 6.3 승인된 후보를 하나씩 적용한다. 후보마다: 범위 선언 (바뀌지 않는 것 포함) → 변경 → Kotlin 테스트 통과 · 테스트가 고정 커밋과 같음 확인 → 커밋. 실패하면 바로 되돌리고 원인을 보고한다
   - [ ] 6.4 완료 확인: Kotlin 테스트 통과, 테스트가 고정 커밋과 같음, `flutter build apk --debug` 성공
   - [ ] 커밋: 후보마다 `refactor: ...`

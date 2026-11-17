@@ -517,3 +517,12 @@
 **Context**: CONSTRUCTION - Code Generation (android-native-tests), Step 6.1 완료 → 6.2 사람 관문 3 대기
 
 ---
+
+## Code Generation (android-native-tests) - REFACTOR 후보 승인 (관문 3)
+**Timestamp**: 2026-11-17T04:53:07Z
+**User Input**: "승인 + 나"
+**AI Response**: "후보 #1 → #2 → #7 적용 승인, #3 ~ #6 은 그대로 둠. 실패 로그 (O-8) 는 '나' = PlaybackCore.kt 의 PlayerControls 감싸개가 예외를 로그로 남기고 다시 던짐. channel 이 null 일 때 AuthControls.initialize 는 권장안 (아무 일도 하지 않고 false → init_failed) 으로 진행 (승인 요청에 '따로 말씀이 없으면 권장안' 으로 안내함). 같은 하위 에이전트가 후보를 하나씩 적용하고, 후보마다 주 세션이 테스트 · 고정 비교 · 빌드를 확인한 뒤 커밋"
+**Status**: Approved
+**Context**: CONSTRUCTION - Code Generation (android-native-tests), Step 6.2 완료 → 6.3
+
+---
