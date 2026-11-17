@@ -746,3 +746,19 @@
 **Context**: Traceability Check ② Construction, GAP 보완 (FR-09, NFR-02)
 
 ---
+
+## Traceability Check ② - PR 생성 지시
+**Timestamp**: 2026-11-17T07:34:00Z
+**User Input**: "A로 진행해줘"
+**AI Response**: "브랜치 푸시만으로는 CI 가 실행되지 않음 (workflow 는 main 푸시와 PR 에서만 실행) 을 알리고 선택지를 제시한 뒤, A (초안 PR) 로 진행. 초안 PR #1 생성 (main ← aidlc/test-reinforcement). CI run 44039821871 success: 점검 · debug APK 빌드 (키 없음) · APK 산출물 업로드 모두 성공, 산출물 app-debug-nokeys (14일 뒤 만료). build-and-test-summary.md 에 'CI 실행' 절 추가"
+**Context**: Traceability Check ② Construction, GAP 보완
+
+---
+
+## Traceability Check ② Construction (2회차)
+**Timestamp**: 2026-11-17T07:43:54Z
+**User Input**: "푸시하고 다시 점검" (2026-11-17, 위 보완 지시)
+**AI Response**: "판정 통과. OK 13 · GAP 0 · ORPHAN 0 · Deferred 1 · N/A 0. 1회차의 GAP 2건 (FR-09, NFR-02 의 CI 실행 근거) 은 PR #1 의 CI 실행으로 해소. Deferred 는 NFR-03 (간헐 실패 수용) 그대로. 일관성 경고 3건은 그대로. 결과 파일 aidlc-docs/verification/phase-check-construction.md (회차 2)"
+**Context**: CONSTRUCTION → OPERATIONS 경계 추적 점검 (Operations 는 모두 SKIP)
+
+---

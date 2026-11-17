@@ -1,7 +1,7 @@
 # Traceability Check 결과 — ② Construction (Construction → Operations)
 
-- **점검 시각**: 2026-11-17T07:32:10Z
-- **회차**: 1
+- **점검 시각**: 2026-11-17T07:43:54Z
+- **회차**: 2 (1회차: 미통과, GAP 2건 = FR-09 · NFR-02 의 CI 실행 근거 없음. 푸시와 초안 PR #1 로 CI 를 실행한 뒤 다시 점검)
 - **대상 결정**: 인자 `construction`
 - **입력 파일**:
   - `aidlc-docs/inception/requirements/requirements.md`
@@ -17,16 +17,16 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 판정 | 미통과 |
+| 판정 | 통과 |
 | 정방향 대상 수 | 14 (FR 9 · NFR 5 · AC 0) |
-| OK | 11 |
-| GAP | 2 |
+| OK | 13 |
+| GAP | 0 |
 | Deferred | 1 |
 | N/A | 0 (User Story · AC 고리는 stage SKIP 으로 전체 N/A) |
 | ORPHAN (역방향) | 0 |
-| 커버리지 | ② 요구 → 테스트 14/14, 테스트 → 실행 통과: 로컬 14/14, CI 실행 근거 0/2 (CI 를 요구하는 FR-09 · NFR-02) |
+| 커버리지 | ② 요구 → 테스트 14/14, 테스트 → 실행 통과: 로컬 14/14, CI 2/2 (CI 를 요구하는 FR-09 · NFR-02) |
 
-GAP 2건은 원인이 하나다: 브랜치를 푸시하지 않아 CI 실행 결과가 없다. 구현과 로컬 실행 근거는 있다.
+1회차의 GAP 2건 (CI 실행 근거 없음) 은 초안 PR #1 의 CI 실행 (run 44039821871, success) 으로 해소되었다. Deferred 1건 (NFR-03) 은 그대로다.
 
 ## 2. 정방향 추적 (요구 → 하위 산출물)
 
@@ -44,9 +44,9 @@ User Stories stage 를 SKIP 했으므로 "User Story" 고리는 모든 행에서
 | FR-06 `PlaybackCore` 테스트 | N/A | `android-native-tests` | android 계획 Step 4, 5 | `PlaybackCommandRouter.kt`, `ChannelAdapter.kt` / `PlaybackCommandRouterTest.kt` (`CR-01` ~ `CR-13`, `P-CR-1` ~ `P-CR-6`, 32개), `ChannelAdapterTest.kt` (`PC-01`, `PC-02`, 5개) | PASS | OK | 요구사항대로 router 로 검증. `PlaybackCore` 의 Android 연결부 (PC-03 ~ PC-07) 는 테스트 대상에서 제외한다고 story map 에 적혀 있음 |
 | FR-07 테스트 용이성을 위한 운영 코드 변경 | N/A | `dart-playback-tests`, `android-native-tests` | dart 계획 Step 2 / android 계획 Step 3, 5, 6 | `dlna_manager.dart` (`forTesting` 의 `soapClient`), `PlaybackContracts.kt`, `PlaybackCommandRouter.kt`, `ChannelAdapter.kt`, `PlaybackCore.kt`, `TidalPlayerManager.kt`, `TidalStreamProxyServer.kt` (생성자) | PASS (전체 테스트 통과, debug APK 빌드 성공) | OK | 실기기 확인은 NFR-02 가 완료 기준 밖으로 정함 |
 | FR-08 발견 버그 수정 | N/A | `dart-playback-tests`, `android-native-tests` | dart 계획 Step 16 / android 계획 Step 8 | Dart: 발견한 버그 없음. Kotlin: `TidalStreamProxyServer.kt` (`8e5b417`), `docs/incidents/2026-11-17-head-content-length-minus-one.md`, 테스트 `PX-17` · `PX-19` · `PX-38` | PASS | OK | 실패 테스트 → `fix:` 커밋 → 문서의 절차를 따름 |
-| FR-09 CI 에 커버리지 점검과 APK 빌드 단계 추가 | N/A | `ci-quality-gate` | ci 계획 Step 1 ~ 4 | `tool/coverage_gate.dart`, `tool/check.sh`, `.github/workflows/check.yml` / `coverage_gate_test.dart` (`[GT-01]` ~ `[GT-13]`, `[P-GT-1]` ~ `[P-GT-5]`, 22개) | 로컬: PASS (`tool/check.sh`, 키 없는 APK 빌드). **CI: 실행 근거 없음** | GAP | 끊긴 고리: 실행 결과. workflow 를 고쳤지만 푸시하지 않아 CI 에서 돈 기록이 없다 |
+| FR-09 CI 에 커버리지 점검과 APK 빌드 단계 추가 | N/A | `ci-quality-gate` | ci 계획 Step 1 ~ 4 | `tool/coverage_gate.dart`, `tool/check.sh`, `.github/workflows/check.yml` / `coverage_gate_test.dart` (`[GT-01]` ~ `[GT-13]`, `[P-GT-1]` ~ `[P-GT-5]`, 22개) | 로컬: PASS (`tool/check.sh`, 키 없는 APK 빌드). CI: PASS (run 44039821871: 점검 · APK 빌드 · 업로드 성공, 산출물 `app-debug-nokeys`, 14일 뒤 만료) | OK | `build-and-test-summary.md` 의 "CI 실행" |
 | NFR-01 커버리지 목표 | N/A | 세 unit | dart 계획 Step 18 / android 계획 Step 9.2 / ci 계획 Step 6.1 | 위 테스트 파일들, `tool/coverage_gate.dart` | PASS: 대상 4개 100.0 / 99.4 / 99.2 / 98.7% (기준 80%). Kotlin 은 규칙 53개 모두에 테스트 | OK | |
-| NFR-02 점검 통과 (로컬과 CI) | N/A | 세 unit | 각 계획의 검증 Step | `tool/check.sh`, `check.yml` | 로컬: PASS (`모든 점검 통과`). **CI: 실행 근거 없음** | GAP | 끊긴 고리: 실행 결과 (CI 부분). 요구사항은 "로컬과 CI 에서 모두 통과" 다 |
+| NFR-02 점검 통과 (로컬과 CI) | N/A | 세 unit | 각 계획의 검증 Step | `tool/check.sh`, `check.yml` | 로컬: PASS (`모든 점검 통과`). CI: PASS (run 44039821871 의 "점검" 단계 성공) | OK | `build-and-test-summary.md` 의 "CI 실행" |
 | NFR-03 테스트 결정성 · 속도 | N/A | `dart-playback-tests`, `android-native-tests` | dart 계획 Step 18 / android 계획 Step 9.3 ~ 9.5 | 가짜 시계 (`fake_async`), 임시 포트, 고정 seed | Dart: 10회 동일. 속도: 기준 안. Kotlin: **10회 연속 동일 기준 미충족** (프록시 테스트 간헐 실패, 약 135회 중 4회) | Deferred | `audit.md` "간헐 실패 조사 중단 지시" (사용자: "멈춰. 그정도는 괜찮아."). 원인 미확인 상태로 수용 |
 | NFR-04 속성 기반 테스트 | N/A | 세 unit | dart 계획의 속성 테스트 Step / android 계획 Step 2, 4 / ci 계획 Step 2 | Dart 속성 18개 + 5개 (`kiri_check`), Kotlin 속성 12개 (`kotest-property`) | PASS | OK | |
 | NFR-05 유지보수성 | N/A | `dart-playback-tests` | dart 계획 Step 3, 18 | `test/helpers/` 의 fake · 도우미, 줄 길이 120 | PASS (포맷 검사 통과) | OK | |
@@ -75,7 +75,6 @@ ORPHAN 없음.
 
 | 대상 | 문제 | 보완할 산출물 | 담당 stage |
 | --- | --- | --- | --- |
-| FR-09, NFR-02 | CI 실행 근거 없음 | 브랜치를 푸시해 `check` workflow 를 실행하고, 결과 (통과 여부, 산출물 `app-debug-nokeys`) 를 `build-and-test-summary.md` 에 적는다 | Build and Test |
 | NFR-03 | 요구사항과 수용한 상태가 다름 | `requirements.md` 의 NFR-03 에 수용 사실을 적거나, 간헐 실패의 원인을 조사해 고친다 | Requirements Analysis 또는 Code Generation (android-native-tests) |
 | NFR-06, NFR-07 | 상위 요구사항 문서에 없는 번호 | `requirements.md` 에 두 항목을 더하거나, unit 문서에서 상위 요구 (NFR-02) 의 하위 번호로 바꾼다 | Requirements Analysis |
 
@@ -83,7 +82,7 @@ ORPHAN 없음.
 
 - AI 가 문서를 대조한 결과이며 기계 검증 (2.x `traceability.json` + 검사 엔진) 이 아님
 - User Story · AC 가 없는 프로젝트라 (stage SKIP) FR · NFR 14개를 단위로 점검했다. AC 단위의 정상 · 경계 · 오류 구분은 하지 않았고, 대신 unit 의 규칙 ID (PB, DB, DM, WA, CR, PC, PX, GT) 가 테스트 이름에 있는지로 대조했다
-- "실행 결과" 는 2026-11-17 의 로컬 실행 (`build-and-test-summary.md`) 이다. 이 점검에서 테스트를 다시 실행하지 않았다
+- "실행 결과" 는 2026-11-17 의 로컬 실행과 CI 실행 1회 (`build-and-test-summary.md`) 다. CI 는 한 번 통과한 것이며, Kotlin 프록시 테스트의 간헐 실패 때문에 매번 통과한다는 뜻은 아니다
 - ② 의 실행 결과 고리는 과정 확장이다 (2.x Gate 3 범위 밖)
 - 실기기 동작은 요구사항 (NFR-02) 이 완료 기준 밖으로 정해 점검 대상이 아니다. 실기기에서 확인되지 않은 변경이 있다는 사실은 `build-and-test-summary.md` 의 "알려진 문제" 에 있다
 
