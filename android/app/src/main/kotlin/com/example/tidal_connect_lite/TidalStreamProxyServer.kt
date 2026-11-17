@@ -221,9 +221,6 @@ class TidalStreamProxyServer(
         }
     }
 
-    /**
-     * TIDAL Direct CDN URL을 스피커로 투명하게 릴레이 (Range 및 Content-Type 완벽 지원)
-     */
     /** HEAD 요청에는 본문 없이 형식과 길이만 알려준다. */
     private fun headResponse(info: StreamInfo): Response {
         var length = -1L
@@ -256,6 +253,9 @@ class TidalStreamProxyServer(
         return response
     }
 
+    /**
+     * TIDAL Direct CDN URL을 스피커로 투명하게 릴레이 (Range 및 Content-Type 완벽 지원)
+     */
     private fun proxyDirectCdn(session: IHTTPSession, token: String, info: StreamInfo, allowRefresh: Boolean): Response {
         val cdnUrl = info.directUrl
         val mimeType = info.mimeType
