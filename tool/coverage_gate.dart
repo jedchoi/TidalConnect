@@ -17,6 +17,9 @@ const coverageTargets = <String>[
 /// 대상 파일마다 넘어야 하는 라인 커버리지(%). 정확히 이 값이면 통과다.
 const coverageThresholdPercent = 80;
 
+/// 보고서의 비율 칸 폭. `기록 없음`의 화면 폭(한글은 두 칸)에 맞춘다.
+const _ratioColumnWidth = 9;
+
 /// lcov에 기록된 파일 하나의 줄 수.
 class FileCoverage {
   const FileCoverage({required this.path, required this.hitLines, required this.totalLines});
@@ -119,8 +122,8 @@ String formatReport(GateResult result) {
 
   final out = StringBuffer();
   for (final (index, target) in result.targets.indexed) {
-    // 비율 칸은 `기록 없음`의 화면 폭(한글은 두 칸)에 맞춰 9칸으로 둔다.
-    final ratio = target.hasNoRecord ? '기록 없음' : _percent(target.hitLines, target.totalLines).padLeft(9);
+    final ratio =
+        target.hasNoRecord ? '기록 없음' : _percent(target.hitLines, target.totalLines).padLeft(_ratioColumnWidth);
     out.write('${target.target.padRight(pathWidth)}  ${counts[index].padLeft(countWidth)}  $ratio  ');
     out.write(target.passed ? '통과' : '실패');
     if (!target.passed && !target.hasNoRecord) out.write('  ${target.missingLines}줄 부족');
