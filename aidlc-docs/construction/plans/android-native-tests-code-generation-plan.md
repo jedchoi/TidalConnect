@@ -68,10 +68,10 @@
     - router 담당: CR-01 ~ CR-13, PC-01 ~ PC-02, P-CR-1 ~ P-CR-6. 경계는 `PlaybackCommandRouter.handle` 과 `ChannelAdapter.kt` 의 함수
     - 프록시 담당: PX-01 ~ PX-38, P-PX-1 ~ P-PX-6. 경계는 `registerTrackStream` 과 HTTP 요청
   - [x] 4.2 **사람 승인 대기 (관문 1)**: 테스트 경계 표를 보여 주고 승인받는다
-  - [ ] 4.3 승인된 표대로 하위 에이전트가 테스트를 쓴다 (모두 `android/app/src/test/kotlin/com/example/tidal_connect_lite/` 에 새로 만듦)
+  - [x] 4.3 승인된 표대로 하위 에이전트가 테스트를 쓴다 (모두 `android/app/src/test/kotlin/com/example/tidal_connect_lite/` 에 새로 만듦)
     - router 담당: `RouterFakes.kt`, `RouterGenerators.kt`, `PlaybackCommandRouterTest.kt`, `ChannelAdapterTest.kt`
     - 프록시 담당: `FakeCdnServer.kt`, `ProxyFixture.kt`, `ProxyGenerators.kt`, `TidalStreamProxyServerTest.kt`
-  - [ ] 4.4 테스트 실행 → RED 판정 표 (열: 테스트 · 결과 · 실패 종류 · RED 인정). 테스트 쪽 오류 (컴파일 오류 · 이름 오류 · fake 오류) 는 RED 로 인정하지 않고 하위 에이전트가 고쳐 다시 실행한다
+  - [x] 4.4 테스트 실행 → RED 판정 표 (열: 테스트 · 결과 · 실패 종류 · RED 인정). 테스트 쪽 오류 (컴파일 오류 · 이름 오류 · fake 오류) 는 RED 로 인정하지 않고 하위 에이전트가 고쳐 다시 실행한다
     - router · 변환 테스트: 뼈대라 실패하는 것이 정상. 뼈대에서 이미 통과하는 것 (예: CR-03) 은 "보호" 로 표시
     - 프록시 테스트: 기존 코드라 통과하는 것이 정상 ("보호"). 실패하는 것이 있으면 규칙 문서와 코드 중 어느 쪽이 다른지 표에 적는다
   - [ ] 4.5 **사람 판정 대기 (관문 2)**: "RED 확인" 응답을 받기 전에는 고정하지 않는다

@@ -476,3 +476,11 @@
 **Context**: CONSTRUCTION - Code Generation (android-native-tests), Step 4.2 완료 → 4.3
 
 ---
+
+## Code Generation (android-native-tests) - RED 2~4단계: 테스트 작성 · 실행 · 판정 표 (관문 2 요청)
+**Timestamp**: 2026-11-17T03:45:46Z
+**User Input**: (없음)
+**AI Response**: "하위 에이전트 2개가 승인된 표대로 테스트 파일 8개 작성 (router: @Test 32 + 5, 프록시: @Test 45). 주 세션이 전체를 다시 실행해 대조: 86개 중 36개 실패 (기존 DashManifestTest 4개 포함). router · 변환 37개 중 33개 실패 (모두 기대값 불일치, RED 인정) · 4개 보호 (CR-03, P-CR-1, P-CR-6, PC-01 b) — 경계 표 예상과 같음. 프록시 45개 중 42개 보호 · 3개 실패 (PX-17, PX-19, PX-38 c): 길이를 모르는 HEAD 응답에 Content-Length: -1 이 실제로 나감 (규칙과 코드 주석은 '알리지 않는다'). 테스트 쪽 오류 0건, src/main 변경 없음, 3회 실행 결과 동일, 프록시 클래스 실행 약 2.6초. 판정 표: code/red-result-router.md, code/red-result-proxy.md. 사람 판정 요청: RED 확인 + F-1 을 버그로 볼지 (코드 수정) 문서를 고칠지"
+**Context**: CONSTRUCTION - Code Generation (android-native-tests), Step 4.3 · 4.4 완료 → 4.5 사람 관문 2 대기
+
+---
