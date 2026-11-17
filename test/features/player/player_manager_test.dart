@@ -6,6 +6,7 @@ import 'package:tidal_connect_lite/features/auth/data/tidal_auth_repository.dart
 import 'package:tidal_connect_lite/features/player/data/backends/playback_backend.dart';
 import 'package:tidal_connect_lite/features/player/data/player_manager.dart';
 import 'package:tidal_connect_lite/features/tidal_api/domain/models/media_item.dart';
+import '../../helpers/fake_backend.dart';
 import '../../helpers/fakes.dart';
 
 MediaTrack t(String id) => MediaTrack(
@@ -16,45 +17,6 @@ MediaTrack t(String id) => MediaTrack(
       coverUrl: '',
       durationSeconds: 180,
     );
-
-/// 재생 요청을 기록하고, 테스트가 이벤트를 직접 흘려보낼 수 있는 가짜 출력 기기.
-class FakeBackend implements PlaybackBackend {
-  final controller = StreamController<BackendEvent>.broadcast(sync: true);
-  final played = <String>[];
-  Future<void> Function(MediaTrack track)? onPlay;
-
-  @override
-  Stream<BackendEvent> get events => controller.stream;
-
-  @override
-  bool get canSeek => true;
-
-  @override
-  Future<void> play(MediaTrack track,
-      {Duration startPosition = Duration.zero, required IsCancelled isCancelled}) async {
-    played.add(track.id);
-    await onPlay?.call(track);
-  }
-
-  @override
-  Future<void> pause() async {}
-  @override
-  Future<void> resume() async {}
-  @override
-  Future<void> seek(Duration position) async {}
-  @override
-  Future<void> stop() async {}
-
-  final nextRequests = <String?>[];
-  @override
-  Future<void> setNext(MediaTrack? track) async => nextRequests.add(track?.id);
-
-  String? quality;
-  @override
-  Future<void> setAudioQuality(String quality) async {
-    this.quality = quality;
-  }
-}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

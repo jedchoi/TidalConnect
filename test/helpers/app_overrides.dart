@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tidal_connect_lite/core/providers.dart';
@@ -107,11 +109,34 @@ class FakeApiClient extends TidalApiClient {
   Future<List<MediaAlbum>> searchAlbums(String query, {int limit = 20}) => _empty('searchAlbums');
   @override
   Future<List<MediaPlaylist>> searchPlaylists(String query, {int limit = 20}) => _empty('searchPlaylists');
+
+  /// 곡 ID별 스트림 정보. 여기에 없는 곡은 [defaultPlaybackInfo]를 쓴다(기본 null = 스트림 없음).
+  final Map<String, TidalPlaybackInfo?> playbackInfos = {};
+  TidalPlaybackInfo? defaultPlaybackInfo;
+
+  /// 지정하면 [getPlaybackInfo]가 이 Completer가 끝날 때까지 응답을 미룬다.
+  Completer<void>? playbackInfoGate;
+
+  @override
+  Future<TidalPlaybackInfo?> getPlaybackInfo(String trackId, {String quality = 'LOSSLESS'}) async {
+    calls.add('getPlaybackInfo:$trackId:$quality');
+    await playbackInfoGate?.future;
+    return playbackInfos.containsKey(trackId) ? playbackInfos[trackId] : defaultPlaybackInfo;
+  }
 }
 
-/// 소켓을 열지 않고 폰 스피커만 돌려주는 SSDP 탐색기.
+/// 소켓을 열지 않는 SSDP 탐색기. 기본은 폰 스피커만 돌려준다.
 class FakeSsdpDiscoveryService extends SSDPDiscoveryService {
   int callCount = 0;
+
+  /// 찾은 것으로 돌려줄 원격 기기. 실제 탐색기처럼 폰 스피커가 항상 맨 앞에 붙는다.
+  List<DlnaDevice> devices = const [];
+
+  /// 지정하면 탐색이 이 예외로 실패한다.
+  Object? error;
+
+  /// 지정하면 기기를 알린 뒤 이 Completer가 끝날 때까지 탐색 완료를 미룬다.
+  Completer<void>? gate;
 
   @override
   Future<List<DlnaDevice>> discoverDevices({
@@ -119,7 +144,15 @@ class FakeSsdpDiscoveryService extends SSDPDiscoveryService {
     void Function(DlnaDevice device)? onDeviceFound,
   }) async {
     callCount++;
-    return [DlnaDevice.localSpeaker];
+    final found = [DlnaDevice.localSpeaker];
+    for (final device in devices) {
+      found.add(device);
+      onDeviceFound?.call(device);
+    }
+    await gate?.future;
+    final failure = error;
+    if (failure != null) throw failure;
+    return found;
   }
 }
 
