@@ -67,7 +67,7 @@
   - [x] 4.1 `tdd-red` 스킬을 불러 절차를 확인한다. 하위 에이전트 2개가 설계 문서만 보고 테스트 경계 표를 만든다 (열: 규칙 ID · 경계 · 입력 · 기대값 · 테스트 파일)
     - router 담당: CR-01 ~ CR-13, PC-01 ~ PC-02, P-CR-1 ~ P-CR-6. 경계는 `PlaybackCommandRouter.handle` 과 `ChannelAdapter.kt` 의 함수
     - 프록시 담당: PX-01 ~ PX-38, P-PX-1 ~ P-PX-6. 경계는 `registerTrackStream` 과 HTTP 요청
-  - [ ] 4.2 **사람 승인 대기 (관문 1)**: 테스트 경계 표를 보여 주고 승인받는다
+  - [x] 4.2 **사람 승인 대기 (관문 1)**: 테스트 경계 표를 보여 주고 승인받는다
   - [ ] 4.3 승인된 표대로 하위 에이전트가 테스트를 쓴다 (모두 `android/app/src/test/kotlin/com/example/tidal_connect_lite/` 에 새로 만듦)
     - router 담당: `RouterFakes.kt`, `RouterGenerators.kt`, `PlaybackCommandRouterTest.kt`, `ChannelAdapterTest.kt`
     - 프록시 담당: `FakeCdnServer.kt`, `ProxyFixture.kt`, `ProxyGenerators.kt`, `TidalStreamProxyServerTest.kt`
