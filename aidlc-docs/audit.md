@@ -654,3 +654,12 @@
 **Context**: CONSTRUCTION - Code Generation (ci-quality-gate), Step 2.4 완료 → 2.5 사람 관문 2 대기
 
 ---
+
+## Code Generation (ci-quality-gate) - RED 판정 (관문 2) · 테스트 고정
+**Timestamp**: 2026-11-17T06:13:50Z
+**User Input**: "RED 확인"
+**AI Response**: "RED 확인 기록. test/tool/coverage_gate_test.dart 를 커밋 7d9ad11 로 고정하고 해시를 계획 파일에 기록. 다음: 새 하위 에이전트로 GREEN (Step 3) 과 연결 (Step 4)"
+**Status**: Approved
+**Context**: CONSTRUCTION - Code Generation (ci-quality-gate), Step 2 완료 → Step 3
+
+---
