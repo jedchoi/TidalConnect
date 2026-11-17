@@ -171,7 +171,7 @@ Map<String, Map<int, bool>> _parseLineHits(String content) {
       final number = int.tryParse(fields[0]);
       final count = int.tryParse(fields[1]);
       if (number == null || count == null) continue;
-      _mergeLineHits(current, {number: count >= 1});
+      _mergeLineHit(current, number, count >= 1);
     }
   }
   return files;
@@ -180,10 +180,15 @@ Map<String, Map<int, bool>> _parseLineHits(String content) {
 /// lcov의 [path]가 [target]의 기록인지. 같거나 `/<대상 경로>`로 끝나면 맞다(절대 경로 허용).
 bool _matchesTarget(String path, String target) => path == target || path.endsWith('/$target');
 
-/// [from]의 줄 기록을 [into]에 합친다. 한 번이라도 실행된 줄은 실행된 줄이다.
+/// 줄 하나의 기록을 [into]에 합친다. 한 번이라도 실행된 줄은 실행된 줄이다.
+void _mergeLineHit(Map<int, bool> into, int number, bool hit) {
+  into[number] = (into[number] ?? false) || hit;
+}
+
+/// [from]의 줄 기록을 [into]에 합친다.
 void _mergeLineHits(Map<int, bool> into, Map<int, bool> from) {
   for (final MapEntry(key: number, value: hit) in from.entries) {
-    into[number] = (into[number] ?? false) || hit;
+    _mergeLineHit(into, number, hit);
   }
 }
 
