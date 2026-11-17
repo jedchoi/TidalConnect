@@ -1,6 +1,6 @@
 // 대상 파일의 라인 커버리지가 기준에 미치는지 검사한다.
 //
-// 사용법: dart run tool/coverage_gate.dart [lcov 파일 경로]
+// 사용법: dart tool/coverage_gate.dart [lcov 파일 경로]
 // 경로를 주지 않으면 coverage/lcov.info 를 읽는다. 먼저 `flutter test --coverage` 로 만들어야 한다.
 // 종료 코드: 통과 0, 실패 1.
 import 'dart:io';
