@@ -1726,6 +1726,79 @@ void main() {
         expect(h.described, ['position(28/180)', 'state(playing)']);
       });
     });
+
+    test('[DB-62c] 탐색 전에 보낸 조회의 STOPPED 응답이 탐색 도중 도착하면 버리고, 탐색 뒤 폴링은 새 흐름으로 이어진다', () {
+      // DB-62c: 마지막 위치 178초(길이 − 3초 이상)에서 STOPPED 를 받으면 곡 종료(DB-23)지만, 탐색 중에 도착한 응답은 버린다.
+      withHarness((async, h) {
+        startDash(async, h, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 178);
+        h.poll(async);
+        h.clearRecords();
+        // 폴링 차례: 조회가 나가고 응답(STOPPED)은 붙잡혀 있다.
+        respond(h, state: 'STOPPED', rel: 0);
+        h.soap.hold('GetTransportInfo');
+        h.poll(async);
+        expect(h.soap.countOf('GetTransportInfo'), 1);
+        // 탐색 시작: 등록 응답을 붙잡아 진행 중으로 둔다.
+        h.answerStartOffset(const Duration(seconds: 30));
+        h.channel.hold('registerTrackStream');
+        final result = h.seek(async, const Duration(seconds: 31));
+        expect(result.completed, isFalse);
+
+        h.soap.release('GetTransportInfo');
+        async.flushMicrotasks();
+
+        expect(h.events, isEmpty);
+
+        h.channel.release('registerTrackStream');
+        async.flushMicrotasks();
+        expect(result.error, isNull);
+        expect(result.completed, isTrue);
+        expect(h.described, ['position(30/180)', 'state(playing,buffering)']);
+
+        // 폴링은 멈추지 않았고 새 흐름(오프셋 30초, 상대) 기준이다.
+        h.clearRecords();
+        respond(h, state: 'PLAYING', rel: 1);
+        h.poll(async);
+        expect(h.soap.countOf('GetTransportInfo'), 1);
+        expect(h.described, ['position(31/180)', 'state(playing)']);
+      });
+    });
+
+    test('[DB-62c] 탐색 전에 보낸 조회의 STOPPED 응답이 도착한 뒤 탐색이 실패해도 폴링은 탐색 전 상태로 이어진다', () {
+      // DB-62c, DB-62b, DB-53: 버린 응답은 상태를 바꾸지 않는다(폴링 중지 없음, PLAYING 을 본 상태 · 마지막 위치 178초 유지).
+      withHarness((async, h) {
+        startDash(async, h, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 178);
+        h.poll(async);
+        h.clearRecords();
+        respond(h, state: 'STOPPED', rel: 0);
+        h.soap.hold('GetTransportInfo');
+        h.poll(async);
+        expect(h.soap.countOf('GetTransportInfo'), 1);
+        h.channel.failing.add('registerTrackStream');
+        h.channel.hold('registerTrackStream');
+        final result = h.seek(async, const Duration(seconds: 31));
+
+        h.soap.release('GetTransportInfo');
+        async.flushMicrotasks();
+
+        expect(h.events, isEmpty);
+
+        h.channel.release('registerTrackStream');
+        async.flushMicrotasks();
+        expect(result.errorCode, 'PROXY_FAILED');
+        expect(h.events, isEmpty);
+
+        // 폴링이 이어진다. 탐색 전 상태 그대로이므로 이후의 STOPPED 는 곡 종료다(179초 ≥ 180 − 3초).
+        h.clearRecords();
+        respond(h, state: 'PLAYING', rel: 179);
+        respond(h, state: 'STOPPED', rel: 0);
+        h.poll(async, 2);
+        expect(h.soap.countOf('GetTransportInfo'), 2);
+        expect(h.described, ['position(179/180)', 'state(playing)', 'position(0/180)', 'ended(101)']);
+      });
+    });
   });
 
   group('위치 보정 (dash-seek)', () {
