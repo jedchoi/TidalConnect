@@ -1,6 +1,7 @@
 name: check
 
-# 푸시와 PR마다 tool/check.sh와 같은 점검(포맷, analyze, flutter test, Kotlin 단위 테스트)을 실행한다.
+# 푸시와 PR마다 tool/check.sh와 같은 점검(포맷, analyze, flutter test + 커버리지 검사, Kotlin 단위 테스트)을
+# 실행하고, 통과하면 키 없는 debug APK를 빌드해 산출물(app-debug-nokeys)로 올린다.
 on:
   push:
     branches: [main]
@@ -33,3 +34,16 @@ jobs:
 
       - name: 점검
         run: tool/check.sh
+
+      # 빌드가 되는지 확인하는 용도다. 공개 저장소의 산출물은 누구나 받을 수 있으므로 TIDAL 키를 넣지 않는다.
+      # 키가 없어 이 APK는 설치하면 시작할 때 assert로 멈춘다. 설치용은 로컬에서 키 파일로 빌드한다.
+      - name: debug APK 빌드 (키 없음)
+        run: flutter build apk --debug
+
+      - name: APK 산출물 업로드
+        uses: actions/upload-artifact@v7
+        with:
+          name: app-debug-nokeys
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 14
+          if-no-files-found: error
