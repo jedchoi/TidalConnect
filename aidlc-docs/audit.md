@@ -425,3 +425,20 @@
 
 ---
 
+## Code Generation (android-native-tests) - Part 1 계획 · 승인 요청
+**Timestamp**: 2026-11-17T02:08:33Z
+**User Input**: (없음)
+**AI Response**: "aidlc-docs/construction/plans/android-native-tests-code-generation-plan.md 생성 (Step 10개: 준비 1~3, RED 4 (tdd-red), GREEN 5 (tdd-green), REFACTOR 6 (tdd-refactor), 변형 확인 7, 발견 처리 8, 검증 9, 요약 10. 사람 관문 3개: 테스트 경계 표 승인 4.2, RED 판정 4.5, 리팩토링 후보 승인 6.2. 커밋 6개 이상, RED 고정 커밋은 실패하는 테스트를 담음). NFR Design 과 달라진 점: 프록시 테스트도 하위 에이전트가 설계 문서만 보고 작성 (NFR Design TW-8 은 '이 세션이 작성' 이었음. 사용자의 TDD 스킬 활용 지시에 맞춰 독립성을 높임). 확장 준수: PBT-01~10 compliant (속성 12개가 Step 4 에, seed · 실행 횟수 Step 2, 모델 비교 P-PX-3, 예시 테스트와 병행) / Resiliency N/A. 승인 요청 문구: 'unit 코드 생성 계획을 검토해 주세요. 이 계획대로 코드 생성 (Part 2) 을 진행할까요? 승인은 계획에 적힌 로컬 커밋을 포함합니다.'"
+**Context**: CONSTRUCTION - Code Generation (android-native-tests), Part 1 Step 6~7
+**AI 점검**: ✅ 5 · ⚠️ 2 · ❌ 0
+
+---
+
+## Code Generation (android-native-tests) - Part 1 계획 승인 · 단계별 커밋 요청
+**Timestamp**: 2026-11-17T02:10:25Z
+**User Input**: "각 red/green/refactor 단계마다 commit 하면서 가고 있어? 그 전 계획들도 단계마다 commit 했어? 안했으면 지금 나눠서 진행하고, 커밋을 마치면 다음단계를 계속 진행해"
+**AI Response**: "답: RED · GREEN · REFACTOR 는 계획에 단계별 커밋이 있으나 아직 시작 전. android-native-tests 의 Functional Design · NFR Requirements · NFR Design · 코드 생성 계획은 커밋되지 않은 상태였음. 지금 stage 별로 나눠 커밋 (4개) 하고, '커밋을 마치면 다음단계를 계속 진행해' 를 코드 생성 계획 승인으로 받아 Part 2 를 시작. 앞으로 stage 가 승인될 때마다 바로 커밋"
+**Status**: Approved
+**Context**: CONSTRUCTION - Code Generation (android-native-tests), Part 1 완료 → Part 2
+
+---
