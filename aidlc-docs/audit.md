@@ -688,3 +688,12 @@
 **Context**: CONSTRUCTION - Code Generation (ci-quality-gate), Step 5.2 완료 → 5.3
 
 ---
+
+## Code Generation (ci-quality-gate) - REFACTOR · 검증 · 완료 승인 요청
+**Timestamp**: 2026-11-17T06:34:58Z
+**User Input**: (없음)
+**AI Response**: "REFACTOR R1 ~ R5 를 후보별로 다시 확인해 커밋 (582ca22, e8a3f72, c85aeca, 66fcd49, 2b65a50). Step 6 검증: tool/check.sh 전체 통과 (Dart 284, Kotlin 86), 실제 lcov 를 고쳐 기록 없음 · 73.0% 를 만들면 종료 코드 1, 변형 21개 중 19개 감지 (살아남음: 같은 줄 기록을 마지막 값으로 덮어씀, 줄의 앞뒤 공백을 떼지 않음), JAVA_HOME 없이 통과, --skip-android 통과, 시간 증가 약 4 ~ 5초, 키 없는 debug APK 빌드 성공, YAML 해석 통과, 새 테스트 10회 동일, 키 값 0건. 확인하지 못함: CI 의 실제 실행, JDK 탐색의 나머지 분기. code/code-summary.md 작성. 확장 준수: PBT-01 ~ 03 · 07 ~ 10 compliant, 04 ~ 06 N/A / RESILIENCY-04 compliant, 그 밖 N/A. 완료 메시지 제시 · 승인 대기"
+**Context**: CONSTRUCTION - Code Generation (ci-quality-gate), Part 2 Step 14 · 승인 대기
+**AI 점검**: ✅ 4 · ⚠️ 0 · ❌ 0 (CG-4 ~ CG-7)
+
+---

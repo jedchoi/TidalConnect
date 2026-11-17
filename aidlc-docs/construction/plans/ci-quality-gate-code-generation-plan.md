@@ -120,26 +120,26 @@ Functional Design 을 건너뛰었으므로 `CoverageGate` 의 동작을 여기�
 
 ### REFACTOR (`tdd-refactor` 스킬)
 
-- [ ] **Step 5. 동작을 바꾸지 않는 구조 정리**
+- [x] **Step 5. 동작을 바꾸지 않는 구조 정리**
   - [x] 5.1 GREEN 을 끝낸 에이전트가 후보 표를 만든다 (열: 후보 · 위치 · 이유 · 동작 변화 위험 · 권고)
   - [x] 5.2 **사람 승인 대기 (관문 3)**. 정리할 것이 없으면 "대상 없음"
-  - [ ] 5.3 승인된 후보를 하나씩 적용하고 후보마다 테스트 · 고정 비교 뒤 커밋
+  - [x] 5.3 승인된 후보를 하나씩 적용하고 후보마다 테스트 · 고정 비교 뒤 커밋
 
 ### 검증과 마무리 (이 세션)
 
-- [ ] **Step 6. 검증** (NFR-01-C7, NFR-02-C1 ~ C4, NFR-07-C5 ~ C7)
-  - [ ] 6.1 `tool/check.sh` 전체 통과. 커버리지 표에 대상 4개가 나오는지 확인
-  - [ ] 6.2 검사가 실패를 잡는지 확인: 대상 파일의 테스트 하나를 임시로 빼거나 lcov 를 고쳐 80% 미만 · 기록 없음을 만들고 종료 코드가 0 이 아닌지 본 뒤 되돌린다
-  - [ ] 6.3 변형 확인: `coverage_gate.dart` 를 일부러 틀리게 바꿔 테스트가 실패하는지 확인하고 되돌린다. 잡지 못한 변형은 테스트를 직접 추가하지 않고 보고한다
-  - [ ] 6.4 `JAVA_HOME` 이 없고 Java 가 PATH 에 없는 셸에서 `tool/check.sh` 의 Kotlin 단계가 실행되는지 확인
-  - [ ] 6.5 `tool/check.sh --skip-android` 통과 (커버리지 검사는 실행됨)
-  - [ ] 6.6 실행 시간: 고치기 전후 Dart 테스트 단계를 3회씩 측정, 증가 10초 이하
-  - [ ] 6.7 키 없이 `flutter build apk --debug` 성공 (CI 의 빌드 step 과 같은 명령). `check.yml` 을 YAML 로 해석해 문법 확인
-  - [ ] 6.8 새 테스트 10회 연속 실행, 결과 동일
-  - [ ] 6.9 스크립트 · workflow · 문서에 키 값이 없는지, 복제 파일 (`*_new.*`, `*_modified.*`, `*_v2.*`) 이 없는지, `git status` 에 `coverage/` 가 나오지 않는지 확인
-- [ ] **Step 7. 요약 문서**
-  - [ ] 7.1 `aidlc-docs/construction/ci-quality-gate/code/code-summary.md` 새로 만듦: 수정 · 생성 파일, 규칙 · 속성별 테스트 대응, Step 6 의 실행 결과, 확인하지 못한 것 (CI 의 실제 실행은 푸시해야 확인됨), 계획과 달라진 점
-  - [ ] 커밋: `docs(aidlc): Code Generation (ci-quality-gate) 요약`
+- [x] **Step 6. 검증** (NFR-01-C7, NFR-02-C1 ~ C4, NFR-07-C5 ~ C7)
+  - [x] 6.1 `tool/check.sh` 전체 통과. 커버리지 표에 대상 4개가 나오는지 확인
+  - [x] 6.2 검사가 실패를 잡는지 확인: 대상 파일의 테스트 하나를 임시로 빼거나 lcov 를 고쳐 80% 미만 · 기록 없음을 만들고 종료 코드가 0 이 아닌지 본 뒤 되돌린다
+  - [x] 6.3 변형 확인: `coverage_gate.dart` 를 일부러 틀리게 바꿔 테스트가 실패하는지 확인하고 되돌린다. 잡지 못한 변형은 테스트를 직접 추가하지 않고 보고한다
+  - [x] 6.4 `JAVA_HOME` 이 없고 Java 가 PATH 에 없는 셸에서 `tool/check.sh` 의 Kotlin 단계가 실행되는지 확인
+  - [x] 6.5 `tool/check.sh --skip-android` 통과 (커버리지 검사는 실행됨)
+  - [x] 6.6 실행 시간: 고치기 전후 Dart 테스트 단계를 3회씩 측정, 증가 10초 이하
+  - [x] 6.7 키 없이 `flutter build apk --debug` 성공 (CI 의 빌드 step 과 같은 명령). `check.yml` 을 YAML 로 해석해 문법 확인
+  - [x] 6.8 새 테스트 10회 연속 실행, 결과 동일
+  - [x] 6.9 스크립트 · workflow · 문서에 키 값이 없는지, 복제 파일 (`*_new.*`, `*_modified.*`, `*_v2.*`) 이 없는지, `git status` 에 `coverage/` 가 나오지 않는지 확인
+- [x] **Step 7. 요약 문서**
+  - [x] 7.1 `aidlc-docs/construction/ci-quality-gate/code/code-summary.md` 새로 만듦: 수정 · 생성 파일, 규칙 · 속성별 테스트 대응, Step 6 의 실행 결과, 확인하지 못한 것 (CI 의 실제 실행은 푸시해야 확인됨), 계획과 달라진 점
+  - [x] 커밋: `docs(aidlc): Code Generation (ci-quality-gate) 요약`
 
 ## 요구사항 추적
 
