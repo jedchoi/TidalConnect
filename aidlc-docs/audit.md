@@ -730,3 +730,11 @@
 **Context**: CONSTRUCTION - Build and Test 완료 → workflow 완료
 
 ---
+
+## Traceability Check ② Construction
+**Timestamp**: 2026-11-17T07:32:10Z
+**User Input**: "/traceability-check construction"
+**AI Response**: "판정 미통과. OK 11 · GAP 2 · ORPHAN 0 · Deferred 1 · N/A 0 (정방향 14: FR 9, NFR 5. User Story · AC 고리는 stage SKIP 으로 N/A). GAP: FR-09 · NFR-02 의 CI 실행 근거 없음 (푸시하지 않음). Deferred: NFR-03 (Kotlin 프록시 테스트 간헐 실패를 사용자가 수용). 일관성 경고 3건. 결과 파일 aidlc-docs/verification/phase-check-construction.md"
+**Context**: CONSTRUCTION → OPERATIONS 경계 추적 점검 (Operations 는 모두 SKIP)
+
+---
