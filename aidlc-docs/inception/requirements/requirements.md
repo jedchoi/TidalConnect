@@ -56,7 +56,7 @@
 ### FR-05: `TidalStreamProxyServer` 테스트 (Kotlin)
 `android/app/src/main/kotlin/com/example/tidal_connect_lite/TidalStreamProxyServer.kt` 에 대해 다음을 검증한다:
 - `/ping` 은 200 `pong`, 그 밖의 경로는 404
-- `/audio/{token}.{ext}`: 미등록 토큰 404, `allowedHost` 와 다른 요청 IP 403, CDN URL 없음 400, 스트림 갱신 실패 403 `Stream expired`
+- `/audio/{token}.{ext}`: 미등록 토큰 404, `allowedHost` 와 다른 요청 IP 403, 직접 주소와 매니페스트가 모두 빈 등록 404, 스트림 갱신 실패 403 `Stream expired` (2026-11-17 정정: 처음에 "CDN URL 없음 400" 으로 적었으나 실제 코드는 그보다 먼저 404 를 돌려준다. android-native-tests Functional Design 계획 Q2=A)
 - HEAD 요청은 본문 없이 길이 · 타입 헤더를 돌려준다
 - 직접 CDN 경로가 Range 헤더를 업스트림에 전달한다
 - 토큰 등록이 16자 토큰과 mime 에 맞는 확장자를 가진 URL 을 만든다

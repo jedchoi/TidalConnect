@@ -317,3 +317,45 @@
 **AI 점검**: ✅ 6 · ⚠️ 1 · ❌ 0
 
 ---
+
+## Code Generation (dart-playback-tests) - 승인
+**Timestamp**: 2026-11-17T01:14:18Z
+**User Input**: "다음 Stage 로 진행"
+**AI Response**: "Code Generation (dart-playback-tests) 승인. unit 1 완료. Functional Design (android-native-tests) 시작"
+**Context**: CONSTRUCTION - Code Generation (dart-playback-tests) 승인 → Functional Design (android-native-tests)
+
+---
+
+## Functional Design (android-native-tests) - 계획 · 질문 제시
+**Timestamp**: 2026-11-17T01:14:52Z
+**User Input**: (없음)
+**AI Response**: "android-native-tests-functional-design-plan.md 생성 (실행 단계 7개, 질문 3개: 버그 판단 기준 이어받기, FR-05 의 400 항목 정정 방식, 프록시 관찰 사항 2건 처리). unit 1 에서 이어받는 결정 2개를 계획에 명시. 답변 대기"
+**Context**: CONSTRUCTION - Functional Design (android-native-tests), Step 4~5
+
+---
+
+## Functional Design (android-native-tests) - 답변 수신
+**Timestamp**: 2026-11-17T01:31:03Z
+**User Input**: "추천으로 진행해줘"
+**AI Response**: "Q1~Q3 [Answer] 에 권장안 A 기입 (기입 주체 표시): 좁은 버그 기준, FR-05 는 요구사항만 정정, 프록시 관찰 사항 2건은 지금 동작 고정. 모호성 분석: 단일 선택지 3개, 모순 없음. 후속 질문 없음. 산출물 생성 시작"
+**Context**: CONSTRUCTION - Functional Design (android-native-tests), Step 5
+
+---
+
+## Functional Design (android-native-tests) - 산출물 생성 · 승인 요청
+**Timestamp**: 2026-11-17T01:33:54Z
+**User Input**: (없음)
+**AI Response**: "functional-design/ 에 business-rules.md (규칙 CR 13개, PC 7개, PX 38개, 채널 메서드 표, 오류 표, 요구사항 대응, unit 1 과의 계약 대조, 관찰 사항 6건), business-logic-model.md (분배 · 요청 처리 · 재발급 흐름, 테스트 가능한 속성 12개), domain-entities.md (새 타입, 기존 엔티티, 생성기 범위) 생성. 계획 체크박스 전부 완료. requirements.md FR-05 의 400 항목을 404 로 정정 (Q2=A). 관찰 사항 O-3 은 계획 질문의 설명 ('길이 없는 응답') 보다 넓음 (CDN 오류 응답의 Content-Length 가 곡 길이로 전달될 수 있음): 완료 메시지에서 사용자에게 알림. 확장 준수: PBT-01 compliant (속성 절, 분류 참조, 속성 없는 부분 명시) / Resiliency N/A (새 외부 호출 · 인프라 없음, 기존 재발급 · 타임아웃 동작을 규칙으로 고정). 승인 요청 문구: '기능 설계 산출물을 검토해 주세요: aidlc-docs/construction/android-native-tests/functional-design/ - 변경 요청 (Request Changes) / 다음 Stage 로 진행 (Continue to Next Stage) - NFR Requirements'"
+**Context**: CONSTRUCTION - Functional Design (android-native-tests), 완료 메시지 제시 · 승인 대기
+**AI 점검**: ✅ 4 · ⚠️ 2 · ❌ 0
+
+---
+
+## Functional Design (android-native-tests) - 승인
+**Timestamp**: 2026-11-17T01:49:20Z
+**User Input**: "다음 Stage 로 진행"
+**AI Response**: "Functional Design (android-native-tests) 승인 (관찰 사항 O-3 은 고정 유지). NFR Requirements (android-native-tests) 시작"
+**Context**: CONSTRUCTION - Functional Design 승인 → NFR Requirements (android-native-tests)
+
+---
+
