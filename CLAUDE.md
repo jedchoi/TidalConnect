@@ -43,5 +43,7 @@ flutter test test/features/player/some_test.dart --plain-name "테스트 이름"
 ## Docs and references
 
 - `docs/dlna-compat.md`: 실기기 렌더러별 재생 결과 표. 렌더러를 시험하면 여기 행을 추가한다.
+- `docs/failure-scenarios.md`: 스피커 전원 끄기·Wi-Fi 끊기 같은 장애 상황을 실기기에서 확인하는 점검표. 재생 경로를 고친 뒤 관련 항목을 해 본다.
+- `docs/incidents/`: 문제의 원인과 수정을 남기는 곳. 버그를 고칠 때는 `README.md`의 절차(실패 테스트 → 별도 `fix:` 커밋 → 문서)를 따른다.
 - `docs/superpowers/specs/`, `docs/superpowers/plans/`: 초기 설계와 구현 계획.
 - `GEMINI.md`: Superpowers 스킬 안내(`.agents/skills/`). 스킬은 `.agents/skills/using-superpowers/SKILL.md`부터 읽는다.
