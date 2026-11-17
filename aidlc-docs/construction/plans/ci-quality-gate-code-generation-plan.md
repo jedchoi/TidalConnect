@@ -110,18 +110,18 @@ Functional Design 을 건너뛰었으므로 `CoverageGate` 의 동작을 여기�
 
 ### 연결 (GREEN 을 끝낸 에이전트, 이 세션이 확인)
 
-- [ ] **Step 4. 로컬 점검과 CI 에 연결** (FR-09-C1 ~ C8, NFR-07-C5 ~ C7)
-  - [ ] 4.1 `tool/check.sh` (기존 파일 수정): `flutter test --coverage --reporter expanded` 로 바꾸고 이어서 `dart run tool/coverage_gate.dart`. 포맷 검사 대상에 `tool` 추가. Kotlin 단계 앞에 JDK 17 탐색 (결정 C7). 머리말 주석 갱신
-  - [ ] 커밋: `chore: tool/check.sh 에 커버리지 검사와 JDK 탐색 추가`
-  - [ ] 4.2 `.github/workflows/check.yml` (기존 파일 수정): "점검" 뒤에 키 없는 debug APK 빌드 step 과 `actions/upload-artifact` step (이름 `app-debug-nokeys`, `retention-days: 14`, `if-no-files-found: error`). 머리말 주석 갱신. `upload-artifact` 의 주 버전은 지금 배포된 최신을 확인해 적는다
-  - [ ] 커밋: `ci: 점검 뒤 debug APK 를 빌드해 산출물로 올림`
-  - [ ] 4.3 문서 (기존 파일 수정): `CLAUDE.md` 의 Commands 절 (커버리지 검사, JDK 탐색, `coverage/`), `README.md` 의 점검 명령 설명과 CI 산출물 안내 ("빌드 확인용, 키 없음, 설치하면 시작할 때 멈춘다")
-  - [ ] 커밋: `docs: 커버리지 검사와 CI 산출물 안내 추가`
+- [x] **Step 4. 로컬 점검과 CI 에 연결** (FR-09-C1 ~ C8, NFR-07-C5 ~ C7)
+  - [x] 4.1 `tool/check.sh` (기존 파일 수정): `flutter test --coverage --reporter expanded` 로 바꾸고 이어서 `dart run tool/coverage_gate.dart`. 포맷 검사 대상에 `tool` 추가. Kotlin 단계 앞에 JDK 17 탐색 (결정 C7). 머리말 주석 갱신
+  - [x] 커밋: `chore: tool/check.sh 에 커버리지 검사와 JDK 탐색 추가`
+  - [x] 4.2 `.github/workflows/check.yml` (기존 파일 수정): "점검" 뒤에 키 없는 debug APK 빌드 step 과 `actions/upload-artifact` step (이름 `app-debug-nokeys`, `retention-days: 14`, `if-no-files-found: error`). 머리말 주석 갱신. `upload-artifact` 의 주 버전은 지금 배포된 최신을 확인해 적는다
+  - [x] 커밋: `ci: 점검 뒤 debug APK 를 빌드해 산출물로 올림`
+  - [x] 4.3 문서 (기존 파일 수정): `CLAUDE.md` 의 Commands 절 (커버리지 검사, JDK 탐색, `coverage/`), `README.md` 의 점검 명령 설명과 CI 산출물 안내 ("빌드 확인용, 키 없음, 설치하면 시작할 때 멈춘다")
+  - [x] 커밋: `docs: 커버리지 검사와 CI 산출물 안내 추가`
 
 ### REFACTOR (`tdd-refactor` 스킬)
 
 - [ ] **Step 5. 동작을 바꾸지 않는 구조 정리**
-  - [ ] 5.1 GREEN 을 끝낸 에이전트가 후보 표를 만든다 (열: 후보 · 위치 · 이유 · 동작 변화 위험 · 권고)
+  - [x] 5.1 GREEN 을 끝낸 에이전트가 후보 표를 만든다 (열: 후보 · 위치 · 이유 · 동작 변화 위험 · 권고)
   - [ ] 5.2 **사람 승인 대기 (관문 3)**. 정리할 것이 없으면 "대상 없음"
   - [ ] 5.3 승인된 후보를 하나씩 적용하고 후보마다 테스트 · 고정 비교 뒤 커밋
 

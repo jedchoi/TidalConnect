@@ -19,7 +19,7 @@
 
 ## C1. `CoverageGate`: Dart 스크립트
 
-- 위치: `tool/coverage_gate.dart`. 실행: `dart run tool/coverage_gate.dart` (인자 없으면 `coverage/lcov.info`)
+- 위치: `tool/coverage_gate.dart`. 실행: `dart tool/coverage_gate.dart` (인자 없으면 `coverage/lcov.info`). 2026-11-17 정정: 처음에 `dart run` 으로 적었으나, `dart run` 은 출력 앞에 진행 표시를 줄바꿈 없이 내어 표의 첫 줄이 밀린다. 파일을 직접 실행한다
 - 근거: 프로젝트의 언어와 같아 새 도구가 필요 없다. `dart:io` 만 쓰므로 Flutter 없이 실행된다. 판정 함수를 `test/` 에서 import 해 검증할 수 있다
 - 버리는 대안
   - 셸 (`awk`): 해석 로직을 자동 테스트하기 어렵고 macOS 와 Linux 의 `awk` 가 다르다

@@ -671,3 +671,11 @@
 **Context**: CONSTRUCTION - Code Generation (ci-quality-gate), Step 3 완료 → Step 4
 
 ---
+
+## Code Generation (ci-quality-gate) - 연결 완료 (Step 4) · REFACTOR 후보 승인 요청 (관문 3)
+**Timestamp**: 2026-11-17T06:20:11Z
+**User Input**: (없음)
+**AI Response**: "GREEN 에이전트가 이어서 Step 4 적용. 주 세션이 diff 검토와 실행으로 확인 뒤 파일별 커밋 3개: check.sh (flutter test --coverage + 커버리지 검사 + 포맷 대상에 tool + JDK 17 탐색), check.yml (키 없는 debug APK 빌드, upload-artifact@v7, app-debug-nokeys, 14일), CLAUDE.md · README.md. 확인: JAVA_HOME 없이 tool/check.sh 전체 통과 (JDK 를 찾아 Kotlin 단계까지), 커버리지 표가 밀리지 않음, YAML 해석 통과 (step 7개), 키 없는 APK 빌드 성공, 테스트가 고정 커밋과 같음. 계획과 달라진 점: dart run 대신 dart tool/coverage_gate.dart 로 직접 실행 (tech-stack-decisions.md C1 정정). 확인하지 못함: CI 의 실제 실행, actionlint (미설치), JDK 탐색의 java_home 분기 · 실패 분기. REFACTOR 후보 표 code/refactor-candidates.md: 8개 중 적용 권고 5개 (R1 ~ R5, 모두 coverage_gate.dart 내부), 그대로 둠 3개. 승인 요청"
+**Context**: CONSTRUCTION - Code Generation (ci-quality-gate), Step 4 완료, Step 5.2 사람 관문 3 대기
+
+---
