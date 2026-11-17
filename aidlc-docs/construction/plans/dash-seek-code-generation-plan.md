@@ -19,15 +19,15 @@
 
 ## 실행 단계
 
-- [ ] **Step 1. 뼈대** (주 세션): 새 시그니처만 넣는다. `DashManifest.segmentStartMs` · `segmentIndexAt` (0 을 돌려줌), `RegisteredStream`, `ProxyRegistrar` 의 새 시그니처, `TidalStreamProxyServer.registerTrackStreamAt` (기존 등록에 위임, 오프셋 0), Dart `ProxyRegistration` 과 `registerTrackStream(startPosition:)` (무시). 운영 코드가 컴파일되고 Dart 테스트 284개가 통과하는 상태
-  - [ ] 커밋: `chore: DASH 탐색용 시그니처 뼈대 추가`
-- [ ] **Step 2. RED** (하위 에이전트 2개: Kotlin 담당, Dart 담당. 규칙 문서와 시그니처만 봄)
-  - [ ] 2.1 테스트 경계 표 (`code/red-seam-table-kotlin.md`, `code/red-seam-table-dart.md`) → 멈추지 않고 테스트 작성 → 실행 → RED 판정 표 (`code/red-result-kotlin.md`, `code/red-result-dart.md`)
-  - [ ] 2.2 주 세션이 표와 결과를 검토하고 다시 실행해 확인 (자동 승인)
-  - [ ] 2.3 테스트를 커밋으로 고정, 해시 기록
-  - [ ] 커밋: `test: DASH 탐색 테스트 추가 (RED)`
+- [x] **Step 1. 뼈대** (주 세션): 새 시그니처만 넣는다. `DashManifest.segmentStartMs` · `segmentIndexAt` (0 을 돌려줌), `RegisteredStream`, `ProxyRegistrar` 의 새 시그니처, `TidalStreamProxyServer.registerTrackStreamAt` (기존 등록에 위임, 오프셋 0), Dart `ProxyRegistration` 과 `registerTrackStream(startPosition:)` (무시). 운영 코드가 컴파일되고 Dart 테스트 284개가 통과하는 상태
+  - [x] 커밋: `chore: DASH 탐색용 시그니처 뼈대 추가`
+- [x] **Step 2. RED** (하위 에이전트 2개: Kotlin 담당, Dart 담당. 규칙 문서와 시그니처만 봄)
+  - [x] 2.1 테스트 경계 표 (`code/red-seam-table-kotlin.md`, `code/red-seam-table-dart.md`) → 멈추지 않고 테스트 작성 → 실행 → RED 판정 표 (`code/red-result-kotlin.md`, `code/red-result-dart.md`)
+  - [x] 2.2 주 세션이 표와 결과를 검토하고 다시 실행해 확인 (자동 승인)
+  - [x] 2.3 테스트를 커밋으로 고정, 해시 기록
+  - [x] 커밋: `test: DASH 탐색 테스트 추가 (RED)`
 
-  고정 커밋 해시: (Step 2.3 에서 기록)
+  고정 커밋 해시: `375ca35` (2026-11-17). 확인 명령: `git diff --exit-code 375ca35 -- test android/app/src/test`
 - [ ] **Step 3. GREEN** (RED 와 다른 하위 에이전트 2개: Kotlin 담당, Dart 담당. 테스트를 고치지 않음)
   - [ ] 3.1 Kotlin: `DashManifest`, `DashSegmentInputStream`, `TidalStreamProxyServer`, `PlaybackCommandRouter` (DS, PS, CR-14 ~ 18)
   - [ ] 3.2 Dart: `TidalSdkNativeBridge`, `DlnaBackend` (NB, DB)
