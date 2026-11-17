@@ -108,3 +108,36 @@
 
 ---
 
+## Application Design - 계획 · 질문 제시
+**Timestamp**: 2026-11-16T23:52:43Z
+**User Input**: (없음)
+**AI Response**: "대상 코드 6개 파일과 test/helpers 를 읽고 application-design-plan.md 생성 (실행 단계 9개, 질문 6개: 채널 대체 방식, DlnaManager 대체, 폴링 시간 제어, PlaybackCore 테스트 방식, 프록시 테스트 수준, fake 위치). 답변 대기"
+**Context**: INCEPTION - Application Design, Step 6 사용자 입력 요청
+
+---
+
+## Application Design - 답변 수신
+**Timestamp**: 2026-11-16T23:54:31Z
+**User Input**: "추천으로 진행해줘"
+**AI Response**: "사용자 지시에 따라 application-design-plan.md 의 Q1~Q6 [Answer] 에 권장안 A 를 기입 (기입 주체와 근거를 각 줄에 표시). 모호성 분석: 6개 모두 단일 선택지, 서로 모순 없음 (Q1 A + Q3 A 는 운영 코드 변경 0 으로 일치, Q4 A 는 Robolectric 미도입으로 Q5 A 의 JVM 단위 테스트와 일치). 후속 질문 없음. 산출물 생성 시작"
+**Context**: INCEPTION - Application Design, Step 7~9
+
+---
+
+## Application Design - 산출물 생성 · 승인 요청
+**Timestamp**: 2026-11-16T23:58:16Z
+**User Input**: (없음)
+**AI Response**: "application-design/ 에 components.md, component-methods.md, services.md, component-dependency.md, application-design.md 생성. 계획 체크박스 1~9 완료 표시. 핵심: 운영 코드 변경은 DlnaManager.forTesting(soapClient), TidalStreamProxyServer(port, httpClient), PlaybackCommandRouter 추출 + 인터페이스 4개, Gradle 테스트 설정. 관찰 사항 4건 (FR-05 의 400 분기 도달 불가 등) 기록. 확장 준수: RESILIENCY-01 compliant (새 컴포넌트 분류), 나머지 N/A (새 외부 호출 · 인프라 없음) / PBT 는 이 stage 적용 규칙 없음 (N/A). 승인 요청 문구: 'application design 산출물을 확인해 주세요: aidlc-docs/inception/application-design/ - 변경 요청 (Request Changes) / 승인 후 계속 (Approve & Continue) - 설계를 승인하고 Units Generation 으로 진행'"
+**Context**: INCEPTION - Application Design, 완료 메시지 제시 · 승인 대기
+**AI 점검**: ✅ 5 · ⚠️ 1 · ❌ 0
+
+---
+
+## Application Design - 승인
+**Timestamp**: 2026-11-16T23:59:48Z
+**User Input**: "승인 후 계속"
+**AI Response**: "Application Design 승인. Units Generation 시작"
+**Context**: INCEPTION - Application Design 승인 → Units Generation
+
+---
+
