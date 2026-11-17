@@ -13,10 +13,13 @@ import java.io.InputStream
  * 다음 세그먼트는 앞 세그먼트를 다 읽었을 때만 받는다. 스피커가 연결을 끊어 [close]가 호출되면
  * 지금 받고 있는 응답만 닫고 남은 세그먼트는 요청하지 않는다.
  * 세그먼트 하나라도 받지 못하면 거기서 스트림을 끝낸다.
+ *
+ * @param startSegment 초기화 세그먼트 다음에 읽기 시작할 세그먼트 번호(0부터)
  */
 class DashSegmentInputStream(
     private val client: OkHttpClient,
     private val manifest: DashManifest,
+    private val startSegment: Int = 0,
 ) : InputStream() {
 
     private var nextIndex = -1 // -1: 초기화 세그먼트 차례
@@ -46,7 +49,7 @@ class DashSegmentInputStream(
         val url: String = when {
             nextIndex == -1 && manifest.initializationUrl != null -> manifest.initializationUrl
             nextIndex == -1 -> {
-                nextIndex = 0
+                nextIndex = startSegment
                 return openNext()
             }
             nextIndex < manifest.segmentCount -> manifest.segmentUrl(nextIndex)
@@ -56,7 +59,7 @@ class DashSegmentInputStream(
             }
         }
         val label = if (nextIndex == -1) "init" else "#${manifest.startNumber + nextIndex}"
-        nextIndex++
+        nextIndex = if (nextIndex == -1) startSegment else nextIndex + 1
         return try {
             val response = client.newCall(Request.Builder().url(url).build()).execute()
             val body = response.body
