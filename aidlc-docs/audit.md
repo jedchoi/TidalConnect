@@ -706,3 +706,18 @@
 **Context**: CONSTRUCTION - Code Generation (ci-quality-gate) 완료 → Build and Test
 
 ---
+
+## Build and Test Stage
+**Timestamp**: 2026-11-17T07:06:52Z
+**Build Status**: Success (debug APK, 키 포함 · 키 없음 모두)
+**Test Status**: Pass (Dart 284 + Kotlin 86 = 370, 실패 0. 커버리지 대상 4개 100.0 / 99.4 / 99.2 / 98.7%). 실기기 통합 시나리오 2개는 미실행 (범위 밖), CI 실제 실행 미확인
+**Files Generated**:
+- build-instructions.md
+- unit-test-instructions.md
+- integration-test-instructions.md
+- build-and-test-summary.md
+- performance-test-instructions.md 는 만들지 않음 (성능 요구 없음, 요약에 N/A 로 기록). 계약 · 보안 · E2E 안내서도 해당 없음으로 요약에 기록
+**AI 점검**: ✅ 2 · ⚠️ 0 · ❌ 0 (BT-1 unit 3개 모두 포함, BT-2 지침의 명령 · 경로가 실제로 있음)
+**확장 준수**: PBT · Resiliency 는 unit 별 Code Generation 에서 준수 확인. 이 stage 에 새로 해당하는 규칙 없음 (N/A)
+
+---
