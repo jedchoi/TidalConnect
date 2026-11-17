@@ -1574,6 +1574,160 @@ void main() {
     });
   });
 
+  group('탐색 중의 폴링 (dash-seek)', () {
+    test('[DB-62] 탐색의 프록시 등록을 기다리는 동안에는 폴링 차례를 건너뛰고, 끝나면 다음 차례부터 이어진다', () {
+      // DB-62: 탐색 중에는 SOAP 조회도 이벤트도 없다. DB-62b: 성공 뒤에는 새 흐름(오프셋 60초) 기준으로 이어진다.
+      withHarness((async, h) {
+        startDash(async, h, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 5);
+        h.poll(async);
+        h.answerStartOffset(const Duration(seconds: 60));
+        h.clearRecords();
+        h.channel.hold('registerTrackStream');
+
+        final result = h.seek(async, const Duration(seconds: 61));
+        h.poll(async, 2);
+
+        expect(result.completed, isFalse);
+        expect(h.soap.countOf('GetTransportInfo'), 0);
+        expect(h.soap.countOf('GetPositionInfo'), 0);
+        expect(h.events, isEmpty);
+
+        h.channel.release('registerTrackStream');
+        async.flushMicrotasks();
+        expect(result.completed, isTrue);
+        expect(h.described, ['position(60/180)', 'state(playing,buffering)']);
+
+        h.clearRecords();
+        respond(h, state: 'PLAYING', rel: 0);
+        h.poll(async);
+        expect(h.soap.countOf('GetTransportInfo'), 1);
+        expect(h.soap.countOf('GetPositionInfo'), 1);
+        expect(h.described, ['position(60/180)', 'state(playing)']);
+      });
+    });
+
+    test('[DB-62] 탐색의 스피커 명령 도중 스피커가 STOPPED라고 답할 상태여도 정지를 알리지 않는다', () {
+      // DB-62: 재생 명령의 Stop 직후를 흉내 낸다. 폴링을 건너뛰므로 state(stopped) 가 나오지 않는다.
+      withHarness((async, h) {
+        startDash(async, h, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 5);
+        h.poll(async);
+        h.answerStartOffset(const Duration(seconds: 60));
+        h.clearRecords();
+        h.soap
+          ..transportState = 'STOPPED'
+          ..positionInfo = positionInfo(rel: 0);
+        h.soap.hold('SetAVTransportURI');
+
+        final result = h.seek(async, const Duration(seconds: 61));
+        h.poll(async, 2);
+
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI']);
+        expect(h.events, isEmpty);
+
+        h.soap.release('SetAVTransportURI');
+        async.flushMicrotasks();
+        expect(result.error, isNull);
+        expect(result.completed, isTrue);
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI', 'Play']);
+        expect(h.described, ['position(60/180)', 'state(playing,buffering)']);
+      });
+    });
+
+    test('[DB-62] 곡 끝 근처에서 탐색하는 도중 스피커가 STOPPED라고 답할 상태여도 곡 종료를 알리지 않는다', () {
+      // DB-62: 마지막 위치 178초(길이 − 3초 이상)에서 STOPPED 를 보면 곡 종료(DB-23)가 되므로, 탐색 중에는 보지 않는다.
+      withHarness((async, h) {
+        startDash(async, h, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 178);
+        h.poll(async);
+        h.answerStartOffset(const Duration(seconds: 30));
+        h.clearRecords();
+        h.soap
+          ..transportState = 'STOPPED'
+          ..positionInfo = positionInfo(rel: 0);
+        h.soap.hold('Play');
+
+        final result = h.seek(async, const Duration(seconds: 31));
+        h.poll(async, 2);
+
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI', 'Play']);
+        expect(h.events, isEmpty);
+
+        h.soap.release('Play');
+        async.flushMicrotasks();
+        expect(result.completed, isTrue);
+        expect(h.described, ['position(30/180)', 'state(playing,buffering)']);
+
+        // DB-62b: 끝난 뒤에는 새 흐름(오프셋 30초, 상대) 기준으로 이어진다.
+        h.clearRecords();
+        respond(h, state: 'PLAYING', rel: 1);
+        h.poll(async);
+        expect(h.described, ['position(31/180)', 'state(playing)']);
+      });
+    });
+
+    test('[DB-62b] 탐색의 프록시 등록이 실패해도 그 뒤 폴링은 탐색 전 상태 기준으로 이어진다', () {
+      // DB-62: 등록을 기다리는 동안 건너뜀. DB-62b, DB-53: 실패 뒤에는 오프셋 28초 · PLAYING 을 본 상태 그대로.
+      withHarness((async, h) {
+        startDashAt(async, h, offsetSeconds: 28, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 0);
+        h.poll(async);
+        h.clearRecords();
+        h.channel.failing.add('registerTrackStream');
+        h.channel.hold('registerTrackStream');
+
+        final result = h.seek(async, const Duration(seconds: 90));
+        h.poll(async, 2);
+
+        expect(h.soap.calls, isEmpty);
+        expect(h.events, isEmpty);
+
+        h.channel.release('registerTrackStream');
+        async.flushMicrotasks();
+        expect(result.errorCode, 'PROXY_FAILED');
+        expect(h.events, isEmpty);
+
+        respond(h, state: 'PLAYING', rel: 0);
+        respond(h, state: 'STOPPED', rel: 0);
+        h.poll(async, 2);
+        expect(h.soap.countOf('GetTransportInfo'), 2);
+        // 탐색 전에 PLAYING 을 봤으므로 STOPPED 는 스피커 쪽 정지다(28초 < 180 − 3초).
+        expect(h.described, ['position(28/180)', 'state(playing)', 'position(28/180)', 'state(stopped)']);
+      });
+    });
+
+    test('[DB-62b] 탐색의 재생 명령이 거부되어도 그 뒤 폴링은 탐색 전 상태 기준으로 이어진다', () {
+      // DB-62: Play 응답을 기다리는 동안 건너뜀. DB-62b, DB-53b: 실패 뒤에는 오프셋 28초 그대로(응답값 88초를 쓰지 않음).
+      withHarness((async, h) {
+        startDashAt(async, h, offsetSeconds: 28, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 0);
+        h.poll(async);
+        h.answerStartOffset(const Duration(seconds: 88));
+        h.clearRecords();
+        h.soap.commandResults['Play'] = false;
+        h.soap.hold('Play');
+
+        final result = h.seek(async, const Duration(seconds: 90));
+        h.poll(async, 2);
+
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI', 'Play']);
+        expect(h.events, isEmpty);
+
+        h.soap.release('Play');
+        async.flushMicrotasks();
+        expect(result.errorCode, 'DLNA_PLAY_FAILED');
+        expect(h.events, isEmpty);
+
+        h.clearRecords();
+        respond(h, state: 'PLAYING', rel: 0);
+        h.poll(async);
+        expect(h.soap.countOf('GetTransportInfo'), 1);
+        expect(h.described, ['position(28/180)', 'state(playing)']);
+      });
+    });
+  });
+
   group('위치 보정 (dash-seek)', () {
     test('[DB-54] 첫 RelTime으로 위치 기준을 정한다: 오프셋 10초 이상이고 RelTime이 오프셋 − 2초 이상이면 절대, 아니면 상대', () {
       // DB-54: 경계는 O = 10, RelTime = O − 2. 기대 위치는 절대면 RelTime, 상대면 O + RelTime(DB-55, DB-55b).
