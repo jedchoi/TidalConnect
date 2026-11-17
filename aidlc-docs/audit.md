@@ -550,3 +550,21 @@
 **Context**: CONSTRUCTION - Code Generation (android-native-tests), Step 7 · 8 완료, Step 9 는 9.3 만 남음
 
 ---
+
+## Code Generation (android-native-tests) - 간헐 실패 조사 중단 지시
+**Timestamp**: 2026-11-17T05:44:12Z
+**User Input**: "멈춰. 그정도는 괜찮아."
+**AI Response**: "프록시 테스트의 간헐 실패 (연속 반복 약 135회 중 4회, DASH 길이 계산 경로에서 2초 제한 시간 초과) 원인 조사를 중단. 조사 에이전트를 멈추고, 임시 파일 · 변경이 남지 않았음을 확인 (테스트 폴더는 고정 커밋 6acf424 와 같음, src/main 은 HEAD 와 같음). 사용자가 이 수준의 간헐 실패를 수용한 것으로 기록. 요약 문서에 확인된 것 · 배제한 것 · 확인하지 못한 것 · 영향 (NFR-03-A4 미충족, check.sh · CI 가 가끔 실패할 수 있음) 을 적음"
+**Status**: 조사 중단, 간헐 실패 수용
+**Context**: CONSTRUCTION - Code Generation (android-native-tests), Step 9.3
+
+---
+
+## Code Generation (android-native-tests) - 완료 · 승인 요청
+**Timestamp**: 2026-11-17T05:44:12Z
+**User Input**: (없음)
+**AI Response**: "계획 Step 10개 완료. code/code-summary.md 작성. 완료 메시지 제시: 새 Kotlin 테스트 82개 (전체 86개 통과), 규칙 53 · 속성 12 대응, 버그 1건 수정 (HEAD 의 Content-Length: -1), 변형 58개 중 56개 감지, tool/check.sh 통과, debug APK 빌드 성공. 알림: 실기기 확인 없음 (onMethodCall 위임, HEAD 응답 변경), 프록시 테스트 간헐 실패 (원인 미확인, 수용), 살아남은 변형 2개. 확장 준수: PBT-01 ~ 10 compliant, RESILIENCY-14 · 15 compliant, 그 밖 N/A"
+**Context**: CONSTRUCTION - Code Generation (android-native-tests), Part 2 Step 14 · 승인 대기
+**AI 점검**: ✅ 3 · ⚠️ 1 · ❌ 0 (CG-4 ✅ 체크박스 모두 [x], CG-5 ⚠️ 통과하나 간헐 실패 있음, CG-6 ✅, CG-7 ✅)
+
+---

@@ -115,10 +115,10 @@
   - [x] 8.3 규칙 문서가 틀린 것: 문서를 고치고, 테스트가 그 때문에 틀렸으면 RED 로 돌아가 다시 판정 · 고정
   - [x] 8.4 버그가 아닌 것: `business-rules.md` 7절 관찰 사항에 추가. 해당이 없으면 "없음"
 
-- [ ] **Step 9. 검증** (unit 완료 기준, NFR-01 ~ NFR-06)
+- [x] **Step 9. 검증** (unit 완료 기준, NFR-01 ~ NFR-06)
   - [x] 9.1 `(cd android && ./gradlew :app:testDebugUnitTest)` 전체: 통과 수 · 실패 수 기록 (NFR-02-A1, A2)
   - [x] 9.2 규칙 ID 대조: CR 13개, PC-01 ~ 02, PX 38개, 속성 12개가 모두 테스트 이름에 있는지 (NFR-01-A1, A2, NFR-04-A1)
-  - [ ] 9.3 10회 연속 실행 (`--rerun-tasks`), 결과 동일 (NFR-03-A4, A7)
+  - [x] 9.3 10회 연속 실행 (`--rerun-tasks`), 결과 동일 (NFR-03-A4, A7). **결과: 기준 미충족** (프록시 테스트가 가끔 실패, 원인 미확인, 사용자가 수용. `code-summary.md` 의 "알려 둘 점")
   - [x] 9.4 새 Kotlin 테스트의 실행 시간 합계 (결과 XML) 30초 이하 (NFR-03-A5). 넘으면 KP-3 에 따라 조정
   - [x] 9.5 8765 포트를 점유한 상태에서 실행해 통과 (NFR-03-A2)
   - [x] 9.6 `tool/check.sh` 전체 (Dart + Kotlin) 통과 (NFR-02-A3, A4)
@@ -126,9 +126,9 @@
   - [x] 9.8 `git diff main -- android/app/src/main` 검토: 채널 이름 상수 변경 없음, `PlaybackCore` 에 남는 함수 본문 변경 없음, `ensureProxyServer` 의 프록시 생성 호출 변경 없음 (NFR-06-A2 ~ A4)
   - [x] 9.9 테스트에 `config/tidal.json` 의 값 · 사설 대역 주소 · `Thread.sleep` 이 없는지 검색, 복제 파일 (`*_new.*`, `*_modified.*`, `*_v2.*`) 이 없는지 확인
 
-- [ ] **Step 10. 요약 문서**
-  - [ ] 10.1 `aidlc-docs/construction/android-native-tests/code/code-summary.md` 새로 만듦: 수정 · 생성 파일, 테스트 경계 표 (승인본), RED 판정 표, 리팩토링 후보와 결과, 규칙 · 속성별 테스트 대응, Step 9 의 실행 결과, 발견한 버그 · 관찰 사항, 실기기에서만 확정되는 부분 (NFR-06-A6), 계획에 없던 변경 · 계획에서 뺀 항목
-  - [ ] 커밋: `docs(aidlc): Code Generation (android-native-tests) 요약`
+- [x] **Step 10. 요약 문서**
+  - [x] 10.1 `aidlc-docs/construction/android-native-tests/code/code-summary.md` 새로 만듦: 수정 · 생성 파일, 테스트 경계 표 (승인본), RED 판정 표, 리팩토링 후보와 결과, 규칙 · 속성별 테스트 대응, Step 9 의 실행 결과, 발견한 버그 · 관찰 사항, 실기기에서만 확정되는 부분 (NFR-06-A6), 계획에 없던 변경 · 계획에서 뺀 항목
+  - [x] 커밋: `docs(aidlc): Code Generation (android-native-tests) 요약`
 
 ## 요구사항 · 규칙 추적
 
