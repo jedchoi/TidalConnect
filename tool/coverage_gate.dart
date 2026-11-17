@@ -17,6 +17,9 @@ const coverageTargets = <String>[
 /// 대상 파일마다 넘어야 하는 라인 커버리지(%). 정확히 이 값이면 통과다.
 const coverageThresholdPercent = 80;
 
+/// 경로를 주지 않았을 때 읽는 lcov 파일. `flutter test --coverage`가 만드는 위치다.
+const _defaultLcovPath = 'coverage/lcov.info';
+
 /// 보고서의 비율 칸 폭. `기록 없음`의 화면 폭(한글은 두 칸)에 맞춘다.
 const _ratioColumnWidth = 9;
 
@@ -137,7 +140,7 @@ String formatReport(GateResult result) {
 ///
 /// [args]의 첫 값이 lcov 파일 경로다. 없으면 `coverage/lcov.info`를 읽는다.
 int runCoverageGate(List<String> args, StringSink out) {
-  final path = args.isEmpty ? 'coverage/lcov.info' : args.first;
+  final path = args.isEmpty ? _defaultLcovPath : args.first;
   final String content;
   try {
     content = File(path).readAsStringSync();
