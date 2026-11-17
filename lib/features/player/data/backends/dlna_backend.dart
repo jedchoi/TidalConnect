@@ -4,6 +4,7 @@ import '../../../../core/utils/app_logger.dart';
 import '../../../auth/data/tidal_auth_repository.dart';
 import '../../../dlna/data/dlna_manager.dart';
 import '../../../dlna/data/upnp_soap_client.dart';
+import '../../../dlna/domain/models/dlna_device.dart';
 import '../../../tidal_api/data/tidal_api_client.dart';
 import '../../../tidal_api/domain/models/media_item.dart';
 import 'playback_backend.dart';
@@ -136,14 +137,8 @@ class DlnaBackend implements PlaybackBackend {
     if (isCancelled()) return;
     final device = _dlna.selectedDevice;
     // DASH 곡은 시작 위치가 속한 세그먼트부터 받는다. 단일 파일 곡은 재생 명령 뒤에 Seek를 보낸다.
-    final registration = await TidalSdkNativeBridge.registerTrackStream(
-      trackId: track.id,
-      directUrl: info.streamUrl,
-      manifestXml: info.manifest,
-      allowedHost: Uri.tryParse(device.locationUrl)?.host ?? '',
-      mimeType: info.mimeType,
-      startPosition: info.isDash ? startPosition : Duration.zero,
-    );
+    final registration =
+        await _register(track, info, device, startPosition: info.isDash ? startPosition : Duration.zero);
     final proxyUrl = registration.url;
     if (isCancelled()) return;
     if (proxyUrl.isEmpty) {
@@ -178,6 +173,22 @@ class DlnaBackend implements PlaybackBackend {
     TidalSdkNativeBridge.setStreamingLock(true);
     _events.add(const BackendStateChanged(playing: true, buffering: true));
   }
+
+  /// 곡의 스트림을 폰의 프록시에 등록한다. 프록시는 [device]의 주소에서 오는 요청만 받는다.
+  static Future<ProxyRegistration> _register(
+    MediaTrack track,
+    TidalPlaybackInfo info,
+    DlnaDevice device, {
+    Duration startPosition = Duration.zero,
+  }) =>
+      TidalSdkNativeBridge.registerTrackStream(
+        trackId: track.id,
+        directUrl: info.streamUrl,
+        manifestXml: info.manifest,
+        allowedHost: Uri.tryParse(device.locationUrl)?.host ?? '',
+        mimeType: info.mimeType,
+        startPosition: startPosition,
+      );
 
   void _startPolling(MediaTrack track) {
     _stopPolling();
@@ -304,14 +315,7 @@ class DlnaBackend implements PlaybackBackend {
 
     final info = await _api.getPlaybackInfo(track.id, quality: preferredQuality);
     if (info == null) return;
-    final proxyUrl = (await TidalSdkNativeBridge.registerTrackStream(
-      trackId: track.id,
-      directUrl: info.streamUrl,
-      manifestXml: info.manifest,
-      allowedHost: Uri.tryParse(device.locationUrl)?.host ?? '',
-      mimeType: info.mimeType,
-    ))
-        .url;
+    final proxyUrl = (await _register(track, info, device)).url;
     if (proxyUrl.isEmpty || _dlna.selectedDevice.udn != device.udn) return;
 
     final ok = await _dlna.setNextOnSelectedDevice(
@@ -412,14 +416,7 @@ class DlnaBackend implements PlaybackBackend {
 
   Future<void> _reregisterAndPlay(MediaTrack track, TidalPlaybackInfo info, Duration position) async {
     final device = _dlna.selectedDevice;
-    final registration = await TidalSdkNativeBridge.registerTrackStream(
-      trackId: track.id,
-      directUrl: info.streamUrl,
-      manifestXml: info.manifest,
-      allowedHost: Uri.tryParse(device.locationUrl)?.host ?? '',
-      mimeType: info.mimeType,
-      startPosition: position,
-    );
+    final registration = await _register(track, info, device, startPosition: position);
     AppLogger.log(
       'DLNA_BACKEND',
       'DASH 탐색 요청: ${position.inMilliseconds}ms → 시작 오프셋 ${registration.startOffset.inMilliseconds}ms'
