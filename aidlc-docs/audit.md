@@ -484,3 +484,12 @@
 **Context**: CONSTRUCTION - Code Generation (android-native-tests), Step 4.3 · 4.4 완료 → 4.5 사람 관문 2 대기
 
 ---
+
+## Code Generation (android-native-tests) - RED 판정 (관문 2) · 테스트 고정
+**Timestamp**: 2026-11-17T04:18:46Z
+**User Input**: "RED 확인 + A"
+**AI Response**: "RED 확인 기록. A = 길이를 모르는 HEAD 응답의 Content-Length: -1 을 버그로 처리 (테스트 3개는 실패하는 그대로 고정, Step 8 에서 코드 수정 · 별도 fix 커밋 · docs/incidents 문서). 테스트 파일 8개를 커밋 6acf424 로 고정하고 해시를 계획 파일에 기록. 다음: 새 하위 에이전트로 GREEN (Step 5)"
+**Status**: Approved
+**Context**: CONSTRUCTION - Code Generation (android-native-tests), Step 4.5 · 4.6 완료 → Step 5
+
+---
