@@ -164,8 +164,7 @@ class DlnaBackend implements PlaybackBackend {
     _track = track;
     _info = info;
     _paused = false;
-    _startOffset = info.isDash ? _wholeSeconds(registration.startOffset) : Duration.zero;
-    _absolutePosition = null;
+    _beginFlow(info.isDash ? registration.startOffset : Duration.zero);
     if (startPosition > Duration.zero && !info.isDash) {
       await _dlna.seek(startPosition.inSeconds);
     }
@@ -200,7 +199,12 @@ class DlnaBackend implements PlaybackBackend {
     _pollTimer = Timer.periodic(_pollInterval, (_) => _poll());
   }
 
-  static Duration _wholeSeconds(Duration d) => Duration(seconds: d.inSeconds);
+  /// 스피커가 새 흐름(새 곡, 갭리스로 넘어간 곡, 탐색으로 다시 등록한 주소)을 재생하기 시작할 때 부른다.
+  /// [startOffset]은 그 흐름이 곡의 어느 위치부터인지다(초 단위로 버림). 위치 기준은 다시 정한다.
+  void _beginFlow(Duration startOffset) {
+    _startOffset = Duration(seconds: startOffset.inSeconds);
+    _absolutePosition = null;
+  }
 
   void _stopPolling() {
     if (_pollTimer != null) TidalSdkNativeBridge.setStreamingLock(false);
@@ -345,8 +349,7 @@ class DlnaBackend implements PlaybackBackend {
     _lastPosition = Duration.zero;
     _track = next.track;
     _info = next.info;
-    _startOffset = Duration.zero;
-    _absolutePosition = null;
+    _beginFlow(Duration.zero);
     AppLogger.log('DLNA_BACKEND', '스피커가 다음 곡으로 넘어감: "${next.track.title}"', type: LogType.info);
     _events.add(BackendTrackStarted(
       next.track.id,
@@ -431,8 +434,7 @@ class DlnaBackend implements PlaybackBackend {
       throw PlaybackException('DLNA_PLAY_FAILED', '"${device.friendlyName}"에 재생 명령을 보내지 못했습니다.');
     }
     _currentUrl = registration.url;
-    _startOffset = _wholeSeconds(registration.startOffset);
-    _absolutePosition = null;
+    _beginFlow(registration.startOffset);
 
     // 재생 명령(SetAVTransportURI)이 스피커의 다음 곡 등록을 지우므로 다시 보낸다.
     final next = _next;
