@@ -646,3 +646,11 @@
 **Context**: CONSTRUCTION - Code Generation (ci-quality-gate), Step 2.2 완료 → 2.3
 
 ---
+
+## Code Generation (ci-quality-gate) - RED 2~4단계: 테스트 · 판정 표 (관문 2 요청)
+**Timestamp**: 2026-11-17T06:12:28Z
+**User Input**: (없음)
+**AI Response**: "RED 에이전트가 test/tool/coverage_gate_test.dart 작성 (예시 17 + 속성 5). 주 세션 재실행으로 확인: 새 테스트 22개 모두 실패 (기대값 비교 실패, 테스트 쪽 오류 0), 기존 262개 통과, 포맷 · 분석 통과. 판정 표 code/red-result.md. 에이전트가 알린 점: 뼈대에서는 15개가 앞쪽 단언에서 멈춰 뒤쪽 기대값은 변형 확인에서 검증됨, 테스트가 모두 통과 가능한지 보려고 저장소 밖에서 버리는 구현으로 확인하고 지움, P-GT-1 · 4 의 반례가 축소되지 않음. RED 확인 요청"
+**Context**: CONSTRUCTION - Code Generation (ci-quality-gate), Step 2.4 완료 → 2.5 사람 관문 2 대기
+
+---
