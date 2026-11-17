@@ -119,126 +119,66 @@ object PlaybackCore {
         eventSink?.success(event)
     }
 
-    private fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
-        when (call.method) {
-            "initTidalAuth" -> {
-                val ch = channel ?: return
-                val clientId = call.argument<String>("clientId") ?: ""
-                val clientSecret = call.argument<String>("clientSecret") ?: ""
-                val isInitialized = auth.initializeAuth(clientId, clientSecret)
-                auth.customCredentialsProvider?.tokenRefresher = { requestTokenFromDart(ch) }
-                
-                if (isInitialized && auth.credentialsProvider != null) {
-                    if (playerManager == null) {
-                        playerManager = TidalPlayerManager(appContext, auth.credentialsProvider).also {
-                            it.onEvent = { event -> emit(event) }
-                        }
+    // ── 채널 명령 ─────────────────────────────────────────────────
+    // 메서드 분배와 응답 값은 PlaybackCommandRouter가 맡는다. 아래는 router가 부르는 운영 구현이다.
+    // object의 속성은 적힌 순서대로 초기화되므로, 운영 구현을 router보다 먼저 적는다.
+
+    private val authControls: AuthControls = object : AuthControls {
+        override fun initialize(clientId: String, clientSecret: String): Boolean {
+            val ch = channel ?: return false
+            val isInitialized = auth.initializeAuth(clientId, clientSecret)
+            auth.customCredentialsProvider?.tokenRefresher = { requestTokenFromDart(ch) }
+
+            if (isInitialized && auth.credentialsProvider != null) {
+                if (playerManager == null) {
+                    playerManager = TidalPlayerManager(appContext, auth.credentialsProvider).also {
+                        it.onEvent = { event -> emit(event) }
                     }
-                    Log.i("TIDAL_NATIVE_SDK", "initializePlayer() called")
-                    playerManager?.initializePlayer()
                 }
+                Log.i("TIDAL_NATIVE_SDK", "initializePlayer() called")
+                playerManager?.initializePlayer()
+            }
 
-                result.success(mapOf(
-                    "status" to if (isInitialized) "initialized" else "init_failed",
-                    "sdk" to "com.tidal.sdk",
-                    "clientId" to clientId
-                ))
-            }
-            "updateUserCredentials" -> {
-                val userId = call.argument<String>("userId") ?: ""
-                val accessToken = call.argument<String>("accessToken") ?: ""
-                val expiresInSeconds = (call.argument<Number>("expiresInSeconds") ?: 3600).toLong()
+            return isInitialized
+        }
 
-                auth.updateUserCredentials(userId, accessToken, expiresInSeconds)
-                Log.i("TIDAL_NATIVE_SDK", "updateUserCredentials 호출됨 (UserId: $userId)")
-                result.success(mapOf("status" to "updated", "userId" to userId))
-            }
-            "clearUserCredentials" -> {
-                auth.clearUserCredentials()
-                result.success(mapOf("status" to "cleared"))
-            }
-            "playTrack" -> runPlayerAction(result) {
-                val trackId = call.argument<String>("trackId") ?: ""
-                requirePlayerManager().playTrack(trackId)
-                mapOf("status" to "playing", "trackId" to trackId)
-            }
-            "pauseTrack" -> runPlayerAction(result) {
-                requirePlayerManager().pause()
-                mapOf("status" to "paused")
-            }
-            "resumeTrack" -> runPlayerAction(result) {
-                requirePlayerManager().resume()
-                mapOf("status" to "resumed")
-            }
-            "seekTrack" -> runPlayerAction(result) {
-                val positionMs = call.argument<Int>("positionMs") ?: 0
-                requirePlayerManager().seekTo(positionMs)
-                mapOf("status" to "seeked", "positionMs" to positionMs)
-            }
-            "stopTrack" -> runPlayerAction(result) {
-                playerManager?.stop()
-                mapOf("status" to "stopped")
-            }
-            "skipToNext" -> runPlayerAction(result) {
-                requirePlayerManager().skipToNext()
-                mapOf("status" to "skipped_to_next")
-            }
-            "setNextTrack" -> runPlayerAction(result) {
-                val nextTrackId = call.argument<String>("trackId") ?: ""
-                requirePlayerManager().setNextTrack(nextTrackId)
-                mapOf("status" to "next_track_set", "trackId" to nextTrackId)
-            }
-            "setAudioQuality" -> runPlayerAction(result) {
-                val quality = call.argument<String>("quality") ?: "LOSSLESS"
-                requirePlayerManager().setAudioQuality(quality)
-                mapOf("status" to "quality_set", "quality" to quality)
-            }
-            "getPhoneVolume" -> result.success(phoneVolumePercent())
-            "setPhoneVolume" -> {
-                setPhoneVolumePercent(call.argument<Int>("percent") ?: 0)
-                result.success(null)
-            }
-            "requestNotificationPermission" -> {
-                result.success(requestNotificationPermission())
-            }
-            "setStreamingLock" -> {
-                setWifiLock(call.argument<Boolean>("enabled") == true)
-                result.success(null)
-            }
-            // ── DLNA 프록시 관련 채널 ──────────────────────────────────────
-            "registerTrackStream" -> {
-                val trackId = call.argument<String>("trackId") ?: ""
-                val directUrl = call.argument<String>("directUrl") ?: ""
-                val manifestXml = call.argument<String>("manifestXml") ?: ""
-                val allowedHost = call.argument<String>("allowedHost") ?: ""
-                val mimeType = call.argument<String>("mimeType") ?: "audio/mp4"
+        override fun updateUserCredentials(userId: String, accessToken: String, expiresInSeconds: Long) {
+            auth.updateUserCredentials(userId, accessToken, expiresInSeconds)
+            Log.i("TIDAL_NATIVE_SDK", "updateUserCredentials 호출됨 (UserId: $userId)")
+        }
 
-                val server = ensureProxyServer()
-                if (server == null) {
-                    result.error("NO_WIFI", "Wi-Fi에 연결되어 있지 않아 스피커로 스트리밍할 수 없습니다.", null)
-                    return
-                }
-                val shortUrl = server.registerTrackStream(trackId, directUrl, manifestXml, allowedHost, mimeType)
-                Log.i("PROXY", "registerTrackStream: TrackID=$trackId")
-                result.success(mapOf("proxyUrl" to shortUrl))
-            }
-            else -> {
-                result.notImplemented()
-            }
+        override fun clearUserCredentials() {
+            auth.clearUserCredentials()
         }
     }
 
-    private fun requirePlayerManager(): TidalPlayerManager =
-        playerManager ?: throw IllegalStateException("TIDAL Player가 초기화되지 않았습니다")
+    // 함수 이름이 PlaybackCore의 private 함수와 같다. `PlaybackCore.`를 빼면 자기 자신을 부른다.
+    private val deviceControls: DeviceControls = object : DeviceControls {
+        override fun phoneVolumePercent(): Int = PlaybackCore.phoneVolumePercent()
 
-    /** 플레이어 동작을 실행하고, 실패하면 Flutter에 오류(PLAYER_ERROR)로 돌려준다. */
-    private inline fun runPlayerAction(result: MethodChannel.Result, action: () -> Map<String, Any?>) {
-        try {
-            result.success(action())
-        } catch (e: Exception) {
-            Log.e("TIDAL_NATIVE_SDK", "플레이어 동작 실패: ${e.message}", e)
-            result.error("PLAYER_ERROR", e.message ?: e.javaClass.simpleName, null)
-        }
+        override fun setPhoneVolumePercent(percent: Int) = PlaybackCore.setPhoneVolumePercent(percent)
+
+        override fun requestNotificationPermission(): Boolean = PlaybackCore.requestNotificationPermission()
+
+        override fun setWifiLock(enabled: Boolean) = PlaybackCore.setWifiLock(enabled)
+    }
+
+    private val proxyRegistrar = ProxyRegistrar { trackId, directUrl, manifestXml, allowedHost, mimeType ->
+        val server = ensureProxyServer() ?: return@ProxyRegistrar null
+        val shortUrl = server.registerTrackStream(trackId, directUrl, manifestXml, allowedHost, mimeType)
+        Log.i("PROXY", "registerTrackStream: TrackID=$trackId")
+        shortUrl
+    }
+
+    private val router = PlaybackCommandRouter(
+        auth = authControls,
+        player = { playerManager?.let { LoggingPlayerControls(it) } },
+        device = deviceControls,
+        proxy = proxyRegistrar,
+    )
+
+    private fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
+        sendCommandResult(router.handle(call.method, channelArguments(call)), result)
     }
 
     /** Flutter에 곡의 새 스트림 정보를 요청한다. 20초 안에 답이 없으면 null. */
@@ -346,6 +286,39 @@ object PlaybackCore {
         } catch (e: Exception) {
             Log.e("PROXY", "프록시 서버 시작 실패: ${e.message}", e)
             null
+        }
+    }
+}
+
+/**
+ * 플레이어 동작이 실패하면 스택 트레이스를 로그로 남기고 예외를 그대로 다시 던진다.
+ *
+ * 예외를 오류 응답(PLAYER_ERROR)으로 바꾸는 일은 [PlaybackCommandRouter]가 한다. router는 Android 타입을
+ * 쓰지 않아 로그를 남길 수 없으므로 여기서 남긴다.
+ */
+private class LoggingPlayerControls(private val inner: PlayerControls) : PlayerControls {
+    override fun playTrack(trackId: String) = logFailure { inner.playTrack(trackId) }
+
+    override fun pause() = logFailure { inner.pause() }
+
+    override fun resume() = logFailure { inner.resume() }
+
+    override fun seekTo(msec: Int) = logFailure { inner.seekTo(msec) }
+
+    override fun stop() = logFailure { inner.stop() }
+
+    override fun skipToNext() = logFailure { inner.skipToNext() }
+
+    override fun setNextTrack(trackId: String) = logFailure { inner.setNextTrack(trackId) }
+
+    override fun setAudioQuality(name: String) = logFailure { inner.setAudioQuality(name) }
+
+    private inline fun logFailure(action: () -> Unit) {
+        try {
+            action()
+        } catch (e: Exception) {
+            Log.e("TIDAL_NATIVE_SDK", "플레이어 동작 실패: ${e.message}", e)
+            throw e
         }
     }
 }
