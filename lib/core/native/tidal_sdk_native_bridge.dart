@@ -257,10 +257,14 @@ class TidalSdkNativeBridge {
         'manifestXml': manifestXml,
         'allowedHost': allowedHost,
         'mimeType': mimeType,
+        'startPositionMs': startPosition.inMilliseconds,
       });
       final proxyUrl = result?['proxyUrl']?.toString() ?? '';
       AppLogger.log('TIDAL_NATIVE_SDK', 'DLNA 프록시 등록 완료', type: LogType.success);
-      return ProxyRegistration(proxyUrl, Duration.zero);
+      if (proxyUrl.isEmpty) return const ProxyRegistration('', Duration.zero);
+      // Kotlin의 Long은 값의 크기에 따라 int로도 오므로 num으로 읽는다.
+      final startOffsetMs = result?['startOffsetMs'];
+      return ProxyRegistration(proxyUrl, Duration(milliseconds: startOffsetMs is num ? startOffsetMs.toInt() : 0));
     } catch (e) {
       AppLogger.log('TIDAL_NATIVE_SDK', 'DLNA 프록시 등록 오류: $e', type: LogType.error);
       return const ProxyRegistration('', Duration.zero);
