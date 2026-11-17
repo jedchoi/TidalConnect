@@ -98,7 +98,7 @@ GateResult evaluateCoverage(
     // 절대 경로와 상대 경로처럼 한 대상에 맞는 기록이 여럿이면 줄 번호별로 합친다.
     final lines = <int, bool>{};
     for (final MapEntry(key: path, value: fileLines) in files.entries) {
-      if (path == target || path.endsWith('/$target')) _mergeLineHits(lines, fileLines);
+      if (_matchesTarget(path, target)) _mergeLineHits(lines, fileLines);
     }
     final hit = _countHit(lines);
     final total = lines.length;
@@ -176,6 +176,9 @@ Map<String, Map<int, bool>> _parseLineHits(String content) {
   }
   return files;
 }
+
+/// lcov의 [path]가 [target]의 기록인지. 같거나 `/<대상 경로>`로 끝나면 맞다(절대 경로 허용).
+bool _matchesTarget(String path, String target) => path == target || path.endsWith('/$target');
 
 /// [from]의 줄 기록을 [into]에 합친다. 한 번이라도 실행된 줄은 실행된 줄이다.
 void _mergeLineHits(Map<int, bool> into, Map<int, bool> from) {
