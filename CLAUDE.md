@@ -35,7 +35,7 @@ flutter test test/features/player/some_test.dart --plain-name "테스트 이름"
 
 **네이티브 쪽 소유 구조:** `PlaybackCore`(object, 프로세스 범위)가 인증 관리자, TIDAL 플레이어, 프록시 서버를 소유한다. Activity가 다시 만들어져도 재생이 끊기지 않도록 Activity에 묶지 않는다. 정지와 해제는 Flutter의 정지 명령으로만 일어난다.
 
-**DASH 경로:** LOSSLESS 요청이어도 TIDAL이 DASH(MPD)로 응답하는 경우가 있다. MPD 해석은 `DashManifest.kt`, 세그먼트 스트림은 `DashSegmentInputStream.kt`가 맡는다. 실기기에서 깨진 적이 있으므로 (`62b2e9d`) 해석 로직을 바꾸면 `DashManifestTest.kt`를 함께 본다.
+**DASH 경로:** LOSSLESS 요청이어도 TIDAL이 DASH(MPD)로 응답하는 경우가 있다. MPD 해석은 `DashManifest.kt`, 세그먼트 스트림은 `DashSegmentInputStream.kt`가 맡는다. 실기기에서 깨진 적이 있으므로 (`62b2e9d`) 해석 로직을 바꾸면 `DashManifestTest.kt`를 함께 본다. 이어 붙인 스트림은 바이트 위치로 건너뛸 수 없어서, DASH 곡의 탐색과 중간 위치 시작은 그 위치가 속한 세그먼트부터의 스트림을 새 주소로 등록해(`registerTrackStream`의 `startPositionMs` → 응답의 `startOffsetMs`) 스피커에 다시 재생시키는 방식이다. `DlnaBackend`가 시작 오프셋으로 재생 위치를 보정한다.
 
 **의존성 주입:** `lib/core/providers.dart`의 Riverpod Provider가 모든 서비스를 연결한다. 테스트는 `test/helpers/`의 override와 fake 구현으로 Provider를 바꿔 끼운다.
 
