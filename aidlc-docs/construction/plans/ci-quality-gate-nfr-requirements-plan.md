@@ -21,9 +21,9 @@
 - [x] 1. 입력 읽기: `unit-of-work.md` Unit 3, FR-09, NFR-01, NFR-02, 지금의 `check.sh` · `check.yml`
 - [x] 2. 아래 질문에 대한 답변 수집 · 모호성 분석
 - [x] 3. `aidlc-docs/construction/ci-quality-gate/nfr-requirements/nfr-requirements.md` 생성
-  - [ ] 3.1 FR-09 · NFR-01 (검사 자동화) · NFR-02 를 측정 기준과 함께 구체화
-  - [ ] 3.2 로컬과 CI 의 점검 내용 일치, 실행 시간, 실패 메시지의 요구
-  - [ ] 3.3 범주별 평가와 해당 없음 근거, 확장 규칙 (PBT, Resiliency) 에서 나오는 요구
+  - [x] 3.1 FR-09 · NFR-01 (검사 자동화) · NFR-02 를 측정 기준과 함께 구체화
+  - [x] 3.2 로컬과 CI 의 점검 내용 일치, 실행 시간, 실패 메시지의 요구
+  - [x] 3.3 범주별 평가와 해당 없음 근거, 확장 규칙 (PBT, Resiliency) 에서 나오는 요구
 - [x] 4. `aidlc-docs/construction/ci-quality-gate/nfr-requirements/tech-stack-decisions.md` 생성: 결정마다 선택 · 근거 · 버리는 대안
 - [x] 5. 검증: 배정된 요구사항이 모두 문서에 있는지, 결정마다 근거가 있는지
 
