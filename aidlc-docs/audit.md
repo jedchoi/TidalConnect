@@ -603,3 +603,12 @@
 **Context**: CONSTRUCTION - NFR Requirements (ci-quality-gate) 완료 → Code Generation (ci-quality-gate)
 
 ---
+
+## Code Generation (ci-quality-gate) - Part 1 계획 · 승인 요청
+**Timestamp**: 2026-11-17T05:58:08Z
+**User Input**: (없음)
+**AI Response**: "aidlc-docs/construction/plans/ci-quality-gate-code-generation-plan.md 생성 (Step 7개: 뼈대 1, RED 2, GREEN 3, 연결 4, REFACTOR 5, 검증 6, 요약 7). Functional Design 을 건너뛴 unit 이라 검사 규칙 GT-01 ~ GT-13 과 속성 P-GT-1 ~ P-GT-5 를 계획에서 정함. unit 2 와 같이 tdd-red → tdd-green → tdd-refactor 흐름, 단계마다 다른 하위 에이전트, 사람 관문 3개 (테스트 경계 표 2.2, RED 판정 2.5, 리팩토링 후보 5.2). 확장 준수: PBT-01 ~ 03, 07 ~ 10 compliant (속성 5개가 Step 2 에), PBT-04 ~ 06 N/A / RESILIENCY-04 compliant (Step 4.2), 그 밖 N/A. 승인 요청 문구: 'unit 코드 생성 계획을 검토해 주세요. 이 계획대로 코드 생성 (Part 2) 을 진행할까요? 승인은 계획에 적힌 로컬 커밋을 포함합니다.'"
+**Context**: CONSTRUCTION - Code Generation (ci-quality-gate), Part 1 Step 6 ~ 7
+**AI 점검**: ✅ 3 · ⚠️ 0 · ❌ 0 (CG-1 요구사항 ID 가 Step 마다 있고 추적 표에 모두 있음 (스토리 없음), CG-2 경로가 workspace 기준, CG-3 테스트 Step 있음)
+
+---
