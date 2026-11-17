@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger
 /**
  * `TidalStreamProxyServer`의 보호 테스트. 기대값은 `business-rules.md` 3절(PX-01 ~ PX-38)과
  * `business-logic-model.md` 3절(P-PX-1 ~ P-PX-6)의 값을 그대로 옮겼다.
+ * 시작 위치가 있는 등록(`registerTrackStreamAt`)은 dash-seek 의 `business-rules.md` 2절(PS-01 ~ PS-10, P-PS-1)이다.
  *
  * 프록시는 실제 서버를 `127.0.0.1`의 임시 포트에 띄우고, CDN만 [FakeCdnServer]로 대신한다.
  * 판정은 HTTP 응답과 가짜 CDN이 받은 요청 기록으로만 한다(등록부·캐시를 직접 보지 않는다).
@@ -965,6 +966,357 @@ class TidalStreamProxyServerTest {
         }
     }
 
+    // ---------------------------------------------------------------- 시작 위치가 있는 등록 (dash-seek 규칙 2절, PS-01 ~ PS-10)
+
+    /**
+     * `MPD4T`: DS-01 의 예와 같은 시각(timescale 44100, `<S d="176400" r="2"/><S d="88200"/>`)을 가진 DASH 곡.
+     * 세그먼트의 시작 시각은 0, 4000, 8000, 12000 ms 다.
+     * 초기화 세그먼트 `INIT`과 세그먼트 `AAAA`, `BB`, `CCCCCC`, `DDD`. 이어 붙이면 `INITAAAABBCCCCCCDDD`(19바이트).
+     */
+    private fun ProxyFixture.mpd4Timed(hasInit: Boolean = true): ProxyDash = prepareDash(
+        if (hasInit) ascii("INIT") else null,
+        listOf(ascii("AAAA"), ascii("BB"), ascii("CCCCCC"), ascii("DDD")),
+        timescale = 44100,
+        timeline = """<S d="176400" r="2"/><S d="88200"/>""",
+    )
+
+    @Test
+    fun `PS-01 registerTrackStreamAt 은 기존 등록과 같은 형식의 주소를 돌려주고 최근 3개를 보관한다`() {
+        // PS-01: 주소 형식 · 토큰 · 확장자가 기존 등록(PX-01 ~ PX-05)과 다르거나, 최근 3개 보관(PX-06)을 따로 세면 실패
+        table {
+            row("PS-01 a 주소 형식") { fx ->
+                val url = fx.registerAt(startPositionMs = 4000L).url
+                val match = Regex("""^http://127\.0\.0\.1:(\d+)/audio/([0-9a-f]{16})\.flac$""").matchEntire(url)
+                truth("주소 형식", match != null, "http://127.0.0.1:<포트>/audio/<16자 16진수>.flac 이 아님: <$url>")
+                if (match != null) eq("주소의 포트", fx.proxy.listeningPort.toString(), match.groupValues[1])
+            }
+            row("PS-01 b 확장자") { fx ->
+                val dash = fx.mpd4Timed()
+                eq("audio/mpeg", "mp3", extensionOf(fx.registerAt(mimeType = "audio/mpeg", startPositionMs = 4000L).url))
+                eq("빈 MIME", "m4a", extensionOf(fx.registerAt(mimeType = "", startPositionMs = 4000L).url))
+                val dashUrl = fx.registerAt(
+                    directUrl = "",
+                    manifestXml = dash.manifest,
+                    mimeType = "audio/flac",
+                    startPositionMs = 4000L,
+                ).url
+                eq("DASH 등록", "m4a", extensionOf(dashUrl))
+            }
+            row("PS-01 c 다시 등록") { fx ->
+                fx.cdn.onGet("/track.flac", body10)
+                val first = fx.registerAt(startPositionMs = 4000L).url
+                val second = fx.registerAt(startPositionMs = 4000L).url
+                truth("토큰", fx.tokenOf(first) != fx.tokenOf(second), "두 주소의 토큰이 같음: <$first>, <$second>")
+                bytes("첫 주소의 본문", body10, fx.get(first).body)
+                bytes("둘째 주소의 본문", body10, fx.get(second).body)
+            }
+            row("PS-01 d 최근 3개") { fx ->
+                for (n in 1..4) fx.cdn.onGet("/t$n.flac", byteArrayOf(n.toByte()))
+                // 1 · 3 번째는 registerTrackStreamAt, 2 번째는 기존 registerTrackStream: 같은 보관함을 쓴다
+                val urls = mutableListOf(
+                    fx.registerAt(trackId = "1", directUrl = fx.cdn.url("/t1.flac")).url,
+                    fx.register(trackId = "2", directUrl = fx.cdn.url("/t2.flac")),
+                    fx.registerAt(trackId = "3", directUrl = fx.cdn.url("/t3.flac")).url,
+                )
+                eq("4번째 등록 전 1번째 상태", 200, fx.get(urls[0]).status)
+                urls += fx.registerAt(trackId = "4", directUrl = fx.cdn.url("/t4.flac")).url
+                val evicted = fx.get(urls[0])
+                eq("1번째 상태", 404, evicted.status)
+                eq("1번째 본문", "Not Found", evicted.bodyText)
+                bytes("2번째 본문", byteArrayOf(0x02), fx.get(urls[1]).body)
+                bytes("3번째 본문", byteArrayOf(0x03), fx.get(urls[2]).body)
+                bytes("4번째 본문", byteArrayOf(0x04), fx.get(urls[3]).body)
+            }
+        }
+    }
+
+    @Test
+    fun `PS-02 DASH 등록의 시작 오프셋은 시작 위치가 속한 세그먼트의 시작 시각이다`() {
+        // PS-02: 요청한 위치를 그대로 돌려주거나, 항상 0 을 돌려주거나, 경계(4000, 12000)에서 앞 세그먼트의 시각을 돌려주면 실패
+        val expected = listOf(
+            0L to 0L,
+            3999L to 0L,
+            4000L to 4000L,
+            5000L to 4000L,
+            11999L to 8000L,
+            12000L to 12000L,
+            // DS-03 · DS-04: 0 이하는 0 번째, 곡 길이(14000) 이상은 마지막 세그먼트
+            -1L to 0L,
+            14000L to 12000L,
+            3_600_000L to 12000L,
+        )
+        table {
+            row("PS-02") { fx ->
+                val dash = fx.mpd4Timed()
+                for ((positionMs, offsetMs) in expected) {
+                    val stream = fx.registerAt(directUrl = "", manifestXml = dash.manifest, startPositionMs = positionMs)
+                    eq("위치 $positionMs 의 startOffsetMs", offsetMs, stream.startOffsetMs)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `PS-03 단일 파일 등록은 시작 위치를 무시하고 시작 오프셋 0 에 기존과 같은 응답이다`() {
+        // PS-03: 단일 파일에 시작 오프셋을 돌려주거나, 본문을 잘라 보내거나, CDN 에 Range 를 붙이면 실패
+        table {
+            row("PS-03 a 직접 주소만") { fx ->
+                fx.cdn.onGet("/track.flac", body10)
+                val stream = fx.registerAt(startPositionMs = 5000L)
+                eq("startOffsetMs", 0L, stream.startOffsetMs)
+                val response = fx.get(stream.url)
+                eq("상태", 200, response.status)
+                bytes("본문", body10, response.body)
+                eq("Content-Type", "audio/flac", response.header("Content-Type"))
+                eq("Content-Length", "10", response.header("Content-Length"))
+                eq("Accept-Ranges", "bytes", response.header("Accept-Ranges"))
+                eq("CDN 기록", listOf(CdnRequest("GET", "/track.flac")), fx.cdn.requests())
+            }
+            row("PS-03 b 직접 주소와 매니페스트가 함께") { fx ->
+                val dash = fx.mpd4Timed()
+                fx.cdn.onGet("/track.flac", body10)
+                val stream = fx.registerAt(manifestXml = dash.manifest, startPositionMs = 5000L)
+                eq("startOffsetMs", 0L, stream.startOffsetMs)
+                val response = fx.get(stream.url)
+                eq("상태", 200, response.status)
+                bytes("본문", body10, response.body)
+                eq("Content-Type", "audio/flac", response.header("Content-Type"))
+            }
+        }
+    }
+
+    @Test
+    fun `PS-04 해석할 수 없거나 시각을 알 수 없는 매니페스트는 시작 오프셋 0 에 처음부터 보낸다`() {
+        // PS-04: 그런 매니페스트의 등록에서 예외를 내거나, 0 이 아닌 오프셋을 돌려주거나, 중간 세그먼트부터 보내면 실패
+        table {
+            row("PS-04 a 해석할 수 없음") { fx ->
+                val stream = fx.registerAt(directUrl = "", manifestXml = "not xml", startPositionMs = 5000L)
+                eq("startOffsetMs", 0L, stream.startOffsetMs)
+                val response = fx.get(stream.url)
+                eq("상태", 500, response.status)
+                eq("본문", "Invalid DASH manifest", response.bodyText)
+            }
+            val unknownTimings = listOf(
+                Triple("PS-04 b d 없는 S", 44100, """<S d="176400"/><S/><S d="176400"/><S d="88200"/>"""),
+                Triple("PS-04 c timescale 0", 0, """<S d="176400" r="2"/><S d="88200"/>"""),
+            )
+            for ((name, timescale, timeline) in unknownTimings) {
+                row(name) { fx ->
+                    val dash = fx.prepareDash(
+                        ascii("INIT"),
+                        listOf(ascii("AAAA"), ascii("BB"), ascii("CCCCCC"), ascii("DDD")),
+                        timescale = timescale,
+                        timeline = timeline,
+                    )
+                    val stream = fx.registerAt(directUrl = "", manifestXml = dash.manifest, startPositionMs = 5000L)
+                    eq("startOffsetMs", 0L, stream.startOffsetMs)
+                    val response = fx.get(stream.url)
+                    eq("상태", 200, response.status)
+                    eq("Content-Length", "19", response.header("Content-Length"))
+                    bytes("본문", ascii("INITAAAABBCCCCCCDDD"), response.body)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `PS-05 기존 registerTrackStream 은 주소 문자열을 돌려주고 시작 위치 0 으로 등록한 것과 같다`() {
+        // PS-05: 인자 5개짜리 등록이 없어지거나, 시각이 있는 매니페스트에서 처음부터가 아닌 본문을 주면 실패
+        table {
+            row("PS-05") { fx ->
+                val dash = fx.mpd4Timed()
+                val url: String = fx.proxy.registerTrackStream("101", "", dash.manifest, "", "audio/mp4")
+                truth(
+                    "주소 형식",
+                    Regex("""^http://127\.0\.0\.1:\d+/audio/[0-9a-f]{16}\.m4a$""").matches(url),
+                    "http://127.0.0.1:<포트>/audio/<16자 16진수>.m4a 이 아님: <$url>",
+                )
+                val response = fx.get(url)
+                eq("상태", 200, response.status)
+                eq("Content-Length", "19", response.header("Content-Length"))
+                bytes("본문", ascii("INITAAAABBCCCCCCDDD"), response.body)
+                val atZero = fx.get(
+                    fx.registerAt(directUrl = "", manifestXml = dash.manifest, startPositionMs = 0L).url,
+                )
+                eq("위치 0 등록의 Content-Length", "19", atZero.header("Content-Length"))
+                bytes("위치 0 등록의 본문", ascii("INITAAAABBCCCCCCDDD"), atZero.body)
+            }
+        }
+    }
+
+    @Test
+    fun `PS-06 시작 세그먼트가 있는 DASH GET 은 초기화 세그먼트와 그 세그먼트부터 끝까지만 보낸다`() {
+        // PS-06: 처음부터 보내거나, 초기화 세그먼트를 빼거나, 시작 세그먼트 앞의 세그먼트를 CDN 에서 받아 오면 실패
+        table {
+            row("PS-06 a 위치 5000 (1번째부터)") { fx ->
+                val dash = fx.mpd4Timed()
+                val stream = fx.registerAt(directUrl = "", manifestXml = dash.manifest, startPositionMs = 5000L)
+                val response = fx.get(stream.url)
+                eq("상태", 200, response.status)
+                bytes("본문", ascii("INITBBCCCCCCDDD"), response.body)
+                eq("Content-Type", "audio/mp4", response.header("Content-Type"))
+                eq("Accept-Ranges", null, response.header("Accept-Ranges"))
+                eq("CDN GET init 건수", 1, fx.cdn.count("GET", dash.initPath!!))
+                eq("CDN GET 1.mp4 건수", 0, fx.cdn.count("GET", dash.segmentPath(1)))
+                eq("CDN GET 2.mp4 건수", 1, fx.cdn.count("GET", dash.segmentPath(2)))
+                eq("CDN GET 3.mp4 건수", 1, fx.cdn.count("GET", dash.segmentPath(3)))
+                eq("CDN GET 4.mp4 건수", 1, fx.cdn.count("GET", dash.segmentPath(4)))
+            }
+            row("PS-06 b 초기화 세그먼트 없음, 위치 8000 (2번째부터)") { fx ->
+                val dash = fx.mpd4Timed(hasInit = false)
+                val stream = fx.registerAt(directUrl = "", manifestXml = dash.manifest, startPositionMs = 8000L)
+                val response = fx.get(stream.url)
+                eq("상태", 200, response.status)
+                bytes("본문", ascii("CCCCCCDDD"), response.body)
+                eq("CDN GET 1.mp4 건수", 0, fx.cdn.count("GET", dash.segmentPath(1)))
+                eq("CDN GET 2.mp4 건수", 0, fx.cdn.count("GET", dash.segmentPath(2)))
+                eq("CDN GET 합계", 2, fx.cdn.count("GET"))
+            }
+            row("PS-06 c 위치 12000 (마지막 세그먼트)") { fx ->
+                val dash = fx.mpd4Timed()
+                val stream = fx.registerAt(directUrl = "", manifestXml = dash.manifest, startPositionMs = 12000L)
+                val response = fx.get(stream.url)
+                eq("상태", 200, response.status)
+                bytes("본문", ascii("INITDDD"), response.body)
+                eq("CDN GET 합계", 2, fx.cdn.count("GET"))
+            }
+        }
+    }
+
+    @Test
+    fun `PS-07 시작 세그먼트가 있는 DASH 의 Content-Length 는 초기화 세그먼트와 그 세그먼트부터의 길이 합이다`() {
+        // PS-07: 곡 전체 길이(19)를 알리거나, 초기화 세그먼트를 빼고 세거나, 범위 안에 길이를 모르는 세그먼트가 있는데 길이를 알리면 실패
+        table {
+            row("PS-07 a 모두 앎 (4 + 2 + 6 + 3 = 15)") { fx ->
+                val dash = fx.mpd4Timed()
+                val stream = fx.registerAt(directUrl = "", manifestXml = dash.manifest, startPositionMs = 4000L)
+                val get = fx.get(stream.url)
+                eq("GET 상태", 200, get.status)
+                eq("GET Content-Length", "15", get.header("Content-Length"))
+                bytes("GET 본문", ascii("INITBBCCCCCCDDD"), get.body)
+                val head = fx.head(stream.url)
+                eq("HEAD 상태", 200, head.status)
+                eq("HEAD Content-Length", "15", head.header("Content-Length"))
+                eq("HEAD 본문 길이", 0, head.body.size)
+            }
+            row("PS-07 b 범위 안의 세그먼트 길이를 모름") { fx ->
+                val dash = fx.mpd4Timed()
+                fx.cdn.onHead(dash.segmentPath(3), CdnHeadReply(200, null))
+                val stream = fx.registerAt(directUrl = "", manifestXml = dash.manifest, startPositionMs = 4000L)
+                val get = fx.get(stream.url)
+                eq("GET 상태", 200, get.status)
+                eq("GET Content-Length", null, get.header("Content-Length"))
+                eq("GET Transfer-Encoding", "chunked", get.header("Transfer-Encoding"))
+                bytes("GET 본문", ascii("INITBBCCCCCCDDD"), get.body)
+                val head = fx.head(stream.url)
+                eq("HEAD 상태", 200, head.status)
+                eq("HEAD Content-Length", null, head.header("Content-Length"))
+            }
+            row("PS-07 c 범위 밖(시작 세그먼트 앞)의 세그먼트 길이만 모름") { fx ->
+                val dash = fx.mpd4Timed()
+                fx.cdn.onHead(dash.segmentPath(1), CdnHeadReply(200, null))
+                val stream = fx.registerAt(directUrl = "", manifestXml = dash.manifest, startPositionMs = 4000L)
+                val get = fx.get(stream.url)
+                eq("GET 상태", 200, get.status)
+                eq("GET Content-Length", "15", get.header("Content-Length"))
+                bytes("GET 본문", ascii("INITBBCCCCCCDDD"), get.body)
+                eq("HEAD Content-Length", "15", fx.head(stream.url).header("Content-Length"))
+            }
+        }
+    }
+
+    @Test
+    fun `PS-08 같은 매니페스트를 다른 시작 세그먼트로 다시 등록해도 세그먼트 길이 조회는 한 번뿐이다`() {
+        // PS-08: 등록(시작 세그먼트)마다 길이를 따로 기억해 CDN 에 HEAD 를 다시 보내면 실패
+        table {
+            row("PS-08 a 처음부터 → 중간부터") { fx ->
+                val dash = fx.mpd4Timed()
+                val first = fx.registerAt(directUrl = "", manifestXml = dash.manifest, startPositionMs = 0L)
+                eq("1번째 GET 상태", 200, fx.get(first.url).status)
+                eq("1번째 뒤 CDN HEAD 합계", 5, fx.cdn.count("HEAD"))
+                val second = fx.registerAt(directUrl = "", manifestXml = dash.manifest, startPositionMs = 4000L)
+                eq("2번째 GET 상태", 200, fx.get(second.url).status)
+                eq("2번째 HEAD 상태", 200, fx.head(second.url).status)
+                for (path in dash.allPaths) eq("CDN HEAD $path 건수", 1, fx.cdn.count("HEAD", path))
+                eq("2번째 뒤 CDN HEAD 합계", 5, fx.cdn.count("HEAD"))
+            }
+            row("PS-08 b 중간부터 → 처음부터") { fx ->
+                val dash = fx.mpd4Timed()
+                val first = fx.registerAt(directUrl = "", manifestXml = dash.manifest, startPositionMs = 8000L)
+                eq("1번째 GET 상태", 200, fx.get(first.url).status)
+                val second = fx.registerAt(directUrl = "", manifestXml = dash.manifest, startPositionMs = 0L)
+                eq("2번째 GET 상태", 200, fx.get(second.url).status)
+                val third = fx.registerAt(directUrl = "", manifestXml = dash.manifest, startPositionMs = 12000L)
+                eq("3번째 HEAD 상태", 200, fx.head(third.url).status)
+                for (path in dash.allPaths) eq("CDN HEAD $path 건수", 1, fx.cdn.count("HEAD", path))
+                eq("CDN HEAD 합계", 5, fx.cdn.count("HEAD"))
+            }
+        }
+    }
+
+    @Test
+    fun `PS-09 시작 세그먼트 0 으로 등록한 DASH 곡의 응답은 기존과 같다`() {
+        // PS-09: 위치 0 의 등록에서 본문 · 길이 · 타입 · 길이 조회 횟수가 기존 DASH 중계(PX-34 ~ PX-38)와 달라지면 실패
+        table {
+            row("PS-09 a 본문 · 길이 · 타입 (PX-34, PX-35)") { fx ->
+                val dash = fx.mpd4Timed()
+                val stream = fx.registerAt(directUrl = "", manifestXml = dash.manifest, startPositionMs = 0L)
+                eq("startOffsetMs", 0L, stream.startOffsetMs)
+                val response = fx.get(stream.url)
+                eq("상태", 200, response.status)
+                bytes("본문", ascii("INITAAAABBCCCCCCDDD"), response.body)
+                eq("Content-Length", "19", response.header("Content-Length"))
+                eq("Content-Type", "audio/mp4", response.header("Content-Type"))
+                eq("Accept-Ranges", null, response.header("Accept-Ranges"))
+                for (path in dash.allPaths) eq("CDN GET $path 건수", 1, fx.cdn.count("GET", path))
+            }
+            row("PS-09 b 길이를 모르는 세그먼트 (PX-36)") { fx ->
+                val dash = fx.mpd4Timed()
+                fx.cdn.onHead(dash.segmentPath(2), CdnHeadReply(200, null))
+                val stream = fx.registerAt(directUrl = "", manifestXml = dash.manifest, startPositionMs = 0L)
+                val response = fx.get(stream.url)
+                eq("상태", 200, response.status)
+                eq("Content-Length", null, response.header("Content-Length"))
+                eq("Transfer-Encoding", "chunked", response.header("Transfer-Encoding"))
+                bytes("본문", ascii("INITAAAABBCCCCCCDDD"), response.body)
+            }
+            row("PS-09 c 해석할 수 없는 매니페스트 (PX-37)") { fx ->
+                val stream = fx.registerAt(directUrl = "", manifestXml = "<MPD><Period/></MPD>", startPositionMs = 0L)
+                val response = fx.get(stream.url)
+                eq("상태", 500, response.status)
+                eq("본문", "Invalid DASH manifest", response.bodyText)
+            }
+            row("PS-09 d HEAD 뒤 GET 의 길이 조회 (PX-38)") { fx ->
+                val dash = fx.mpd4Timed()
+                val stream = fx.registerAt(directUrl = "", manifestXml = dash.manifest, startPositionMs = 0L)
+                eq("HEAD Content-Length", "19", fx.head(stream.url).header("Content-Length"))
+                eq("GET Content-Length", "19", fx.get(stream.url).header("Content-Length"))
+                eq("CDN HEAD 합계", 5, fx.cdn.count("HEAD"))
+            }
+        }
+    }
+
+    @Test
+    fun `PS-10 같은 곡을 다른 위치로 여러 번 등록하면 주소마다 자기 시작 세그먼트의 본문을 준다`() {
+        // PS-10: 다시 등록할 때 앞 등록의 시작 세그먼트가 바뀌거나(곡 · 매니페스트 단위로 기억), 같은 주소를 돌려주면 실패
+        table {
+            row("PS-10") { fx ->
+                val dash = fx.mpd4Timed()
+                val atStart = fx.registerAt(directUrl = "", manifestXml = dash.manifest, startPositionMs = 0L)
+                val atMiddle = fx.registerAt(directUrl = "", manifestXml = dash.manifest, startPositionMs = 4000L)
+                val atLast = fx.registerAt(directUrl = "", manifestXml = dash.manifest, startPositionMs = 12000L)
+                eq("서로 다른 주소의 수", 3, setOf(atStart.url, atMiddle.url, atLast.url).size)
+                // 등록한 순서와 다르게 조회하고, 처음 주소를 마지막에 한 번 더 본다
+                bytes("위치 4000 주소의 본문", ascii("INITBBCCCCCCDDD"), fx.get(atMiddle.url).body)
+                bytes("위치 0 주소의 본문", ascii("INITAAAABBCCCCCCDDD"), fx.get(atStart.url).body)
+                bytes("위치 12000 주소의 본문", ascii("INITDDD"), fx.get(atLast.url).body)
+                val again = fx.get(atMiddle.url)
+                eq("위치 4000 주소를 다시 조회한 Content-Length", "15", again.header("Content-Length"))
+                bytes("위치 4000 주소를 다시 조회한 본문", ascii("INITBBCCCCCCDDD"), again.body)
+            }
+        }
+    }
+
     // ---------------------------------------------------------------- 속성 테스트
 
     /** PX-02 의 판정 순서를 옮긴 참조 표. */
@@ -1103,6 +1455,38 @@ class TidalStreamProxyServerTest {
                     val expected = (listOfNotNull(content.init) + content.segments).fold(ByteArray(0)) { acc, part -> acc + part }
                     assertArrayEquals("$content 의 본문", expected, response.body)
                     assertEquals("$content 의 Content-Length", expected.size.toString(), response.header("Content-Length"))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `P-PS-1 어떤 DASH 내용과 시작 위치든 본문은 초기화 세그먼트와 그 위치의 세그먼트부터 이은 것이고 길이와 시작 오프셋이 맞다`() {
+        // P-PS-1: 어떤 세그먼트 내용 · 개수 · 길이 · 위치에서든 본문이 "초기화 + 시작 세그먼트부터" 와 다르거나,
+        // Content-Length 가 그 길이와 다르거나, startOffsetMs 가 시작 세그먼트의 시작 시각과 다르면 실패.
+        // 시작 세그먼트와 시작 시각은 DS-01 ~ DS-04 를 옮긴 참조 모델(DashTiming)로 구한다
+        ProxyFixture().use { fx ->
+            property {
+                checkAll(pbt(25), ProxyGenerators.dashSeek) { seek ->
+                    val dash = fx.prepareDash(
+                        seek.content.init,
+                        seek.content.segments,
+                        timescale = seek.timing.timescale,
+                        timeline = seek.timing.timelineXml(),
+                    )
+                    val stream = fx.registerAt(
+                        directUrl = "",
+                        manifestXml = dash.manifest,
+                        mimeType = "audio/mp4",
+                        startPositionMs = seek.positionMs,
+                    )
+                    val response = fx.get(stream.url)
+                    val k = seek.timing.indexAt(seek.positionMs)
+                    val expected = (listOfNotNull(seek.content.init) + seek.content.segments.drop(k))
+                        .fold(ByteArray(0)) { acc, part -> acc + part }
+                    assertEquals("$seek 의 startOffsetMs", seek.timing.startsMs[k], stream.startOffsetMs)
+                    assertArrayEquals("$seek 의 본문 (${k}번째부터)", expected, response.body)
+                    assertEquals("$seek 의 Content-Length", expected.size.toString(), response.header("Content-Length"))
                 }
             }
         }

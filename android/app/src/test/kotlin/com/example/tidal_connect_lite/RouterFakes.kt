@@ -81,10 +81,13 @@ class FakeDeviceControls : DeviceControls {
     override fun setWifiLock(enabled: Boolean) = record("setWifiLock($enabled)")
 }
 
-/** [ProxyRegistrar] fake. [result]가 null이면 Wi-Fi가 없는 경우다. */
+/**
+ * [ProxyRegistrar] fake. [result]가 null이면 Wi-Fi가 없는 경우다.
+ * 기본 결과는 시작 오프셋 0(처음부터)인 등록이다.
+ */
 class FakeProxyRegistrar : ProxyRegistrar {
     val calls = mutableListOf<String>()
-    var result: String? = "http://192.0.2.1:8765/audio/0123456789abcdef.flac"
+    var result: RegisteredStream? = RegisteredStream("http://192.0.2.1:8765/audio/0123456789abcdef.flac", 0L)
     var failure: RuntimeException? = null
 
     override fun registerTrackStream(
@@ -93,8 +96,9 @@ class FakeProxyRegistrar : ProxyRegistrar {
         manifestXml: String,
         allowedHost: String,
         mimeType: String,
-    ): String? {
-        calls += "registerTrackStream($trackId, $directUrl, $manifestXml, $allowedHost, $mimeType)"
+        startPositionMs: Long,
+    ): RegisteredStream? {
+        calls += "registerTrackStream($trackId, $directUrl, $manifestXml, $allowedHost, $mimeType, $startPositionMs)"
         failure?.let { throw it }
         return result
     }

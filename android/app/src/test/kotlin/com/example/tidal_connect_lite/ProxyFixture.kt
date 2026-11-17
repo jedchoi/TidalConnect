@@ -99,6 +99,20 @@ class ProxyFixture : Closeable {
         mimeType: String = "audio/flac",
     ): String = proxy.registerTrackStream(trackId, directUrl, manifestXml, allowedHost, mimeType)
 
+    /**
+     * "기본 등록" 값으로 `registerTrackStreamAt`을 부른다. [register]와 같은 기본값에 시작 위치가 더해진다.
+     * 돌려주는 값은 주소와 시작 오프셋이다.
+     */
+    fun registerAt(
+        trackId: String = "101",
+        directUrl: String = cdn.url("/track.flac"),
+        manifestXml: String = "",
+        allowedHost: String = "",
+        mimeType: String = "audio/flac",
+        startPositionMs: Long = 0L,
+    ): RegisteredStream =
+        proxy.registerTrackStreamAt(trackId, directUrl, manifestXml, allowedHost, mimeType, startPositionMs)
+
     /** 프록시에 GET을 보낸다. [urlOrPath]는 등록이 돌려준 주소 전체이거나 `/`로 시작하는 경로다. */
     fun get(urlOrPath: String, range: String? = null): ProxyResponse = send("GET", urlOrPath, range)
 
@@ -115,20 +129,29 @@ class ProxyFixture : Closeable {
     /**
      * DASH 매니페스트만 만든다(가짜 CDN에 내용은 등록하지 않는다).
      * 주소는 [base] 아래의 고유 경로를 가리킨다. 세그먼트 번호는 1부터다.
+     *
+     * [timescale]과 [timeline]을 주지 않으면 `timescale="44100"`에 세그먼트마다 `<S d="1"/>`이다.
+     * [timeline]은 `SegmentTimeline` 안에 그대로 넣을 `<S .../>` 원문이며, 나타내는 세그먼트 수가 [segmentCount]와 같아야 한다.
      */
-    fun newDash(hasInit: Boolean, segmentCount: Int, base: String = cdn.url("")): ProxyDash {
+    fun newDash(
+        hasInit: Boolean,
+        segmentCount: Int,
+        base: String = cdn.url(""),
+        timescale: Int = 44100,
+        timeline: String? = null,
+    ): ProxyDash {
         val prefix = "/dash/${dashCounter.incrementAndGet()}"
         val initPath = if (hasInit) "$prefix/init.mp4" else null
         val segmentPaths = (1..segmentCount).map { "$prefix/$it.mp4" }
         val initAttribute = if (initPath != null) """ initialization="$base$initPath"""" else ""
-        val timeline = (1..segmentCount).joinToString("") { """<S d="1"/>""" }
+        val timelineXml = timeline ?: (1..segmentCount).joinToString("") { """<S d="1"/>""" }
         val manifest = """<?xml version="1.0" encoding="UTF-8"?>
 <MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="static">
   <Period>
     <AdaptationSet contentType="audio" mimeType="audio/mp4">
       <Representation id="FLAC,44100,16" codecs="flac" bandwidth="1000000" audioSamplingRate="44100">
-        <SegmentTemplate timescale="44100"$initAttribute media="$base$prefix/${'$'}Number${'$'}.mp4" startNumber="1">
-          <SegmentTimeline>$timeline</SegmentTimeline>
+        <SegmentTemplate timescale="$timescale"$initAttribute media="$base$prefix/${'$'}Number${'$'}.mp4" startNumber="1">
+          <SegmentTimeline>$timelineXml</SegmentTimeline>
         </SegmentTemplate>
       </Representation>
     </AdaptationSet>
@@ -139,10 +162,20 @@ class ProxyFixture : Closeable {
 
     /**
      * DASH 매니페스트를 만들고 가짜 CDN에 그 내용을 등록한다.
-     * [init]이 null이면 초기화 세그먼트가 없는 매니페스트다.
+     * [init]이 null이면 초기화 세그먼트가 없는 매니페스트다. [timescale]과 [timeline]은 [newDash]와 같다.
      */
-    fun prepareDash(init: ByteArray?, segments: List<ByteArray>): ProxyDash {
-        val dash = newDash(hasInit = init != null, segmentCount = segments.size)
+    fun prepareDash(
+        init: ByteArray?,
+        segments: List<ByteArray>,
+        timescale: Int = 44100,
+        timeline: String? = null,
+    ): ProxyDash {
+        val dash = newDash(
+            hasInit = init != null,
+            segmentCount = segments.size,
+            timescale = timescale,
+            timeline = timeline,
+        )
         if (init != null) cdn.onGet(dash.initPath!!, init)
         segments.forEachIndexed { index, bytes -> cdn.onGet(dash.segmentPaths[index], bytes) }
         return dash

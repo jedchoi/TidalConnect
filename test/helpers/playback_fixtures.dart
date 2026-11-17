@@ -80,7 +80,7 @@ TidalPlaybackInfo directStream({
       sampleRate: sampleRate,
     );
 
-/// DASH 스트림 정보. 탐색할 수 없다.
+/// DASH 스트림 정보. 탐색은 프록시에 다시 등록하는 방식으로 한다(dash-seek).
 TidalPlaybackInfo dashStream({String manifest = '<MPD/>'}) => TidalPlaybackInfo(
       streamUrl: '',
       manifest: manifest,
@@ -100,6 +100,11 @@ AuthToken testUserToken() => AuthToken(
 
 /// 가짜 프록시가 곡마다 돌려주는 주소. 실제 프록시처럼 16자 토큰과 확장자가 붙는다.
 String proxyUrlFor(String trackId) => '$fakeProxyOrigin/audio/${trackId.padLeft(16, '0')}.flac';
+
+/// 시작 위치([startPositionMs] > 0)를 주고 등록했을 때 가짜 프록시가 돌려주는 주소.
+/// 실제 프록시처럼 등록마다 주소가 다르다([proxyUrlFor]와도 다르다).
+String proxyUrlAt(String trackId, int startPositionMs) =>
+    '$fakeProxyOrigin/audio/${'${trackId}t$startPositionMs'.padLeft(16, '0')}.mp4';
 
 /// `GetPositionInfo` 응답을 만든다.
 Map<String, String> positionInfo({int rel = 0, int duration = 180, String trackUri = ''}) => {
@@ -206,6 +211,27 @@ class DlnaBackendHarness {
     final result = capture(backend.play(track, startPosition: startPosition, isCancelled: isCancelled ?? () => false));
     async.flushMicrotasks();
     return result;
+  }
+
+  /// 탐색을 요청하고 비동기 작업을 끝까지 진행시킨다.
+  CallResult seek(FakeAsync async, Duration position) {
+    final result = capture(backend.seek(position));
+    async.flushMicrotasks();
+    return result;
+  }
+
+  /// 시작 위치가 있는 등록(`startPositionMs` > 0)에 프록시가 [startOffset]을 시작 오프셋으로 답하게 한다.
+  /// 그 등록의 주소는 [proxyUrlAt]이다. 시작 위치가 0이거나 없는 등록은 기본 동작([proxyUrlFor], 오프셋 0)과 같다.
+  void answerStartOffset(Duration startOffset) {
+    channel.responses['registerTrackStream'] = (call) {
+      final arguments = call.arguments as Map;
+      final id = arguments['trackId'] as String;
+      final start = arguments['startPositionMs'];
+      if (start is int && start > 0) {
+        return {'proxyUrl': proxyUrlAt(id, start), 'startOffsetMs': startOffset.inMilliseconds};
+      }
+      return {'proxyUrl': proxyUrlFor(id), 'startOffsetMs': 0};
+    };
   }
 
   /// 폴링을 [times]번 돌린다(1초씩 진행).

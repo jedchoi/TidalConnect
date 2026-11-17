@@ -22,13 +22,18 @@ data class RouterCall(val method: String, val args: Map<String, Any?>)
 /** 플레이어가 던질 예외와, 그때 router가 오류 메시지로 돌려줘야 하는 문자열. */
 data class RouterThrown(val exception: RuntimeException, val expectedMessage: String)
 
-/** `registerTrackStream`의 다섯 인자. null은 "인자 없음"이다. */
+/**
+ * `registerTrackStream`의 여섯 인자. null은 "인자 없음"이다.
+ * [startPositionMs]는 [startPositionAsLong]에 따라 채널 인자에 Int 또는 Long 타입으로 실린다.
+ */
 data class RouterRegistration(
     val trackId: String?,
     val directUrl: String?,
     val manifestXml: String?,
     val allowedHost: String?,
     val mimeType: String?,
+    val startPositionMs: Int? = null,
+    val startPositionAsLong: Boolean = false,
 ) {
     fun toArgs(): Map<String, Any?> = routerArgsOf(
         "trackId" to trackId,
@@ -36,6 +41,7 @@ data class RouterRegistration(
         "manifestXml" to manifestXml,
         "allowedHost" to allowedHost,
         "mimeType" to mimeType,
+        "startPositionMs" to startPositionMs?.let { if (startPositionAsLong) it.toLong() else it },
     )
 }
 
@@ -157,16 +163,21 @@ object RouterArbs {
         listOf("audio/flac", "audio/mp4", "audio/m4a", "audio/aac", "audio/mpeg", "application/octet-stream", ""),
     )
 
-    /** 등록 인자: 다섯 문자열 각각 있음(빈 문자열 포함) 또는 없음(null). */
+    /** 등록 인자: 다섯 문자열 각각 있음(빈 문자열 포함) 또는 없음(null), 시작 위치(Int 또는 Long) 있음 또는 없음. */
     fun registration(): Arb<RouterRegistration> = Arb.bind(
         trackId().orNull(0.3),
         directUrl().orNull(0.3),
         manifestXml().orNull(0.3),
         allowedHost().orNull(0.3),
         mimeType().orNull(0.3),
-    ) { trackId, directUrl, manifestXml, allowedHost, mimeType ->
-        RouterRegistration(trackId, directUrl, manifestXml, allowedHost, mimeType)
+        position().orNull(0.3),
+        Arb.boolean(),
+    ) { trackId, directUrl, manifestXml, allowedHost, mimeType, startPositionMs, asLong ->
+        RouterRegistration(trackId, directUrl, manifestXml, allowedHost, mimeType, startPositionMs, asLong)
     }
+
+    /** 등록 함수가 돌려줄 시작 오프셋(밀리초): 0 ~ 36,000,000. 0(처음부터)이 자주 나오게 섞는다. */
+    fun startOffsetMs(): Arb<Long> = Arb.choice(Arb.constant(0L), position().map { it.toLong() })
 
     /** 등록 함수가 돌려줄 URL 모양의 문자열. */
     fun proxyUrl(): Arb<String> = Arb.bind(
