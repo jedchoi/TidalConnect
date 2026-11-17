@@ -738,3 +738,11 @@
 **Context**: CONSTRUCTION → OPERATIONS 경계 추적 점검 (Operations 는 모두 SKIP)
 
 ---
+
+## Traceability Check ② - 보완 지시
+**Timestamp**: 2026-11-17T07:33:00Z
+**User Input**: "푸시하고 다시 점검"
+**AI Response**: "브랜치 aidlc/test-reinforcement 를 origin 에 푸시하고 CI 실행 결과를 확인한 뒤 추적성 점검을 다시 실행"
+**Context**: Traceability Check ② Construction, GAP 보완 (FR-09, NFR-02)
+
+---
