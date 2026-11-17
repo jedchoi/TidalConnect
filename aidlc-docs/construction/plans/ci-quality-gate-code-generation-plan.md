@@ -64,11 +64,11 @@ Functional Design 을 건너뛰었으므로 `CoverageGate` 의 동작을 여기�
 
 ### 준비 (이 세션)
 
-- [ ] **Step 1. 뼈대와 설정** (FR-09-C7, NFR-07-C2)
-  - [ ] 1.1 `.gitignore` 에 `coverage/` 추가 (기존 파일 수정)
-  - [ ] 1.2 `tool/coverage_gate.dart` 뼈대 (새로 만듦): 상수 `coverageTargets`, `coverageThresholdPercent`, 타입 (`FileCoverage`, `TargetResult`, `GateResult`), 순수 함수 `parseLcov(String)`, `evaluateCoverage(String, {targets, thresholdPercent})`, `formatReport(GateResult)`, 실행 함수 `runCoverageGate(List<String> args, StringSink out)`, `main`. 본문은 빈 결과를 돌려준다
-  - [ ] 1.3 `dart format`, `flutter analyze --fatal-infos`, 기존 `flutter test` 262개 통과 확인
-  - [ ] 커밋: `chore: 커버리지 검사 스크립트 뼈대 추가, coverage/ 를 git 에서 제외`
+- [x] **Step 1. 뼈대와 설정** (FR-09-C7, NFR-07-C2)
+  - [x] 1.1 `.gitignore` 에 `coverage/` 추가 (기존 파일 수정)
+  - [x] 1.2 `tool/coverage_gate.dart` 뼈대 (새로 만듦): 상수 `coverageTargets`, `coverageThresholdPercent`, 타입 (`FileCoverage`, `TargetResult`, `GateResult`), 순수 함수 `parseLcov(String)`, `evaluateCoverage(String, {targets, thresholdPercent})`, `formatReport(GateResult)`, 실행 함수 `runCoverageGate(List<String> args, StringSink out)`, `main`. 본문은 빈 결과를 돌려준다
+  - [x] 1.3 `dart format`, `flutter analyze --fatal-infos`, 기존 `flutter test` 262개 통과 확인
+  - [x] 커밋: `chore: 커버리지 검사 스크립트 뼈대 추가, coverage/ 를 git 에서 제외`
 
 ### RED (`tdd-red` 스킬)
 

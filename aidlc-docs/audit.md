@@ -612,3 +612,12 @@
 **AI 점검**: ✅ 3 · ⚠️ 0 · ❌ 0 (CG-1 요구사항 ID 가 Step 마다 있고 추적 표에 모두 있음 (스토리 없음), CG-2 경로가 workspace 기준, CG-3 테스트 Step 있음)
 
 ---
+
+## Code Generation (ci-quality-gate) - Part 1 계획 승인
+**Timestamp**: 2026-11-17T05:59:22Z
+**User Input**: "승인"
+**AI Response**: "코드 생성 계획 승인 기록. Part 2 시작. Step 1 완료: tool/coverage_gate.dart 뼈대 (상수 · 타입 · 함수 시그니처, 본문은 빈 결과), .gitignore 에 coverage/ 추가. 포맷 · 분석 통과, 기존 Dart 테스트 262개 통과. 다음: RED 하위 에이전트가 테스트 경계 표 작성 (Step 2.1)"
+**Status**: Approved
+**Context**: CONSTRUCTION - Code Generation (ci-quality-gate), Part 1 완료 → Part 2 Step 1 완료
+
+---
