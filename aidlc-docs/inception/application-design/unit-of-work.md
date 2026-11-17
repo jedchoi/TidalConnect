@@ -76,6 +76,7 @@ FR-01, FR-02, FR-03, FR-04, FR-07 (Dart 부분), FR-08 (이 범위에서 발견�
 | 운영 코드 (수정) | `PlaybackCore.kt`, `TidalPlayerManager.kt`, `TidalStreamProxyServer.kt` (같은 폴더) |
 | 테스트 (새로 만듦) | `android/app/src/test/kotlin/com/example/tidal_connect_lite/PlaybackCommandRouterTest.kt`, `TidalStreamProxyServerTest.kt`, fake 파일들 (같은 폴더) |
 | 설정 (수정) | `android/app/build.gradle.kts` (테스트 의존성, 단위 테스트 설정) |
+| NFR Design 에서 추가 (2026-11-17) | 운영 코드 `PlaybackContracts.kt` (인터페이스 · 결과 타입), `ChannelAdapter.kt` (채널 응답 변환) / 테스트 `ChannelAdapterTest.kt`, `RouterFakes.kt`, `RouterGenerators.kt`, `FakeCdnServer.kt`, `ProxyFixture.kt`, `ProxyGenerators.kt`, `PbtSupport.kt` |
 
 ### 배정된 요구사항
 FR-05, FR-06, FR-07 (Kotlin 부분), FR-08 (이 범위에서 발견한 것), NFR-01 (Kotlin 부분: 수치 없이 FR-05 · FR-06 동작 목록 충족), NFR-02, NFR-03, NFR-04 (Kotlin)

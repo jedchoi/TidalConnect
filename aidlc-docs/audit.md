@@ -392,3 +392,36 @@
 
 ---
 
+## NFR Design (android-native-tests) - 계획 · 질문 제시
+**Timestamp**: 2026-11-17T02:01:51Z
+**User Input**: (없음)
+**AI Response**: ".claude/skills 에 추가된 tdd-red · tdd-green · tdd-refactor 스킬과 tdd_snapshot.py, test-antipatterns.md 를 읽음. 스킬은 Python 실습 모듈 전제 (pytest · ruff, tests/ · backend/ 폴더, git 미사용, 세션 분리) 라 이 프로젝트에 그대로 적용 불가함을 확인. android-native-tests-nfr-design-plan.md 생성 (실행 단계 6개, 질문 1개: Code Generation 작업 방식 - TDD 흐름을 옮겨 router 에 적용 / unit 1 방식 / 스킬을 먼저 고침). 답변 대기"
+**Context**: CONSTRUCTION - NFR Design (android-native-tests), Step 4~5
+
+---
+
+## NFR Design (android-native-tests) - 답변 수신
+**Timestamp**: 2026-11-17T02:04:40Z
+**User Input**: "추천으로 진행해줘"
+**AI Response**: "Q1 [Answer] 에 권장안 A 기입 (기입 주체 표시): TDD 흐름을 이 프로젝트에 맞게 옮겨 router 에 적용 (RED 는 구현을 읽지 않은 하위 에이전트, 고정은 커밋, GREEN 은 테스트 변경 없이 구현, REFACTOR 는 PlaybackCore 위임), 프록시는 보호 테스트 + 변형 확인. 모호성 분석: 단일 선택지, 모순 없음. 산출물 생성 시작"
+**Context**: CONSTRUCTION - NFR Design (android-native-tests), Step 5
+
+---
+
+## NFR Design (android-native-tests) - 산출물 생성 · 승인 요청
+**Timestamp**: 2026-11-17T02:05:20Z
+**User Input**: (없음)
+**AI Response**: "nfr-design/ 에 nfr-design-patterns.md (작업 방식 TW-1~9: 뼈대 → RED (하위 에이전트) → 경계 표 승인 → RED 판정 → 커밋 고정 → GREEN → REFACTOR, 프록시 보호 테스트, 안티패턴 점검 / 결정성 KD-1~5 / 검증 · 속성 KV-1~4 · KP-1~5 / 재구성 KR-1~5 / NFR 항목별 대응 표 35개), logical-components.md (운영 코드 새 파일 3개 · 수정 3개, 테스트 지원 파일 9개, 인프라 구성 요소 해당 없음) 생성. unit-of-work.md 포함 파일 목록에 추가분 반영. 계획 체크박스 전부 완료. 확장 준수: Resiliency N/A (RESILIENCY-14 · 15 는 unit 1 에서 처리, 새 외부 호출 없음) / PBT 는 이 stage 강제 규칙 없음, PBT-06~08 을 KP 패턴에 반영. 승인 요청 문구: 'NFR 설계를 검토해 주세요: aidlc-docs/construction/android-native-tests/nfr-design/ - 변경 요청 (Request Changes) / 다음 Stage 로 진행 (Continue to Next Stage) - Code Generation'"
+**Context**: CONSTRUCTION - NFR Design (android-native-tests), 완료 메시지 제시 · 승인 대기
+**AI 점검**: ✅ 4 · ⚠️ 1 · ❌ 0
+
+---
+
+## NFR Design (android-native-tests) - 승인
+**Timestamp**: 2026-11-17T02:07:23Z
+**User Input**: "다음 Stage 로 진행. tdd red/green/refactor를 활용해서 진행"
+**AI Response**: "NFR Design (android-native-tests) 승인. Infrastructure Design 은 실행 계획대로 SKIP. Code Generation (android-native-tests) Part 1 (Planning) 시작. 사용자 지시에 따라 계획에 tdd-red · tdd-green · tdd-refactor 스킬 단계를 넣는다 (NFR Design TW-1~9 의 옮김 방식 적용)"
+**Context**: CONSTRUCTION - NFR Design 승인 → Code Generation (android-native-tests)
+
+---
+
