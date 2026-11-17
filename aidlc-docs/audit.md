@@ -762,3 +762,19 @@
 **Context**: CONSTRUCTION → OPERATIONS 경계 추적 점검 (Operations 는 모두 SKIP)
 
 ---
+
+## 실기기 설치 요청
+**Timestamp**: 2026-11-17T07:58:35Z
+**User Input**: "실기기에 설치해줘"
+**AI Response**: "연결된 폰 (SM-F711N) 에 커밋 4101815 의 debug APK (키 포함) 를 adb install -r 로 덮어 설치. 확인 순서 안내"
+**Context**: workflow 완료 뒤 실기기 확인
+
+---
+
+## 실기기 확인 결과 · 푸시 요청
+**Timestamp**: 2026-11-17T08:03:31Z
+**User Input**: "잘 동작해. 푸시해줘"
+**AI Response**: "실기기 확인 결과를 build-and-test-summary.md 의 '알려진 문제' 에 기록 (확인한 항목의 상세는 없음). 로컬 커밋을 origin/aidlc/test-reinforcement 에 푸시 (초안 PR #1 에 반영, CI 재실행)"
+**Context**: workflow 완료 뒤 실기기 확인, PR #1
+
+---
