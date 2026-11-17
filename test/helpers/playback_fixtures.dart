@@ -150,9 +150,14 @@ class CallResult {
 /// [future]를 시작하고 결과를 [CallResult]에 받는다.
 CallResult capture(Future<void> future) {
   final result = CallResult();
-  future.then((_) => result.completed = true, onError: (Object e) {
-    result.error = e;
-  });
+  future.then<void>(
+    (_) {
+      result.completed = true;
+    },
+    onError: (Object error) {
+      result.error = error;
+    },
+  );
   return result;
 }
 
