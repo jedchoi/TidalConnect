@@ -8,11 +8,15 @@ import io.flutter.plugin.common.MethodChannel
 
 /** 채널 호출의 인자를 router가 읽는 맵으로 바꾼다. 인자가 맵이 아니면 빈 맵을 돌려준다. */
 fun channelArguments(call: MethodCall): Map<String, Any?> {
-    // 뼈대: 아직 인자를 읽지 않는다.
-    return emptyMap()
+    @Suppress("UNCHECKED_CAST")
+    return call.arguments as? Map<String, Any?> ?: emptyMap()
 }
 
 /** router의 결과를 채널 응답으로 보낸다. */
 fun sendCommandResult(commandResult: CommandResult, result: MethodChannel.Result) {
-    // 뼈대: 아직 아무것도 보내지 않는다.
+    when (commandResult) {
+        is CommandResult.Success -> result.success(commandResult.value)
+        is CommandResult.Error -> result.error(commandResult.code, commandResult.message, null)
+        CommandResult.NotImplemented -> result.notImplemented()
+    }
 }
