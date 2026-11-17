@@ -18,14 +18,14 @@
 
 ## 실행 단계
 
-- [ ] 1. 입력 읽기: `unit-of-work.md` Unit 3, FR-09, NFR-01, NFR-02, 지금의 `check.sh` · `check.yml`
-- [ ] 2. 아래 질문에 대한 답변 수집 · 모호성 분석
-- [ ] 3. `aidlc-docs/construction/ci-quality-gate/nfr-requirements/nfr-requirements.md` 생성
+- [x] 1. 입력 읽기: `unit-of-work.md` Unit 3, FR-09, NFR-01, NFR-02, 지금의 `check.sh` · `check.yml`
+- [x] 2. 아래 질문에 대한 답변 수집 · 모호성 분석
+- [x] 3. `aidlc-docs/construction/ci-quality-gate/nfr-requirements/nfr-requirements.md` 생성
   - [ ] 3.1 FR-09 · NFR-01 (검사 자동화) · NFR-02 를 측정 기준과 함께 구체화
   - [ ] 3.2 로컬과 CI 의 점검 내용 일치, 실행 시간, 실패 메시지의 요구
   - [ ] 3.3 범주별 평가와 해당 없음 근거, 확장 규칙 (PBT, Resiliency) 에서 나오는 요구
-- [ ] 4. `aidlc-docs/construction/ci-quality-gate/nfr-requirements/tech-stack-decisions.md` 생성: 결정마다 선택 · 근거 · 버리는 대안
-- [ ] 5. 검증: 배정된 요구사항이 모두 문서에 있는지, 결정마다 근거가 있는지
+- [x] 4. `aidlc-docs/construction/ci-quality-gate/nfr-requirements/tech-stack-decisions.md` 생성: 결정마다 선택 · 근거 · 버리는 대안
+- [x] 5. 검증: 배정된 요구사항이 모두 문서에 있는지, 결정마다 근거가 있는지
 
 ## 앞 unit 에서 이어받는 결정
 
@@ -49,7 +49,7 @@ C) Python 스크립트 - 쓰기 쉽다. 프로젝트에 Python 이 없어 CI 와
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: A (사용자 지시 "추천으로 진행해줘" 에 따라 권장안 기입)
 
 ## Question 2 (유지보수성 · PBT)
 Question 1 이 A 일 때, lcov 해석 로직을 어떻게 검증할까요? (확장 규칙 PBT 는 "전체 강제" 로 켜져 있습니다. 해석과 비율 계산은 순수 함수라 속성 테스트의 대상이 됩니다)
@@ -60,7 +60,7 @@ B) 예시 기반 테스트만 - 로직이 수십 줄이라 예시로 충분하�
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: A (사용자 지시 "추천으로 진행해줘" 에 따라 권장안 기입)
 
 ## Question 3 (유지보수성)
 검사 대상 파일 목록과 기준값 (80%) 을 어디에 둘까요?
@@ -71,7 +71,7 @@ B) 따로 둔 설정 파일 (예: `tool/coverage_targets.txt`) - 대상을 늘�
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: A (사용자 지시 "추천으로 진행해줘" 에 따라 권장안 기입)
 
 ## Question 4 (보안 · 기술 스택 선택)
 CI 가 올리는 debug APK 에 TIDAL 키를 넣을까요? 이 저장소는 공개 저장소라 workflow 산출물을 로그인한 누구나 받을 수 있습니다.
@@ -84,7 +84,7 @@ C) APK 를 올리지 않고 빌드만 확인 - FR-09 의 "산출물 업로드" �
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: A (사용자 지시 "추천으로 진행해줘" 에 따라 권장안 기입)
 
 ## Question 5 (성능 · 기술 스택 선택)
 APK 빌드와 업로드를 언제 실행할까요? (debug APK 빌드는 CI 에서 수 분이 더 걸리고, 산출물은 약 230MB 입니다)
@@ -95,7 +95,7 @@ B) `main` 푸시에서만 - PR 은 빠르다. 빌드가 깨진 것을 병합한 
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: A (사용자 지시 "추천으로 진행해줘" 에 따라 권장안 기입)
 
 ## Question 6 (신뢰성)
 올린 APK 산출물을 며칠 보관할까요? (GitHub 기본값은 90일입니다)
@@ -108,7 +108,7 @@ C) 7일
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: A (사용자 지시 "추천으로 진행해줘" 에 따라 권장안 기입)
 
 ## Question 7 (사용성)
 `tool/check.sh` 가 Java 를 스스로 찾게 할까요? 지금은 개발 Mac 의 셸에 Java 가 PATH 에 없어, `JAVA_HOME` 을 지정하지 않으면 Kotlin 단계가 "Unable to locate a Java Runtime" 으로 실패합니다.
@@ -119,7 +119,7 @@ B) 그대로 둔다 - `CLAUDE.md` 의 Commands 절에 `JAVA_HOME` 을 지정하�
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: A (사용자 지시 "추천으로 진행해줘" 에 따라 권장안 기입)
 
 ## Question 8 (사용성 · 유지보수성)
 커버리지 검사가 실패하거나 통과했을 때 무엇을 출력할까요?
@@ -130,4 +130,4 @@ B) 통과하면 한 줄, 실패하면 못 미친 파일만 출력한다
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: A (사용자 지시 "추천으로 진행해줘" 에 따라 권장안 기입)

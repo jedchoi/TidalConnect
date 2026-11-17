@@ -585,3 +585,12 @@
 **Context**: CONSTRUCTION - NFR Requirements (ci-quality-gate), Step 2 ~ 4
 
 ---
+
+## NFR Requirements (ci-quality-gate) - 답변 · 산출물
+**Timestamp**: 2026-11-17T05:52:09Z
+**User Input**: "추천으로 진행해줘"
+**AI Response**: "질문 8개에 권장안 (모두 A) 을 [Answer] 에 기입 (기입 주체 표시). 모호성 분석: 답 사이의 모순 없음. 산출물 생성: nfr-requirements/nfr-requirements.md (NFR-01-C1 ~ C7, FR-09-C1 ~ C8, NFR-02-C1 ~ C4, NFR-07-C1 ~ C7, 범주별 평가, PBT · Resiliency 적용, 배정 대조), tech-stack-decisions.md (결정 C1 ~ C10). 주요 결정: Dart 스크립트 tool/coverage_gate.dart + 예시 · 속성 테스트, 대상 · 기준값은 상수, CI APK 는 키 없이 빌드 (공개 저장소), 점검과 같은 조건으로 빌드 · 14일 보관, check.sh 가 JDK 17 을 찾음. 확장 준수: PBT-01 · 02 · 03 · 07 ~ 10 적용, PBT-04 ~ 06 N/A / RESILIENCY-04 적용, 그 밖 N/A. 완료 메시지 제시 · 승인 대기"
+**Context**: CONSTRUCTION - NFR Requirements (ci-quality-gate), Step 5 ~ 7
+**AI 점검**: ✅ 2 · ⚠️ 0 · ❌ 0 (NR-1, NR-2)
+
+---
