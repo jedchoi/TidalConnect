@@ -33,6 +33,7 @@ FR-07 (대체 지점) 과 FR-08 (발견 버그 수정) 은 unit 1 · 2 가 각�
 | 테스트 도우미 (수정) | `test/helpers/fakes.dart`, `test/helpers/app_overrides.dart`, `test/features/player/player_manager_test.dart` (`FakeBackend` 를 도우미로 옮김) |
 | 테스트 (새로 만듦) | `test/features/player/phone_backend_test.dart`, `test/features/player/dlna_backend_test.dart`, `test/features/player/wave_audio_handler_test.dart`, `test/features/dlna/dlna_manager_test.dart` |
 | 설정 (수정 가능) | `pubspec.yaml` (`dev_dependencies`: PBT 프레임워크, 필요하면 `fake_async`) |
+| NFR Design 에서 추가 (2026-11-17) | 테스트 도우미 `test/helpers/playback_fixtures.dart`, `event_descriptions.dart`, `generators.dart`, `pbt_config.dart` / 문서 `docs/failure-scenarios.md`, `docs/incidents/README.md`, `CLAUDE.md` 1줄 |
 
 ### 배정된 요구사항
 FR-01, FR-02, FR-03, FR-04, FR-07 (Dart 부분), FR-08 (이 범위에서 발견한 것), NFR-01 (달성), NFR-02, NFR-03, NFR-04 (Dart), NFR-05

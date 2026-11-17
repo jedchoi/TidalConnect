@@ -258,3 +258,36 @@
 
 ---
 
+## NFR Design (dart-playback-tests) - 계획 · 질문 제시
+**Timestamp**: 2026-11-17T00:41:14Z
+**User Input**: (없음)
+**AI Response**: "dart-playback-tests-nfr-design-plan.md 생성 (실행 단계 5개, 질문 2개: RESILIENCY-14 복원력 테스트 방식 (규칙 문구 그대로 + 이 앱에 맞춘 참고), 장애 기록 위치). 답변 대기"
+**Context**: CONSTRUCTION - NFR Design (dart-playback-tests), Step 4~5
+
+---
+
+## NFR Design (dart-playback-tests) - 답변 수신
+**Timestamp**: 2026-11-17T00:43:34Z
+**User Input**: "추천으로 진행해줘"
+**AI Response**: "[Answer] 에 권장안 기입 (기입 주체 표시): Q1=B (관행 없음 → 실기기 장애 상황 점검표 제안), Q2=A (docs/incidents/ 에 문제별 문서). 모호성 분석: 단일 선택지 2개, 모순 없음 (Q1 B 의 결과 기록처 docs/dlna-compat.md 와 Q2 A 의 docs/incidents/ 는 용도가 다름: 렌더러 시험 결과 대 원인 분석). 후속 질문 없음. 산출물 생성 시작"
+**Context**: CONSTRUCTION - NFR Design (dart-playback-tests), Step 5
+
+---
+
+## NFR Design (dart-playback-tests) - 산출물 생성 · 승인 요청
+**Timestamp**: 2026-11-17T00:45:31Z
+**User Input**: (없음)
+**AI Response**: "nfr-design/ 에 nfr-design-patterns.md (결정성 DT-1~5, 검증 VF-1~5, 속성 테스트 PT-1~7, 조립 AS-1~3, 복원력 RS-1~2, NFR 항목별 대응 표 30개), logical-components.md (fake 5개 파일, 도우미 4개 파일, 모델 2개, 문서 3개, 인프라 구성 요소 해당 없음) 생성. unit-of-work.md 포함 파일 목록에 추가분 반영. 계획 체크박스 전부 완료. 확장 준수: RESILIENCY-14 compliant (방식 식별: 자동 테스트 + 실기기 점검표 제안, DR 시나리오는 DR 전략 N/A 로 해당 없음, 결과 추적 docs/dlna-compat.md), RESILIENCY-15 compliant (절차 · 양식 제안, 개선 추적 체크박스, 경보 연동은 모니터링 없음으로 N/A), 그 밖 RESILIENCY N/A / PBT 는 이 stage 강제 규칙 없음, PBT-06~08 을 PT 패턴에 반영. 승인 요청 문구: 'NFR 설계를 검토해 주세요: aidlc-docs/construction/dart-playback-tests/nfr-design/ - 변경 요청 (Request Changes) / 다음 Stage 로 진행 (Continue to Next Stage) - Code Generation'"
+**Context**: CONSTRUCTION - NFR Design (dart-playback-tests), 완료 메시지 제시 · 승인 대기
+**AI 점검**: ✅ 4 · ⚠️ 1 · ❌ 0
+
+---
+
+## NFR Design (dart-playback-tests) - 승인
+**Timestamp**: 2026-11-17T00:47:54Z
+**User Input**: "다음 Stage 로 진행"
+**AI Response**: "NFR Design (dart-playback-tests) 승인. Infrastructure Design (dart-playback-tests) 은 실행 계획대로 SKIP. Code Generation (dart-playback-tests) Part 1 (Planning) 시작"
+**Context**: CONSTRUCTION - NFR Design 승인 → Code Generation (dart-playback-tests)
+
+---
+
