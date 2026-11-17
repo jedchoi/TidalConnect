@@ -51,13 +51,13 @@
   - [x] 2.2 일부러 틀린 속성을 임시 파일로 실행해 실패 출력에 seed 와 축소된 입력이 나오는지 확인하고 임시 파일을 지운다
   - [x] 커밋: `test: Kotlin 단위 테스트 설정과 속성 테스트 도우미 추가`
 
-- [ ] **Step 3. 시그니처 뼈대와 프록시 생성자** (패턴 TW-1 · KR-4, FR-07)
-  - [ ] 3.1 `android/app/src/main/kotlin/com/example/tidal_connect_lite/PlaybackContracts.kt` 새로 만듦: `CommandResult`, `PlayerControls`, `AuthControls`, `DeviceControls`, `ProxyRegistrar` (`component-methods.md` 의 시그니처 그대로, 로직 없음)
-  - [ ] 3.2 `.../PlaybackCommandRouter.kt` 새로 만듦: 뼈대. `handle` 은 모든 호출에 `CommandResult.NotImplemented` 를 돌려준다
-  - [ ] 3.3 `.../ChannelAdapter.kt` 새로 만듦: 뼈대. 인자 변환은 빈 맵을 돌려주고, 응답 변환은 아무것도 보내지 않는다
-  - [ ] 3.4 `.../TidalStreamProxyServer.kt` 수정: 생성자에 `port` (기본 `PROXY_PORT`), `httpClient` (기본 지금 설정) 추가, 돌려주는 주소의 포트를 실제로 열린 포트로 (동작 동일, NFR-06-A4)
-  - [ ] 3.5 기존 테스트 통과, `flutter build apk --debug --dart-define-from-file=config/tidal.json` 성공 확인
-  - [ ] 커밋: `refactor: 명령 분배용 인터페이스 뼈대 추가, 프록시 포트와 HTTP 클라이언트 주입 가능하게`
+- [x] **Step 3. 시그니처 뼈대와 프록시 생성자** (패턴 TW-1 · KR-4, FR-07)
+  - [x] 3.1 `android/app/src/main/kotlin/com/example/tidal_connect_lite/PlaybackContracts.kt` 새로 만듦: `CommandResult`, `PlayerControls`, `AuthControls`, `DeviceControls`, `ProxyRegistrar` (`component-methods.md` 의 시그니처 그대로, 로직 없음)
+  - [x] 3.2 `.../PlaybackCommandRouter.kt` 새로 만듦: 뼈대. `handle` 은 모든 호출에 `CommandResult.NotImplemented` 를 돌려준다
+  - [x] 3.3 `.../ChannelAdapter.kt` 새로 만듦: 뼈대. 인자 변환은 빈 맵을 돌려주고, 응답 변환은 아무것도 보내지 않는다
+  - [x] 3.4 `.../TidalStreamProxyServer.kt` 수정: 생성자에 `port` (기본 `PROXY_PORT`), `httpClient` (기본 지금 설정) 추가, 돌려주는 주소의 포트를 실제로 열린 포트로 (동작 동일, NFR-06-A4)
+  - [x] 3.5 기존 테스트 통과, `flutter build apk --debug --dart-define-from-file=config/tidal.json` 성공 확인
+  - [x] 커밋: `refactor: 명령 분배용 인터페이스 뼈대 추가, 프록시 포트와 HTTP 클라이언트 주입 가능하게`
 
 ### RED (`tdd-red` 스킬, 패턴 TW-2 ~ TW-5)
 

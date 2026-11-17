@@ -21,8 +21,16 @@ import java.util.concurrent.TimeUnit
  * 지연 로딩(Lazy Chunk Stream)을 적용하여 전체 곡(100+ 세그먼트)이 스피커 재생 속도에 맞춰
  * 끊김 없이 자연스럽게 스트리밍되도록 지원합니다.
  */
-/** @param boundHost 서버가 바인딩할 Wi-Fi 주소. 다른 인터페이스에서는 접근할 수 없다. */
-class TidalStreamProxyServer(val boundHost: String) : NanoHTTPD(boundHost, PROXY_PORT) {
+/**
+ * @param boundHost 서버가 바인딩할 Wi-Fi 주소. 다른 인터페이스에서는 접근할 수 없다.
+ * @param port 바인딩할 포트. 운영은 기본값([PROXY_PORT])을 쓴다. 테스트는 0을 넘겨 빈 포트를 쓴다.
+ * @param httpClient TIDAL CDN에 요청을 보내는 클라이언트. 테스트는 타임아웃이 짧은 것을 넘긴다.
+ */
+class TidalStreamProxyServer(
+    val boundHost: String,
+    private val port: Int = PROXY_PORT,
+    private val httpClient: OkHttpClient = defaultHttpClient(),
+) : NanoHTTPD(boundHost, port) {
 
     companion object {
         const val PROXY_PORT = 8765
@@ -48,13 +56,14 @@ class TidalStreamProxyServer(val boundHost: String) : NanoHTTPD(boundHost, PROXY
             }
             return null
         }
-    }
 
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(120, TimeUnit.SECONDS)
-        .writeTimeout(20, TimeUnit.SECONDS)
-        .build()
+        /** 운영에서 쓰는 CDN 클라이언트 설정. */
+        fun defaultHttpClient(): OkHttpClient = OkHttpClient.Builder()
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(120, TimeUnit.SECONDS)
+            .writeTimeout(20, TimeUnit.SECONDS)
+            .build()
+    }
 
     /** 등록된 곡 하나. 토큰은 곡마다 새로 만드는 추측 불가능한 경로 조각이다. */
     data class StreamInfo(
@@ -91,8 +100,12 @@ class TidalStreamProxyServer(val boundHost: String) : NanoHTTPD(boundHost, PROXY
             streamRegistry[token] = StreamInfo(trackId, directUrl, manifestXml, allowedHost, mime)
         }
         Log.i(TAG, "트랙 스트림 등록: TrackID=$trackId, mime=$mime, direct=${directUrl.isNotEmpty()}")
-        return "http://$boundHost:$PROXY_PORT/audio/$token.${extensionFor(mime)}"
+        return "http://$boundHost:$servingPort/audio/$token.${extensionFor(mime)}"
     }
+
+    /** 스피커에 알려줄 포트. 서버가 떠 있으면 실제로 열린 포트이고, 아니면 생성할 때 받은 포트다. */
+    private val servingPort: Int
+        get() = listeningPort.takeIf { it > 0 } ?: port
 
     /** 렌더러가 확장자로 형식을 추측하는 경우가 있어 MIME에 맞는 확장자를 붙인다. */
     private fun extensionFor(mime: String): String = when {
