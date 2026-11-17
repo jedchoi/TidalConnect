@@ -46,6 +46,10 @@ class DlnaBackend implements PlaybackBackend {
   /// pause()가 성공한 뒤 resume()이나 새 재생이 없었는지.
   bool _paused = false;
 
+  /// DASH 곡의 탐색(다시 등록 · 스피커 명령 · 알림)이 진행 중인지. 그동안에는 폴링 차례를 건너뛴다.
+  /// 탐색의 Stop 직후에 STOPPED를 보고 스피커 쪽 정지나 곡 끝으로 잘못 판정하지 않기 위해서다.
+  bool _seeking = false;
+
   /// 폴링 흐름의 번호. 탐색으로 흐름이 바뀌면 그 전에 보낸 확인의 응답을 버리는 데 쓴다.
   int _pollGeneration = 0;
 
@@ -202,7 +206,7 @@ class DlnaBackend implements PlaybackBackend {
 
   /// GetTransportInfo와 GetPositionInfo로 스피커 상태를 읽어 이벤트로 바꾼다.
   Future<void> _poll() async {
-    if (_polling) return;
+    if (_polling || _seeking) return;
     _polling = true;
     try {
       final trackId = _trackId;
@@ -412,6 +416,15 @@ class DlnaBackend implements PlaybackBackend {
       await _dlna.seek(position.inSeconds);
       return;
     }
+    _seeking = true;
+    try {
+      await _reregisterAndPlay(track, info, position);
+    } finally {
+      _seeking = false;
+    }
+  }
+
+  Future<void> _reregisterAndPlay(MediaTrack track, TidalPlaybackInfo info, Duration position) async {
     final device = _dlna.selectedDevice;
     final registration = await TidalSdkNativeBridge.registerTrackStream(
       trackId: track.id,
