@@ -359,3 +359,36 @@
 
 ---
 
+## NFR Requirements (android-native-tests) - 계획 · 질문 제시
+**Timestamp**: 2026-11-17T01:52:18Z
+**User Input**: (없음)
+**AI Response**: "사전 확인: 이 셸에 Java 없음 → JAVA_HOME=/opt/homebrew/opt/openjdk@17 로 기존 Kotlin 테스트 4개 통과 확인. 임시 탐침 테스트 (android/app/build.gradle.kts 임시 변경 + TmpProbeTest.kt, 확인 뒤 되돌림) 로 android.util.Log (isReturnDefaultValues), Flutter 타입 (MethodCall · Result), kotest-property 6.2.7 · 5.9.1, mockwebserver 4.12.0 동작 확인. android-native-tests-nfr-requirements-plan.md 생성 (실행 단계 6개, 질문 2개: Kotlin PBT 프레임워크, FakeCdnServer 구현 수단). 답변 대기"
+**Context**: CONSTRUCTION - NFR Requirements (android-native-tests), Step 4~5
+
+---
+
+## NFR Requirements (android-native-tests) - 답변 수신
+**Timestamp**: 2026-11-17T01:59:32Z
+**User Input**: "추천으로 진행해줘"
+**AI Response**: "Q1~Q2 [Answer] 에 권장안 A 기입 (기입 주체 표시): kotest-property 6.2.7, mockwebserver 4.12.0. 모호성 분석: 단일 선택지 2개, 모순 없음. 후속 질문 없음. 산출물 생성 시작. 참고: 이번 턴에 tdd-red · tdd-green · tdd-refactor 스킬이 새로 보임. Code Generation 계획 단계에서 적용 여부를 확인할 예정"
+**Context**: CONSTRUCTION - NFR Requirements (android-native-tests), Step 5
+
+---
+
+## NFR Requirements (android-native-tests) - 산출물 생성 · 승인 요청
+**Timestamp**: 2026-11-17T02:00:19Z
+**User Input**: (없음)
+**AI Response**: "nfr-requirements/ 에 nfr-requirements.md (NFR-01·02·03·04·05 구체화 29개 항목 + 재구성 안전성 NFR-06 6개 항목), tech-stack-decisions.md (결정 9개: kotest-property 6.2.7 정확히 고정, mockwebserver 4.12.0, unitTests.isReturnDefaultValues, JUnit 4 유지, OkHttp, 직접 작성 fake, 고정 seed, JDK 17, PlaybackCore 경계 확인 방식) 생성. 계획 체크박스 전부 완료. 확장 준수: PBT-09 compliant (Kotlin 프레임워크 선택 · 요건 대조, Dart 와 합쳐 언어마다 선택 충족; 축소 출력 확인은 Code Generation 예정), PBT-08 seed 정책 결정 / Resiliency N/A. 승인 요청 문구: 'NFR 요구사항을 검토해 주세요: aidlc-docs/construction/android-native-tests/nfr-requirements/ - 변경 요청 (Request Changes) / 다음 Stage 로 진행 (Continue to Next Stage) - NFR Design'"
+**Context**: CONSTRUCTION - NFR Requirements (android-native-tests), 완료 메시지 제시 · 승인 대기
+**AI 점검**: ✅ 4 · ⚠️ 1 · ❌ 0
+
+---
+
+## NFR Requirements (android-native-tests) - 승인
+**Timestamp**: 2026-11-17T02:00:54Z
+**User Input**: "다음 Stage 로 진행"
+**AI Response**: "NFR Requirements (android-native-tests) 승인. NFR Design (android-native-tests) 시작"
+**Context**: CONSTRUCTION - NFR Requirements 승인 → NFR Design (android-native-tests)
+
+---
+
