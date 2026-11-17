@@ -42,14 +42,14 @@
 
 ### 준비 (이 세션)
 
-- [ ] **Step 1. Gradle 설정** (결정 A1 ~ A3, NFR-06-A5)
-  - [ ] 1.1 `android/app/build.gradle.kts`: `testOptions { unitTests.isReturnDefaultValues = true }`, `testImplementation` 2개 (`io.kotest:kotest-property:6.2.7`, `com.squareup.okhttp3:mockwebserver:4.12.0`) 추가 (기존 파일 수정)
-  - [ ] 1.2 기존 `DashManifestTest` 4개 통과 확인 (NFR-02-A2)
+- [x] **Step 1. Gradle 설정** (결정 A1 ~ A3, NFR-06-A5)
+  - [x] 1.1 `android/app/build.gradle.kts`: `testOptions { unitTests.isReturnDefaultValues = true }`, `testImplementation` 2개 (`io.kotest:kotest-property:6.2.7`, `com.squareup.okhttp3:mockwebserver:4.12.0`) 추가 (기존 파일 수정)
+  - [x] 1.2 기존 `DashManifestTest` 4개 통과 확인 (NFR-02-A2)
 
-- [ ] **Step 2. 속성 테스트 도우미** (패턴 KP-1 · KP-2 · KP-5)
-  - [ ] 2.1 `android/app/src/test/kotlin/com/example/tidal_connect_lite/PbtSupport.kt` 새로 만듦: seed (환경 변수 `PBT_SEED` 또는 20261117) · 실행 횟수로 `PropTestConfig` 를 만드는 함수, `runBlocking` 으로 감싸는 함수
-  - [ ] 2.2 일부러 틀린 속성을 임시 파일로 실행해 실패 출력에 seed 와 축소된 입력이 나오는지 확인하고 임시 파일을 지운다
-  - [ ] 커밋: `test: Kotlin 단위 테스트 설정과 속성 테스트 도우미 추가`
+- [x] **Step 2. 속성 테스트 도우미** (패턴 KP-1 · KP-2 · KP-5)
+  - [x] 2.1 `android/app/src/test/kotlin/com/example/tidal_connect_lite/PbtSupport.kt` 새로 만듦: seed (환경 변수 `PBT_SEED` 또는 20261117) · 실행 횟수로 `PropTestConfig` 를 만드는 함수, `runBlocking` 으로 감싸는 함수
+  - [x] 2.2 일부러 틀린 속성을 임시 파일로 실행해 실패 출력에 seed 와 축소된 입력이 나오는지 확인하고 임시 파일을 지운다
+  - [x] 커밋: `test: Kotlin 단위 테스트 설정과 속성 테스트 도우미 추가`
 
 - [ ] **Step 3. 시그니처 뼈대와 프록시 생성자** (패턴 TW-1 · KR-4, FR-07)
   - [ ] 3.1 `android/app/src/main/kotlin/com/example/tidal_connect_lite/PlaybackContracts.kt` 새로 만듦: `CommandResult`, `PlayerControls`, `AuthControls`, `DeviceControls`, `ProxyRegistrar` (`component-methods.md` 의 시그니처 그대로, 로직 없음)
