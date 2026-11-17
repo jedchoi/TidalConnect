@@ -217,7 +217,7 @@ class TidalStreamProxyServer(
             proxyDirectCdn(session, token, info, allowRefresh = true)
         } else {
             Log.i(TAG, "🚀 DASH 매니페스트 세그먼트 중계 시작: TrackID=$trackId")
-            proxyDashManifest(session, info.manifestXml, info.startSegment)
+            proxyDashManifest(info.manifestXml, info.startSegment)
         }
     }
 
@@ -283,7 +283,7 @@ class TidalStreamProxyServer(
                 return if (refreshed.directUrl.isNotEmpty()) {
                     proxyDirectCdn(session, token, refreshed, allowRefresh = false)
                 } else {
-                    proxyDashManifest(session, refreshed.manifestXml)
+                    proxyDashManifest(refreshed.manifestXml)
                 }
             }
 
@@ -331,7 +331,7 @@ class TidalStreamProxyServer(
      *
      * 초기화 세그먼트 다음에 [startSegment]번째(0부터) 세그먼트부터 보낸다.
      */
-    private fun proxyDashManifest(session: IHTTPSession, manifestXml: String, startSegment: Int = 0): Response {
+    private fun proxyDashManifest(manifestXml: String, startSegment: Int = 0): Response {
         return try {
             val manifest = DashManifest.parse(manifestXml)
             if (manifest == null) {
