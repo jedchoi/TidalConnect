@@ -220,3 +220,7 @@ unit 1 의 Dart 테스트가 검증한 채널 문자열과 이 unit 의 규칙�
 | O-6 | `initTidalAuth` 는 지금 채널 객체가 없으면 응답 없이 끝난다. 재구성 뒤에는 `AuthControls.initialize` 가 결과를 돌려주므로 항상 응답한다 | 채널을 통해 호출이 왔다면 채널 객체는 항상 있다. 생기지 않는 상태에서만 동작이 달라진다 |
 | O-7 | 재구성 전의 `onMethodCall` 은 `positionMs` · `percent` 를 `call.argument<Int>` 로 읽는다. Long 이 오면 형 변환 예외가 나서 `seekTrack` 은 `PLAYER_ERROR`, `setPhoneVolume` 은 예외가 밖으로 나간다. router 는 Long 도 읽어 Int 로 넘긴다 (CR-10). 2026-11-17 보완 때 CR-10 을 "지금 코드 기준" 이라고 적었으나 이 부분은 지금 코드와 다르다 (GREEN 에이전트가 발견) | 입력 범위 밖. Flutter 의 표준 코덱은 32비트에 들어가는 정수를 Integer 로 보내므로, 재생 위치 (약 24.8일 미만) 와 볼륨 (0 ~ 100) 은 항상 Int 로 온다. `onMethodCall` 을 router 로 넘기면 생기지 않는 입력에 대한 동작만 달라진다 (O-1 과 같은 성격) |
 | O-8 | 재구성 전의 `runPlayerAction` 은 플레이어 동작이 실패하면 `Log.e` 로 예외의 스택 트레이스를 남긴다. router 는 Android 타입을 쓰지 않아 로그를 남기지 않는다 | REFACTOR 의 위임 단계에서 처리 방법을 정한다 (후보 표에 올림) |
+| O-9 | 채널 인자가 null 도 맵도 아니면 재구성 전에는 `call.argument` 가 형 변환 예외를 던진다. 위임 뒤에는 빈 맵으로 본다 (PC-01) | 입력 범위 밖. Dart 쪽은 인자 없이 부르거나 맵으로만 보낸다 (REFACTOR 후보 표의 D-5) |
+| O-10 | 채널 인자가 `JSONObject` 이면 재구성 전에는 값을 읽고, 위임 뒤에는 빈 맵으로 본다 | 이 채널은 표준 코덱을 써서 `JSONObject` 가 오지 않는다 (D-6) |
+| O-11 | 숫자 인자가 소수이면 재구성 전에는 `positionMs` · `percent` 에서 형 변환 예외가 나고, 위임 뒤에는 소수점 아래를 버린다 | 입력 범위 밖 (CR-10). Dart 쪽은 정수만 보낸다 (D-7) |
+| O-12 | 플레이어 동작은 성공했는데 `result.success` 가 예외를 던지면 재구성 전에는 그것을 잡아 `result.error` 를 부르고, 위임 뒤에는 예외가 밖으로 나간다 | 채널 응답 객체가 예외를 던지는 경우는 한 호출에 두 번 응답할 때뿐이며 이 코드에서는 생기지 않는다 (D-8) |

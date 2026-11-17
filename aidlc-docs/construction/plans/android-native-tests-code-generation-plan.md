@@ -94,7 +94,7 @@
 ### REFACTOR (`tdd-refactor` 스킬, 패턴 TW-7 · KR-1 ~ KR-3)
 
 - [ ] **Step 6. 동작을 바꾸지 않는 구조 정리** (FR-07, NFR-06)
-  - [ ] 6.1 GREEN 을 끝낸 하위 에이전트가 이어서 `tdd-refactor` 스킬의 절차를 따른다. 시작 확인: GREEN 상태, 테스트가 고정 커밋과 같음. 후보 표를 만든다 (열: 후보 · 위치 · 이유 · 동작 변화 위험). 예상 후보:
+  - [x] 6.1 GREEN 을 끝낸 하위 에이전트가 이어서 `tdd-refactor` 스킬의 절차를 따른다. 시작 확인: GREEN 상태, 테스트가 고정 커밋과 같음. 후보 표를 만든다 (열: 후보 · 위치 · 이유 · 동작 변화 위험). 예상 후보:
     - `TidalPlayerManager` 에 `PlayerControls` 구현 선언 (`: PlayerControls`, `override`)
     - `PlaybackCore.onMethodCall` 의 `when` 분기 → router 위임. 같은 규칙 (메서드 분배) 이 `PlaybackCore` 와 router 두 곳에 있게 된 것을 한 곳으로. 협력 인터페이스의 운영 구현 3개를 기존 private 함수에 연결 (PC-04 ~ PC-06)
     - GREEN 에서 생긴 중복 (있으면)

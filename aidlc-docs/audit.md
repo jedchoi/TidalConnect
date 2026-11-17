@@ -501,3 +501,19 @@
 **Context**: CONSTRUCTION - Code Generation (android-native-tests), Step 5 완료 → Step 6
 
 ---
+
+## Code Generation (android-native-tests) - 재개 요청
+**Timestamp**: 2026-11-17T04:31:00Z
+**User Input**: "이어서 진행해"
+**AI Response**: "REFACTOR 후보 표를 만들던 하위 에이전트가 사용량 제한 (5시간 한도) 으로 중단되었음. 남은 변경 없음 · 테스트가 고정 커밋과 같음을 확인하고 같은 에이전트를 이어서 재개"
+**Context**: CONSTRUCTION - Code Generation (android-native-tests), Step 6.1 진행 중
+
+---
+
+## Code Generation (android-native-tests) - REFACTOR 1단계: 후보 표 · 승인 요청 (관문 3)
+**Timestamp**: 2026-11-17T04:34:49Z
+**User Input**: (없음)
+**AI Response**: "GREEN 을 끝낸 하위 에이전트가 이어서 code/refactor-candidates.md 작성 (코드 변경 없음). 후보 7개: 권고 적용 = #1 TidalPlayerManager : PlayerControls, #2 PlaybackCore.onMethodCall → router 위임 + 운영 구현 3개 + 쓰이지 않는 함수 삭제, #7 오래된 주석 정리 / 그대로 둠 = #3 ~ #6 (router 내부 정리). #2 의 동작 변화: 실제 입력에서 달라지는 것은 실패 로그 (O-8) 하나, 생기지 않는 입력에서만 달라지는 것 7개 (O-1 · O-6 · O-7 과 새로 찾은 4개 → business-rules.md 에 O-9 ~ O-12 로 추가). 사람이 정할 것: 후보별 적용 여부, 실패 로그 처리 (가 · 나 · 다 · 라, 권고 나), channel 이 null 일 때 initialize 의 반환 (권고 false), 실기기 확인 시점"
+**Context**: CONSTRUCTION - Code Generation (android-native-tests), Step 6.1 완료 → 6.2 사람 관문 3 대기
+
+---
