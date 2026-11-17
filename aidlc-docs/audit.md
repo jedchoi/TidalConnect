@@ -534,3 +534,19 @@
 **Context**: CONSTRUCTION - Code Generation (android-native-tests), Step 6 완료 → Step 8 (수정) → Step 7
 
 ---
+
+## Code Generation (android-native-tests) - 재개 요청 (여러 번)
+**Timestamp**: 2026-11-17T05:00:00Z ~ 05:10:00Z
+**User Input**: "이어서 진행해" (하위 에이전트와 백그라운드 실행을 기다리는 동안 5회)
+**AI Response**: "매번 진행 상황을 알리고, 겹치지 않는 읽기 전용 검증 (규칙 ID 대조, 금지 패턴 · 비밀 값 검색, main 대비 변경 범위) 을 먼저 진행"
+**Context**: CONSTRUCTION - Code Generation (android-native-tests), Step 8 · 7 진행 중
+
+---
+
+## Code Generation (android-native-tests) - 버그 수정 · 변형 확인 · 검증 (Step 7 ~ 9)
+**Timestamp**: 2026-11-17T05:42:09Z
+**User Input**: (없음)
+**AI Response**: "Step 8: 새 하위 에이전트가 TidalStreamProxyServer.headResponse 수정 (+5 −1, NanoHTTPD 가 HEAD 응답에 붙이는 Content-Length 를 길이를 모를 때만 막음). 주 세션 확인 뒤 커밋 8e5b417 (fix), e4466ff (docs/incidents). Kotlin 테스트 86개 전부 통과, 테스트 폴더는 고정 커밋과 같음. 규칙 문서 7절에 O-13 ~ O-15 추가, O-8 처리 결과 기록. Step 7: 변형 58개 (router 21, 변환 4, 프록시 33) 중 56개 감지, 2개 살아남음 (Exception → Throwable, expiresInSeconds 를 Int 로 자름). 운영 코드 복원 확인. Step 9: 규칙 ID 대조 통과 (규칙 53 · 속성 12), 실행 시간 2.5 ~ 2.7초, 8765 점유 상태 통과, tool/check.sh 전체 통과 (Dart 262 + Kotlin 86), debug APK 빌드 성공, 비밀 값 · 금지 패턴 없음. **9.3 미충족**: 10회 연속의 첫 회에서 프록시 테스트 1개 실패. 추가 반복 150회에서 3회 재현 (P-PX-6 DASH 2회, PX-38 c 1회, 모두 테스트 클라이언트의 2초 읽기 제한 시간 초과, DASH 길이 계산 경로). CPU 부하와 임시 포트 소진은 배제. 원인 조사를 새 하위 에이전트에 맡김 (수정은 하지 않고 원인과 수정 후보만 보고)"
+**Context**: CONSTRUCTION - Code Generation (android-native-tests), Step 7 · 8 완료, Step 9 는 9.3 만 남음
+
+---

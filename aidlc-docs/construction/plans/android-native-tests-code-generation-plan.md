@@ -105,26 +105,26 @@
 
 ### 검증과 마무리 (이 세션)
 
-- [ ] **Step 7. 변형 확인** (패턴 TW-8, NFR-01-A3)
-  - [ ] 7.1 router · 변환 · 프록시의 운영 코드를 일부러 틀리게 바꿔 테스트가 실패하는지 확인하고 되돌린다
-  - [ ] 7.2 잡지 못한 변형이 있으면 테스트를 직접 추가하지 않고 보고한다 (테스트 추가는 RED 로 돌아가 다시 판정 · 고정)
+- [x] **Step 7. 변형 확인** (패턴 TW-8, NFR-01-A3)
+  - [x] 7.1 router · 변환 · 프록시의 운영 코드를 일부러 틀리게 바꿔 테스트가 실패하는지 확인하고 되돌린다
+  - [x] 7.2 잡지 못한 변형이 있으면 테스트를 직접 추가하지 않고 보고한다 (테스트 추가는 RED 로 돌아가 다시 판정 · 고정)
 
-- [ ] **Step 8. 발견한 것 처리** (FR-08, Functional Design 계획 Q1=A 기준)
-  - [ ] 8.1 RED · GREEN · 변형 확인에서 규칙과 다르게 동작한 곳을 정리한다
-  - [ ] 8.2 기준에 해당하는 버그: 실패하는 테스트는 이미 있으므로 `lib` · Kotlin 수정 → 별도 커밋 `fix: ...` → `docs/incidents/YYYY-MM-DD-<이름>.md`
-  - [ ] 8.3 규칙 문서가 틀린 것: 문서를 고치고, 테스트가 그 때문에 틀렸으면 RED 로 돌아가 다시 판정 · 고정
-  - [ ] 8.4 버그가 아닌 것: `business-rules.md` 7절 관찰 사항에 추가. 해당이 없으면 "없음"
+- [x] **Step 8. 발견한 것 처리** (FR-08, Functional Design 계획 Q1=A 기준)
+  - [x] 8.1 RED · GREEN · 변형 확인에서 규칙과 다르게 동작한 곳을 정리한다
+  - [x] 8.2 기준에 해당하는 버그: 실패하는 테스트는 이미 있으므로 `lib` · Kotlin 수정 → 별도 커밋 `fix: ...` → `docs/incidents/YYYY-MM-DD-<이름>.md`
+  - [x] 8.3 규칙 문서가 틀린 것: 문서를 고치고, 테스트가 그 때문에 틀렸으면 RED 로 돌아가 다시 판정 · 고정
+  - [x] 8.4 버그가 아닌 것: `business-rules.md` 7절 관찰 사항에 추가. 해당이 없으면 "없음"
 
 - [ ] **Step 9. 검증** (unit 완료 기준, NFR-01 ~ NFR-06)
-  - [ ] 9.1 `(cd android && ./gradlew :app:testDebugUnitTest)` 전체: 통과 수 · 실패 수 기록 (NFR-02-A1, A2)
-  - [ ] 9.2 규칙 ID 대조: CR 13개, PC-01 ~ 02, PX 38개, 속성 12개가 모두 테스트 이름에 있는지 (NFR-01-A1, A2, NFR-04-A1)
+  - [x] 9.1 `(cd android && ./gradlew :app:testDebugUnitTest)` 전체: 통과 수 · 실패 수 기록 (NFR-02-A1, A2)
+  - [x] 9.2 규칙 ID 대조: CR 13개, PC-01 ~ 02, PX 38개, 속성 12개가 모두 테스트 이름에 있는지 (NFR-01-A1, A2, NFR-04-A1)
   - [ ] 9.3 10회 연속 실행 (`--rerun-tasks`), 결과 동일 (NFR-03-A4, A7)
-  - [ ] 9.4 새 Kotlin 테스트의 실행 시간 합계 (결과 XML) 30초 이하 (NFR-03-A5). 넘으면 KP-3 에 따라 조정
-  - [ ] 9.5 8765 포트를 점유한 상태에서 실행해 통과 (NFR-03-A2)
-  - [ ] 9.6 `tool/check.sh` 전체 (Dart + Kotlin) 통과 (NFR-02-A3, A4)
-  - [ ] 9.7 `flutter build apk --debug --dart-define-from-file=config/tidal.json` 성공 (NFR-06-A1)
-  - [ ] 9.8 `git diff main -- android/app/src/main` 검토: 채널 이름 상수 변경 없음, `PlaybackCore` 에 남는 함수 본문 변경 없음, `ensureProxyServer` 의 프록시 생성 호출 변경 없음 (NFR-06-A2 ~ A4)
-  - [ ] 9.9 테스트에 `config/tidal.json` 의 값 · 사설 대역 주소 · `Thread.sleep` 이 없는지 검색, 복제 파일 (`*_new.*`, `*_modified.*`, `*_v2.*`) 이 없는지 확인
+  - [x] 9.4 새 Kotlin 테스트의 실행 시간 합계 (결과 XML) 30초 이하 (NFR-03-A5). 넘으면 KP-3 에 따라 조정
+  - [x] 9.5 8765 포트를 점유한 상태에서 실행해 통과 (NFR-03-A2)
+  - [x] 9.6 `tool/check.sh` 전체 (Dart + Kotlin) 통과 (NFR-02-A3, A4)
+  - [x] 9.7 `flutter build apk --debug --dart-define-from-file=config/tidal.json` 성공 (NFR-06-A1)
+  - [x] 9.8 `git diff main -- android/app/src/main` 검토: 채널 이름 상수 변경 없음, `PlaybackCore` 에 남는 함수 본문 변경 없음, `ensureProxyServer` 의 프록시 생성 호출 변경 없음 (NFR-06-A2 ~ A4)
+  - [x] 9.9 테스트에 `config/tidal.json` 의 값 · 사설 대역 주소 · `Thread.sleep` 이 없는지 검색, 복제 파일 (`*_new.*`, `*_modified.*`, `*_v2.*`) 이 없는지 확인
 
 - [ ] **Step 10. 요약 문서**
   - [ ] 10.1 `aidlc-docs/construction/android-native-tests/code/code-summary.md` 새로 만듦: 수정 · 생성 파일, 테스트 경계 표 (승인본), RED 판정 표, 리팩토링 후보와 결과, 규칙 · 속성별 테스트 대응, Step 9 의 실행 결과, 발견한 버그 · 관찰 사항, 실기기에서만 확정되는 부분 (NFR-06-A6), 계획에 없던 변경 · 계획에서 뺀 항목
