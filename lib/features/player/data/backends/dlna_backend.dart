@@ -417,8 +417,32 @@ class DlnaBackend implements PlaybackBackend {
     }
   }
 
+  /// 탐색의 본문: (1) 다시 등록 (2) 새 주소로 재생 명령 (3) 흐름 교체 (4) 다음 곡 · 일시정지 되살리기 (5) 폴링과 알림.
+  /// (1) · (2)가 실패하면 예외를 던지고 그 전 상태(주소, 시작 오프셋, 폴링)를 그대로 둔다.
   Future<void> _reregisterAndPlay(MediaTrack track, TidalPlaybackInfo info, Duration position) async {
     final device = _dlna.selectedDevice;
+    final registration = await _registerAt(track, info, device, position);
+    final ok = await _dlna.playOnSelectedDevice(streamUrl: registration.url, metadata: _metadataOf(track, info));
+    if (!ok) {
+      throw PlaybackException('DLNA_PLAY_FAILED', '"${device.friendlyName}"에 재생 명령을 보내지 못했습니다.');
+    }
+    _currentUrl = registration.url;
+    _beginFlow(registration.startOffset);
+    await _restoreNextAndPause();
+    _restartPollingKeepingLock(track);
+    _events.add(BackendPositionChanged(_startOffset, duration: _duration));
+    _events.add(_paused
+        ? const BackendStateChanged(playing: false)
+        : const BackendStateChanged(playing: true, buffering: true));
+  }
+
+  /// 곡을 [position]이 속한 세그먼트부터 다시 등록한다. 주소를 받지 못하면 PROXY_FAILED.
+  Future<ProxyRegistration> _registerAt(
+    MediaTrack track,
+    TidalPlaybackInfo info,
+    DlnaDevice device,
+    Duration position,
+  ) async {
     final registration = await _register(track, info, device, startPosition: position);
     AppLogger.log(
       'DLNA_BACKEND',
@@ -429,35 +453,31 @@ class DlnaBackend implements PlaybackBackend {
     if (registration.url.isEmpty) {
       throw const PlaybackException('PROXY_FAILED', '스피커용 스트림 주소를 만들지 못했습니다. Wi-Fi 연결을 확인하세요.');
     }
-    final ok = await _dlna.playOnSelectedDevice(streamUrl: registration.url, metadata: _metadataOf(track, info));
-    if (!ok) {
-      throw PlaybackException('DLNA_PLAY_FAILED', '"${device.friendlyName}"에 재생 명령을 보내지 못했습니다.');
-    }
-    _currentUrl = registration.url;
-    _beginFlow(registration.startOffset);
+    return registration;
+  }
 
-    // 재생 명령(SetAVTransportURI)이 스피커의 다음 곡 등록을 지우므로 다시 보낸다.
+  /// 탐색의 재생 명령이 바꿔 놓은 스피커 상태를 되돌린다.
+  /// 재생 명령(SetAVTransportURI)은 스피커의 다음 곡 등록을 지우고, 일시정지 상태였어도 재생을 시작한다.
+  Future<void> _restoreNextAndPause() async {
     final next = _next;
     if (next != null) {
-      final nextOk = await _dlna.setNextOnSelectedDevice(
+      final ok = await _dlna.setNextOnSelectedDevice(
         streamUrl: next.url,
         metadata: _metadataOf(next.track, next.info),
       );
-      if (!nextOk) _next = null;
+      if (!ok) _next = null;
     }
     if (_paused) await _dlna.pauseCurrent();
+  }
 
-    // 폴링을 새 흐름 기준으로 다시 시작한다. 스트리밍 잠금은 켜진 채로 둔다.
-    // (_stopPolling은 잠금을 풀기 때문에 타이머만 직접 바꾼다.)
+  /// 폴링을 새 흐름 기준으로 다시 시작한다. 스트리밍 잠금은 켜진 채로 둔다.
+  /// ([_stopPolling]은 잠금을 풀기 때문에 타이머만 직접 바꾼다.)
+  void _restartPollingKeepingLock(MediaTrack track) {
     if (_pollTimer == null) TidalSdkNativeBridge.setStreamingLock(true);
     _pollTimer?.cancel();
     _pollTimer = null;
     _pollGeneration++;
     _startPolling(track);
-    _events.add(BackendPositionChanged(_startOffset, duration: _duration));
-    _events.add(_paused
-        ? const BackendStateChanged(playing: false)
-        : const BackendStateChanged(playing: true, buffering: true));
   }
 
   /// 스피커에 보내는 곡 정보(DIDL-Lite). 재생 · 다음 곡 등록 · 탐색이 같은 값을 보낸다.
