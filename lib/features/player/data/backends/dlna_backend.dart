@@ -159,14 +159,7 @@ class DlnaBackend implements PlaybackBackend {
     AppLogger.log('DLNA_BACKEND', '스피커 재생 요청: "${device.friendlyName}"', type: LogType.network);
     final ok = await _dlna.playOnSelectedDevice(
       streamUrl: proxyUrl,
-      metadata: DidlMetadata(
-        title: track.title,
-        artist: track.artistName,
-        album: track.albumTitle,
-        albumArtUri: track.coverUrl,
-        durationSeconds: track.durationSeconds,
-        mimeType: info.mimeType,
-      ),
+      metadata: _metadataOf(track, info),
     );
     if (isCancelled()) return;
     if (!ok) {
@@ -323,14 +316,7 @@ class DlnaBackend implements PlaybackBackend {
 
     final ok = await _dlna.setNextOnSelectedDevice(
       streamUrl: proxyUrl,
-      metadata: DidlMetadata(
-        title: track.title,
-        artist: track.artistName,
-        album: track.albumTitle,
-        albumArtUri: track.coverUrl,
-        durationSeconds: track.durationSeconds,
-        mimeType: info.mimeType,
-      ),
+      metadata: _metadataOf(track, info),
     );
     if (ok) {
       _next = _PreparedNext(track, proxyUrl, info);
@@ -475,6 +461,7 @@ class DlnaBackend implements PlaybackBackend {
         : const BackendStateChanged(playing: true, buffering: true));
   }
 
+  /// 스피커에 보내는 곡 정보(DIDL-Lite). 재생 · 다음 곡 등록 · 탐색이 같은 값을 보낸다.
   static DidlMetadata _metadataOf(MediaTrack track, TidalPlaybackInfo info) => DidlMetadata(
         title: track.title,
         artist: track.artistName,
