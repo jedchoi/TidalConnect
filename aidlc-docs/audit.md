@@ -442,3 +442,20 @@
 **Context**: CONSTRUCTION - Code Generation (android-native-tests), Part 1 완료 → Part 2
 
 ---
+
+## Code Generation (android-native-tests) - 질문: 단계별 하위 에이전트 여부
+**Timestamp**: 2026-11-17T02:15:51Z
+**User Input**: "각 red/green/refactor는 별도의 서브 에이전트로 실행한거야?"
+**AI Response**: "답: 지금까지 실행한 것은 RED 의 첫 절차뿐이고 하위 에이전트 2개 (router 담당, 프록시 담당) 가 진행 중. GREEN 과 REFACTOR 는 아직 시작 전이며, 계획상 하위 에이전트가 아니라 이 세션이 실행하게 되어 있음 (RED 를 쓴 에이전트와는 다른 세션). 원하면 GREEN 을 새 하위 에이전트로, REFACTOR 를 그 에이전트를 이어서 실행하도록 바꿀 수 있다고 안내"
+**Context**: CONSTRUCTION - Code Generation (android-native-tests), Step 4.1 진행 중 (하위 에이전트 대기)
+
+---
+
+## Code Generation (android-native-tests) - 계획 변경: GREEN · REFACTOR 를 하위 에이전트로
+**Timestamp**: 2026-11-17T02:17:43Z
+**User Input**: "응 새 하위 에이전트로 green/refactor를 진행해줘. 에이전트를 분리해야 자기편향이 줄어드니까"
+**AI Response**: "계획 수정: GREEN 은 새 하위 에이전트 (RED 에이전트 · 이 세션과 다름), REFACTOR 는 그 에이전트를 이어서 실행. 이 세션은 조율 · 사람 관문 전달 · 테스트 변경 확인 · 커밋만 맡음. 계획 파일의 역할 표와 Step 5.1 · 6.1 문구를 고침"
+**Status**: Plan amended
+**Context**: CONSTRUCTION - Code Generation (android-native-tests), Step 4.1 진행 중
+
+---

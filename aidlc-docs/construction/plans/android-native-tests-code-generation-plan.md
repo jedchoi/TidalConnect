@@ -24,8 +24,8 @@
 | 스킬의 요구 | 이 계획에서 |
 | --- | --- |
 | RED 는 테스트 작성 전용 세션, 구현 코드 본문을 읽지 않음 | 하위 에이전트 2개 (router 담당, 프록시 담당) 가 설계 문서와 시그니처만 보고 쓴다. `PlaybackCore.kt`, `TidalPlayerManager.kt`, `TidalAuthManager.kt`, `TidalStreamProxyServer.kt`, `DashSegmentInputStream.kt` 의 본문을 읽지 않는다 |
-| GREEN 은 구현 전용 세션 (RED 와 분리) | 이 세션 (RED 를 쓴 하위 에이전트와 다른 세션) |
-| REFACTOR 는 GREEN 을 끝낸 세션 그대로 | 이 세션 |
+| GREEN 은 구현 전용 세션 (RED 와 분리) | 새 하위 에이전트 (RED 를 쓴 에이전트와 다르고, 이 세션과도 다르다). 2026-11-17 사용자 지시로 변경: 에이전트를 나눠 자기편향을 줄인다 |
+| REFACTOR 는 GREEN 을 끝낸 세션 그대로 | GREEN 을 끝낸 하위 에이전트를 이어서 실행 |
 | `pytest`, `ruff` | `(cd android && ./gradlew :app:testDebugUnitTest)` |
 | `tdd_snapshot.py lock / check / restore` | 테스트 파일을 커밋해 고정 (해시 기록) / `git diff --exit-code <해시> -- <테스트 폴더>` / `git checkout <해시> -- <테스트 폴더>` |
 | `tdd_snapshot.py save / revert` (리팩토링 되돌리기 기준) | 후보마다 커밋 / 실패하면 `git checkout -- <파일>` 로 마지막 커밋으로 |
@@ -35,6 +35,8 @@
 ## 커밋
 
 브랜치 `aidlc/test-reinforcement` 에 아래 "커밋" 표시 지점마다 로컬 커밋을 만든다 (푸시하지 않음). 이 계획의 승인을 그 커밋들에 대한 승인으로 본다.
+
+역할 분담 (2026-11-17 사용자 지시): RED 는 하위 에이전트 2개, GREEN · REFACTOR 는 또 다른 하위 에이전트 1개가 맡는다. 이 세션은 조율, 사람 관문 (테스트 경계 표 · RED 판정 · 리팩토링 후보) 전달, 테스트가 고정 커밋과 같은지 확인, 커밋만 한다. 준비 (Step 1 ~ 3) 와 검증 (Step 7 ~ 10) 은 이 세션이 한다.
 
 주의: Step 4.6 의 고정 커밋은 **실패하는 테스트를 담는다** (RED). Step 5 가 끝날 때까지 이 브랜치의 Kotlin 테스트는 실패 상태다.
 
@@ -81,7 +83,7 @@
 ### GREEN (`tdd-green` 스킬, 패턴 TW-6)
 
 - [ ] **Step 5. 고정된 테스트를 고치지 않고 구현** (FR-06, FR-07)
-  - [ ] 5.1 `tdd-green` 스킬을 불러 절차를 확인한다. 시작 확인: 테스트가 고정 커밋과 같은지 (`git diff --exit-code`), 실패 테스트 목록 = 구현 대상
+  - [ ] 5.1 새 하위 에이전트 (GREEN 담당) 가 `tdd-green` 스킬의 절차를 따른다. 이 세션은 조율 · 테스트 변경 여부 확인 · 커밋만 맡는다. 시작 확인: 테스트가 고정 커밋과 같은지 (`git diff --exit-code`), 실패 테스트 목록 = 구현 대상
   - [ ] 5.2 `PlaybackCommandRouter.kt` 구현 (CR-01 ~ CR-13): 실패 테스트를 규칙 묶음씩 통과시킨다
   - [ ] 5.3 `ChannelAdapter.kt` 구현 (PC-01, PC-02)
   - [ ] 5.4 프록시 테스트 가운데 실패가 남아 있으면 고치지 않고 정리해 보고한다 (Step 8 에서 처리)
@@ -92,7 +94,7 @@
 ### REFACTOR (`tdd-refactor` 스킬, 패턴 TW-7 · KR-1 ~ KR-3)
 
 - [ ] **Step 6. 동작을 바꾸지 않는 구조 정리** (FR-07, NFR-06)
-  - [ ] 6.1 `tdd-refactor` 스킬을 불러 절차를 확인한다. 시작 확인: GREEN 상태, 테스트가 고정 커밋과 같음. 후보 표를 만든다 (열: 후보 · 위치 · 이유 · 동작 변화 위험). 예상 후보:
+  - [ ] 6.1 GREEN 을 끝낸 하위 에이전트가 이어서 `tdd-refactor` 스킬의 절차를 따른다. 시작 확인: GREEN 상태, 테스트가 고정 커밋과 같음. 후보 표를 만든다 (열: 후보 · 위치 · 이유 · 동작 변화 위험). 예상 후보:
     - `TidalPlayerManager` 에 `PlayerControls` 구현 선언 (`: PlayerControls`, `override`)
     - `PlaybackCore.onMethodCall` 의 `when` 분기 → router 위임. 같은 규칙 (메서드 분배) 이 `PlaybackCore` 와 router 두 곳에 있게 된 것을 한 곳으로. 협력 인터페이스의 운영 구현 3개를 기존 private 함수에 연결 (PC-04 ~ PC-06)
     - GREEN 에서 생긴 중복 (있으면)
