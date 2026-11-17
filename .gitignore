@@ -21,3 +21,9 @@ build/
 
 # 빌드 시 주입하는 TIDAL 키 (config/tidal.example.json 참고)
 config/tidal.json
+
+# Claude Code 개인 설정
+.claude/settings.local.json
+
+# flutter test --coverage 결과
+coverage/

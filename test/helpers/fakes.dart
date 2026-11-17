@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:tidal_connect_lite/features/auth/data/secure_storage_service.dart';
 import 'package:tidal_connect_lite/features/auth/data/tidal_auth_repository.dart';
+import 'package:tidal_connect_lite/features/auth/domain/models/auth_token.dart';
 
 /// 테스트 공용 가짜 구현 모음.
 
@@ -166,6 +167,13 @@ class FakeAuthRepository extends TidalAuthRepository {
   String? catalogToken;
   String? recoveredToken;
   int recoverCount = 0;
+
+  /// 지정하면 [getValidUserToken]이 이 토큰을 돌려준다(로그인 상태).
+  /// 지정하지 않으면 원래 동작대로 빈 저장소를 조회해 null이 된다.
+  AuthToken? validUserToken;
+
+  @override
+  Future<AuthToken?> getValidUserToken() async => validUserToken ?? await super.getValidUserToken();
 
   @override
   Future<String?> getCatalogToken() async => catalogToken;
