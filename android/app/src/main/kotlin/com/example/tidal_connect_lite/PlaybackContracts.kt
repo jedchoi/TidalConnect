@@ -16,7 +16,7 @@ sealed interface CommandResult {
     data object NotImplemented : CommandResult
 }
 
-/** TIDAL 플레이어 제어. 실패하면 예외를 던진다. 운영 구현은 [TidalPlayerManager]. */
+/** TIDAL 플레이어 제어. 실패하면 예외를 던진다. 운영 구현은 [TidalPlayerManager]이며, 실패 로그를 남기는 감싸개를 거쳐 쓰인다. */
 interface PlayerControls {
     fun playTrack(trackId: String)
     fun pause()

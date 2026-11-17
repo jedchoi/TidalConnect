@@ -159,7 +159,7 @@ class TidalPlayerManager(
     private fun requirePlayer(): Player =
         tidalPlayer ?: throw IllegalStateException("TIDAL Player가 초기화되지 않았습니다")
 
-    // 아래 동작들은 실패하면 예외를 던진다. 호출하는 쪽(MainActivity)이 Flutter에 오류로 돌려준다.
+    // 아래 동작들은 실패하면 예외를 던진다. 호출하는 쪽(PlaybackCommandRouter)이 오류 응답(PLAYER_ERROR)으로 바꾼다.
 
     /** TIDAL 공식 Player SDK로 트랙을 재생한다. */
     override fun playTrack(trackId: String) {
