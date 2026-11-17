@@ -4,12 +4,16 @@ import android.util.Log
 import fi.iki.elonen.NanoHTTPD
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.ByteArrayInputStream
 import java.io.InputStream
+import java.io.PrintWriter
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import java.net.Inet4Address
 import java.security.SecureRandom
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /**
@@ -240,12 +244,12 @@ class TidalStreamProxyServer(
         // 본문은 보내지 않지만 Content-Length는 실제 파일 길이로 알린다. 길이를 모르면 알리지 않는다(0으로 알리면
         // 렌더러가 빈 파일로 여긴다).
         val response = if (length >= 0) {
-            newFixedLengthResponse(Response.Status.OK, info.mimeType, java.io.ByteArrayInputStream(ByteArray(0)), length)
+            newFixedLengthResponse(Response.Status.OK, info.mimeType, ByteArrayInputStream(ByteArray(0)), length)
         } else {
             // NanoHTTPD는 HEAD 응답이면 길이를 모르는(chunked) 응답에도 Content-Length를 써서 "-1"이 나간다.
             // 그 헤더를 쓰는 메서드만 막아 헤더 없이 보낸다. 본문 스트림이 비어 있어 본문은 그대로 0바이트다.
-            object : Response(Response.Status.OK, info.mimeType, java.io.ByteArrayInputStream(ByteArray(0)), -1L) {
-                override fun sendContentLengthHeaderIfNotAlreadyPresent(pw: java.io.PrintWriter, size: Long) = size
+            object : Response(Response.Status.OK, info.mimeType, ByteArrayInputStream(ByteArray(0)), -1L) {
+                override fun sendContentLengthHeaderIfNotAlreadyPresent(pw: PrintWriter, size: Long) = size
             }
         }
         if (info.directUrl.isNotEmpty()) response.addHeader("Accept-Ranges", "bytes")
@@ -362,21 +366,21 @@ class TidalStreamProxyServer(
      * 길이를 모르는 세그먼트는 저장하지 않아 다음 요청에서 다시 조회한다.
      */
     private val dashSegmentLengths =
-        java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.ConcurrentHashMap<Int, Long>>()
+        ConcurrentHashMap<String, ConcurrentHashMap<Int, Long>>()
 
     /**
      * 초기화 세그먼트와 [startSegment]번째부터의 세그먼트 바이트 수를 더한다. 그 범위에 길이를 모르는 것이 있으면 null.
      * 길이는 세그먼트마다 HEAD 요청으로 구하며, 한 번 알아낸 길이는 같은 매니페스트의 다른 요청에도 다시 쓴다.
      */
     private fun dashLength(manifestXml: String, manifest: DashManifest, startSegment: Int): Long? {
-        val known = dashSegmentLengths.getOrPut(manifestXml) { java.util.concurrent.ConcurrentHashMap() }
+        val known = dashSegmentLengths.getOrPut(manifestXml) { ConcurrentHashMap() }
         val wanted = buildList {
             if (manifest.initializationUrl != null) add(INIT_SEGMENT)
             for (i in startSegment until manifest.segmentCount) add(i)
         }
         val missing = wanted.filter { !known.containsKey(it) }
         if (missing.isNotEmpty()) {
-            val pool = java.util.concurrent.Executors.newFixedThreadPool(8)
+            val pool = Executors.newFixedThreadPool(8)
             try {
                 val futures = missing.map { index ->
                     val url = if (index == INIT_SEGMENT) manifest.initializationUrl!! else manifest.segmentUrl(index)
