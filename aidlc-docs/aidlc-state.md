@@ -34,7 +34,7 @@ unit 순서: dart-playback-tests → android-native-tests → ci-quality-gate (`
 - [x] NFR Requirements (dart-playback-tests) - Completed on 2026-11-17T00:39:55Z
 - [x] NFR Design (dart-playback-tests) - Completed on 2026-11-17T00:45:31Z
 - [ ] Infrastructure Design (dart-playback-tests) - SKIP (서버 · 클라우드 인프라 없음)
-- [ ] Code Generation (dart-playback-tests) - EXECUTE
+- [x] Code Generation (dart-playback-tests) - Completed on 2026-11-17T01:12:26Z
 - [ ] Functional Design (android-native-tests) - EXECUTE
 - [ ] NFR Requirements (android-native-tests) - EXECUTE
 - [ ] NFR Design (android-native-tests) - EXECUTE
