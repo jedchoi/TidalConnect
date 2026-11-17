@@ -208,3 +208,53 @@
 **Context**: CONSTRUCTION - Functional Design (dart-playback-tests) 승인 대기 중, 워크플로우 진행 없음
 
 ---
+
+## Functional Design (dart-playback-tests) - 승인
+**Timestamp**: 2026-11-17T00:25:20Z
+**User Input**: "다음 Stage 로 진행"
+**AI Response**: "Functional Design (dart-playback-tests) 승인. NFR Requirements (dart-playback-tests) 시작"
+**Context**: CONSTRUCTION - Functional Design 승인 → NFR Requirements (dart-playback-tests)
+
+---
+
+## NFR Requirements (dart-playback-tests) - 계획 · 질문 제시
+**Timestamp**: 2026-11-17T00:27:02Z
+**User Input**: (없음)
+**AI Response**: "PBT 후보 사전 확인 (flutter pub add --dev --dry-run: kiri_check 1.4.0 · glados 1.1.7 모두 해석 성공, pub.dev 메타데이터, 패키지 소스에서 seed · 축소 · 비동기 지원 확인. pubspec 은 바꾸지 않음, 전역 pub 캐시에 두 패키지 다운로드). dart-playback-tests-nfr-requirements-plan.md 생성 (실행 단계 6개, 질문 2개: PBT 프레임워크, seed 정책). 답변 대기"
+**Context**: CONSTRUCTION - NFR Requirements (dart-playback-tests), Step 4~5
+
+---
+
+## 워크플로우 밖 질문 - release 설치 시 TIDAL 로그인 오류
+**Timestamp**: 2026-11-17T00:31:54Z
+**User Input**: "그런데 내가 어제 debug로 설치한 앱은 잘 동작하는데 다른 폰에 release로 설치하니까 tidal에 로그인 하려고하면 페이지 에서 에러가 나는데 왜그럴까? tidal 페이지에서 나는 에러는 코드랑 상고나없나?"
+**AI Response**: "조사 (코드 변경 없음): build/app/outputs/flutter-apk/app-release.apk (2026-11-17 09:22 빌드) 의 libapp.so 에 config/tidal.json 의 TIDAL_CLIENT_ID 가 들어 있지 않고, app-debug.apk 에는 들어 있음을 확인. release 를 --dart-define-from-file 없이 빌드해 client_id 가 빈 값으로 로그인 주소에 들어간 것으로 판단. 키 누락 assert (lib/main.dart:13) 는 debug 에서만 동작. 해결 명령 안내. FR-09 의 CI APK 산출물도 키가 없으면 같은 문제가 있음을 ci-quality-gate unit 에서 다룰 사항으로 알림"
+**Context**: CONSTRUCTION - NFR Requirements (dart-playback-tests) 답변 대기 중, 워크플로우 진행 없음
+
+---
+
+## NFR Requirements (dart-playback-tests) - 답변 수신
+**Timestamp**: 2026-11-17T00:38:33Z
+**User Input**: "추천으로 진행해줘"
+**AI Response**: "Q1~Q2 [Answer] 에 권장안 A 기입 (기입 주체 표시): kiri_check 1.4.0, 고정 seed. 모호성 분석: 단일 선택지 2개, 모순 없음. 후속 질문 없음. 산출물 생성 시작"
+**Context**: CONSTRUCTION - NFR Requirements (dart-playback-tests), Step 5
+
+---
+
+## NFR Requirements (dart-playback-tests) - 산출물 생성 · 승인 요청
+**Timestamp**: 2026-11-17T00:39:55Z
+**User Input**: (없음)
+**AI Response**: "nfr-requirements/ 에 nfr-requirements.md (NFR-01~05 구체화 28개 항목, 테스트 데이터 보안 2개, 범주별 평가), tech-stack-decisions.md (결정 8개: kiri_check 1.4.0, fake_async 1.3.3 직접 선언, 테스트 바인딩 채널 대체, SharedPreferences mock, 직접 작성 fake, flutter_test, flutter test --coverage, 고정 seed) 생성. 계획 체크박스 전부 완료. 확장 준수: PBT-09 compliant (프레임워크 선택 · 요건 대조 문서화, 의존성 반영은 Code Generation 예정), PBT-08 seed 정책 결정 / Resiliency N/A (새 외부 호출 · 인프라 없음). 승인 요청 문구: 'NFR 요구사항을 검토해 주세요: aidlc-docs/construction/dart-playback-tests/nfr-requirements/ - 변경 요청 (Request Changes) / 다음 Stage 로 진행 (Continue to Next Stage) - NFR Design'"
+**Context**: CONSTRUCTION - NFR Requirements (dart-playback-tests), 완료 메시지 제시 · 승인 대기
+**AI 점검**: ✅ 4 · ⚠️ 1 · ❌ 0
+
+---
+
+## NFR Requirements (dart-playback-tests) - 승인
+**Timestamp**: 2026-11-17T00:40:36Z
+**User Input**: "다음 Stage 로 진행"
+**AI Response**: "NFR Requirements (dart-playback-tests) 승인. NFR Design (dart-playback-tests) 시작"
+**Context**: CONSTRUCTION - NFR Requirements 승인 → NFR Design (dart-playback-tests)
+
+---
+
