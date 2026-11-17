@@ -34,7 +34,7 @@ queue, cache, circuit breaker, 로드 밸런서 같은 인프라 구성 요소�
 | `PlaybackCommandRouterTest.kt` | CR-01 ~ CR-13 의 예시 기반 테스트, P-CR-1 ~ P-CR-6 의 속성 테스트 | router 검증 | TW-2 ~ TW-4, KV-1, KV-4 |
 | `ChannelAdapterTest.kt` | PC-01, PC-02 의 테스트 | 변환 검증. `MethodChannel.Result` 는 테스트 안에서 직접 구현해 받은 응답을 기록 | KR-3 |
 
-### 프록시 쪽 (보호 테스트: 이 세션이 작성)
+### 프록시 쪽 (보호 테스트: RED 단계의 프록시 담당 하위 에이전트가 작성)
 
 | 파일 | 구성 요소 | 책임 | 관련 패턴 |
 | --- | --- | --- | --- |

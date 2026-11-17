@@ -459,3 +459,11 @@
 **Context**: CONSTRUCTION - Code Generation (android-native-tests), Step 4.1 진행 중
 
 ---
+
+## Code Generation (android-native-tests) - RED 1단계: 테스트 경계 표 · 승인 요청
+**Timestamp**: 2026-11-17T02:29:16Z
+**User Input**: (없음)
+**AI Response**: "tdd-red 스킬 절차 1. 구현을 읽지 않은 하위 에이전트 2개가 설계 문서만 보고 테스트 경계 표 작성: code/red-seam-table-router.md (예시 31행 · 속성 6행), code/red-seam-table-proxy.md (예시 90행 · 속성 7행). 에이전트가 문서만으로 정할 수 없다고 보고한 32건 (router 11, 프록시 21) 을 지금 코드의 동작 기준으로 규칙 문서에 보완: business-rules.md 의 CR-01·02·07·10, PC-01·03, PX-02·04·11·16·17·19·24·27·28·29·30·34·36·38, nfr-requirements.md 의 NFR-01-A1·A2, NFR-05-A2, nfr-design-patterns.md TW-8, logical-components.md. 라이브러리 (NanoHTTPD · OkHttp) 가 헤더를 어떻게 내보내는지에 달린 행은 답을 미리 정하지 않고 규칙 문장대로 단언하게 둠 (실패하면 RED 판정 표에서 보고). 승인 요청 문구: '테스트 경계 표 2개를 검토해 주세요. 승인하시면 이 표대로 테스트를 작성합니다.'"
+**Context**: CONSTRUCTION - Code Generation (android-native-tests), Step 4.2 사람 관문 1 대기
+
+---

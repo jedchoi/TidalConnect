@@ -12,8 +12,8 @@ Kotlin 은 수치 목표가 없다 (`requirements.md` NFR-01). 대신 다음을 
 
 | ID | 요구 | 측정 |
 | --- | --- | --- |
-| NFR-01-A1 | `business-rules.md` 의 CR 규칙 13개와 PX 규칙 38개 모두에 테스트가 하나 이상 있다 | 테스트 이름의 규칙 ID 표기 (`[CR-01]`) 를 규칙 목록과 대조 |
-| NFR-01-A2 | PC 규칙 가운데 변환 부분 (PC-01 ~ PC-03) 에 테스트가 있다. 나머지 (PC-04 ~ PC-07) 는 NFR-06-A1 과 코드 검토로 확인한다 | 같은 방식 |
+| NFR-01-A1 | `business-rules.md` 의 CR 규칙 13개와 PX 규칙 38개 모두에 테스트가 하나 이상 있다 | 테스트 이름 맨 앞의 규칙 ID 표기 (`CR-01 ...`, 대괄호 없음) 를 규칙 목록과 대조 |
+| NFR-01-A2 | PC 규칙 가운데 변환 부분 (PC-01, PC-02) 에 테스트가 있다. PC-03 은 CR-01 의 테스트와 `git diff` 로, 나머지 (PC-04 ~ PC-07) 는 NFR-06-A1 과 코드 검토로 확인한다 (2026-11-17 정정: 처음에 PC-01 ~ PC-03 으로 적었다) | 같은 방식 |
 | NFR-01-A3 | 모든 테스트는 규칙 또는 속성을 하나 이상 검증한다 | 코드 검토 |
 
 ### NFR-02 점검 통과
@@ -61,7 +61,7 @@ Kotlin 은 수치 목표가 없다 (`requirements.md` NFR-01). 대신 다음을 
 | ID | 요구 | 측정 |
 | --- | --- | --- |
 | NFR-05-A1 | fake · 생성기 · 서버 도우미는 테스트와 같은 패키지 (`android/app/src/test/kotlin/com/example/tidal_connect_lite/`) 에 둔다 (Application Design 계획 Q6=A) | 파일 위치 |
-| NFR-05-A2 | 테스트 이름은 규칙 ID 를 대괄호로 적고 한국어 문장으로 쓴다 (Kotlin 의 역따옴표 함수 이름). 기존 `DashManifestTest` 의 영어 이름은 그대로 둔다 | 코드 검토 |
+| NFR-05-A2 | 테스트 이름은 규칙 ID 를 맨 앞에 적고 한국어 문장으로 쓴다 (Kotlin 의 역따옴표 함수 이름). JVM 메서드 이름에는 대괄호를 쓸 수 없어 unit 1 과 달리 대괄호 없이 적는다 (2026-11-17 정정). 기존 `DashManifestTest` 의 영어 이름은 그대로 둔다 | 코드 검토 |
 | NFR-05-A3 | 새 운영 코드 (`PlaybackCommandRouter`, 인터페이스) 는 기존 Kotlin 코드처럼 한국어 KDoc 주석을 단다 | 코드 검토 |
 
 ## 2. 재구성 안전성 (이 unit 고유)
