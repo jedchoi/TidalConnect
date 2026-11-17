@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-11-16T08:15:48Z
-- **Current Stage**: CONSTRUCTION - Code Generation (android-native-tests)
+- **Current Stage**: CONSTRUCTION - NFR Requirements (ci-quality-gate)
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -39,7 +39,7 @@ unit 순서: dart-playback-tests → android-native-tests → ci-quality-gate (`
 - [x] NFR Requirements (android-native-tests) - Completed on 2026-11-17T02:00:19Z
 - [x] NFR Design (android-native-tests) - Completed on 2026-11-17T02:05:20Z
 - [ ] Infrastructure Design (android-native-tests) - SKIP (서버 · 클라우드 인프라 없음)
-- [ ] Code Generation (android-native-tests) - EXECUTE
+- [x] Code Generation (android-native-tests) - Completed on 2026-11-17T05:48:17Z
 - [ ] Functional Design (ci-quality-gate) - SKIP (비즈니스 로직 없는 설정 · 스크립트, unit 계획 Q3=A)
 - [ ] NFR Requirements (ci-quality-gate) - EXECUTE
 - [ ] NFR Design (ci-quality-gate) - SKIP (unit 계획 Q3=A)
@@ -63,8 +63,8 @@ unit 순서: dart-playback-tests → android-native-tests → ci-quality-gate (`
 
 ## Current Status
 - **Lifecycle Phase**: CONSTRUCTION
-- **Current Stage**: Code Generation (android-native-tests)
-- **Next Stage**: NFR Requirements (ci-quality-gate)
+- **Current Stage**: NFR Requirements (ci-quality-gate)
+- **Next Stage**: Code Generation (ci-quality-gate)
 - **Status**: Ready to proceed
 
 ## Reverse Engineering Status
