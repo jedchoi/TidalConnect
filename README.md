@@ -57,9 +57,15 @@ android/app/src/main/kotlin/.../
 ## 점검
 
 ```sh
-tool/check.sh                 # 포맷, analyze, flutter test, Kotlin 단위 테스트
-tool/check.sh --skip-android  # Kotlin 테스트 제외
+tool/check.sh                 # 포맷, analyze, flutter test(커버리지 수집), 커버리지 검사, Kotlin 단위 테스트
+tool/check.sh --skip-android  # Kotlin 테스트 제외 (커버리지 검사는 실행)
 ```
+
+커버리지 검사(`tool/coverage_gate.dart`)는 재생 경로의 파일 4개(`phone_backend.dart`, `dlna_backend.dart`, `dlna_manager.dart`, `wave_audio_handler.dart`)가 각각 라인 커버리지 80% 이상인지 본다. 하나라도 모자라거나 기록이 없으면 점검이 실패한다.
+Kotlin 테스트에는 JDK 17이 필요하다. `JAVA_HOME`이 없으면 스크립트가 macOS에 설치된 JDK 17을 찾아 쓴다.
+
+GitHub Actions는 푸시와 PR마다 같은 `tool/check.sh`를 실행하고, 통과하면 debug APK를 산출물 `app-debug-nokeys`로 올린다(14일 보관).
+`app-debug-nokeys`는 빌드 확인용이다. 키가 없어 설치하면 시작할 때 멈춘다. 설치용 APK는 로컬에서 `--dart-define-from-file=config/tidal.json`으로 만든다.
 
 ## DLNA 호환성
 

@@ -9,11 +9,12 @@ Run from the repo root. Flutter is pinned to 3.41.7 in CI (`.github/workflows/ch
 ```sh
 flutter pub get
 flutter run --dart-define-from-file=config/tidal.json   # TIDAL 키 필요; 없으면 디버그 assert로 중단
-tool/check.sh                 # CI와 같은 전체 점검: format, analyze --fatal-infos, flutter test, Kotlin 테스트
-tool/check.sh --skip-android  # Kotlin 테스트 제외 (Gradle 없이 빠르게)
+tool/check.sh                 # CI와 같은 전체 점검: format, analyze --fatal-infos, flutter test --coverage, 커버리지 검사, Kotlin 테스트
+tool/check.sh --skip-android  # Kotlin 테스트 제외 (Gradle 없이 빠르게). 커버리지 검사는 실행
 
-dart format --output=none --set-exit-if-changed --line-length 120 lib test   # 포맷 (줄 길이 120)
+dart format --output=none --set-exit-if-changed --line-length 120 lib test tool   # 포맷 (줄 길이 120)
 flutter analyze --fatal-infos
+flutter test --coverage && dart tool/coverage_gate.dart   # 커버리지 검사만 (대상 4개 파일 각각 80% 이상)
 
 flutter test test/features/player/                       # 디렉터리 단위
 flutter test test/features/player/some_test.dart --plain-name "테스트 이름"   # 단일 테스트
@@ -21,6 +22,8 @@ flutter test test/features/player/some_test.dart --plain-name "테스트 이름"
 ```
 
 `config/tidal.json`은 git에서 제외되어 있다. 형식은 `config/tidal.example.json`을 따른다. CI에는 `flutter build apk --debug --config-only`로 Gradle 설정만 생성하므로 `gradlew`와 `local.properties`는 저장소에 없다.
+
+커버리지 검사의 대상 파일과 기준값은 `tool/coverage_gate.dart`의 상수다. `coverage/`는 git에서 제외되어 있다. `tool/check.sh`는 `JAVA_HOME`이 없고 `java`도 실행되지 않으면 JDK 17을 스스로 찾는다(`/usr/libexec/java_home -v 17` → Homebrew `openjdk@17`). CI는 점검이 통과하면 키 없는 debug APK를 빌드해 산출물 `app-debug-nokeys`로 올린다(빌드 확인용, 14일 보관).
 
 ## Architecture
 
