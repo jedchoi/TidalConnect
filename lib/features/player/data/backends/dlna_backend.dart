@@ -113,13 +113,14 @@ class DlnaBackend implements PlaybackBackend {
     if (isCancelled()) return;
     _canSeek = !info.isDash;
     final device = _dlna.selectedDevice;
-    final proxyUrl = await TidalSdkNativeBridge.registerTrackStream(
+    final proxyUrl = (await TidalSdkNativeBridge.registerTrackStream(
       trackId: track.id,
       directUrl: info.streamUrl,
       manifestXml: info.manifest,
       allowedHost: Uri.tryParse(device.locationUrl)?.host ?? '',
       mimeType: info.mimeType,
-    );
+    ))
+        .url;
     if (isCancelled()) return;
     if (proxyUrl.isEmpty) {
       throw const PlaybackException('PROXY_FAILED', '스피커용 스트림 주소를 만들지 못했습니다. Wi-Fi 연결을 확인하세요.');
@@ -251,13 +252,14 @@ class DlnaBackend implements PlaybackBackend {
 
     final info = await _api.getPlaybackInfo(track.id, quality: preferredQuality);
     if (info == null) return;
-    final proxyUrl = await TidalSdkNativeBridge.registerTrackStream(
+    final proxyUrl = (await TidalSdkNativeBridge.registerTrackStream(
       trackId: track.id,
       directUrl: info.streamUrl,
       manifestXml: info.manifest,
       allowedHost: Uri.tryParse(device.locationUrl)?.host ?? '',
       mimeType: info.mimeType,
-    );
+    ))
+        .url;
     if (proxyUrl.isEmpty || _dlna.selectedDevice.udn != device.udn) return;
 
     final ok = await _dlna.setNextOnSelectedDevice(

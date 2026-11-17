@@ -17,6 +17,12 @@ data class DashManifest(
     val startNumber: Int,
     val segmentCount: Int,
 ) {
+    /** [index]번째(0부터) 세그먼트의 시작 시각(밀리초). 시각을 알 수 없는 매니페스트면 0. */
+    fun segmentStartMs(index: Int): Long = 0L
+
+    /** [positionMs]가 속한 세그먼트의 번호(0부터). 시각을 알 수 없는 매니페스트면 0. */
+    fun segmentIndexAt(positionMs: Long): Int = 0
+
     /** [index]번째(0부터) 세그먼트 주소. */
     fun segmentUrl(index: Int): String = mediaTemplate.replace("\$Number\$", (startNumber + index).toString())
 

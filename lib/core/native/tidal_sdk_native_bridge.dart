@@ -239,12 +239,16 @@ class TidalSdkNativeBridge {
 
   /// 트랙의 스트림 정보(Direct URL 또는 DASH 매니페스트)를 프록시에 등록하고,
   /// 50자 이내의 짧고 표준적인 DLNA 프록시 URL(예: http://192.168.45.63:8765/audio/189569817.mp4)을 반환합니다.
-  static Future<String> registerTrackStream({
+  ///
+  /// [startPosition]은 재생을 시작할 위치다. DASH 곡은 이 위치가 속한 세그먼트부터 보내고,
+  /// 그 세그먼트의 시작 시각을 [ProxyRegistration.startOffset]으로 돌려준다.
+  static Future<ProxyRegistration> registerTrackStream({
     required String trackId,
     String directUrl = '',
     String manifestXml = '',
     required String allowedHost,
     String mimeType = 'audio/mp4',
+    Duration startPosition = Duration.zero,
   }) async {
     try {
       final result = await _channel.invokeMethod<Map>('registerTrackStream', {
@@ -256,10 +260,21 @@ class TidalSdkNativeBridge {
       });
       final proxyUrl = result?['proxyUrl']?.toString() ?? '';
       AppLogger.log('TIDAL_NATIVE_SDK', 'DLNA 프록시 등록 완료', type: LogType.success);
-      return proxyUrl;
+      return ProxyRegistration(proxyUrl, Duration.zero);
     } catch (e) {
       AppLogger.log('TIDAL_NATIVE_SDK', 'DLNA 프록시 등록 오류: $e', type: LogType.error);
-      return '';
+      return const ProxyRegistration('', Duration.zero);
     }
   }
+}
+
+/// 프록시에 등록한 곡.
+class ProxyRegistration {
+  const ProxyRegistration(this.url, this.startOffset);
+
+  /// 스피커가 접근할 프록시 주소. 등록에 실패하면 빈 문자열이다.
+  final String url;
+
+  /// 이 주소의 흐름이 곡의 어느 위치부터 시작하는지. 처음부터면 0이다.
+  final Duration startOffset;
 }

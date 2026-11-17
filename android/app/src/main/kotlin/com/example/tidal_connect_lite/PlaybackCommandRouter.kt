@@ -100,7 +100,8 @@ class PlaybackCommandRouter(
                 manifestXml = args.string("manifestXml"),
                 allowedHost = args.string("allowedHost"),
                 mimeType = args.string("mimeType", "audio/mp4"),
-            )
+                startPositionMs = 0L,
+            )?.url
             if (proxyUrl == null) {
                 CommandResult.Error("NO_WIFI", "Wi-Fi에 연결되어 있지 않아 스피커로 스트리밍할 수 없습니다.")
             } else {

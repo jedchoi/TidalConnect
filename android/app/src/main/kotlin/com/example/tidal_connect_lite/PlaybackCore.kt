@@ -163,12 +163,14 @@ object PlaybackCore {
         override fun setWifiLock(enabled: Boolean) = PlaybackCore.setWifiLock(enabled)
     }
 
-    private val proxyRegistrar = ProxyRegistrar { trackId, directUrl, manifestXml, allowedHost, mimeType ->
-        val server = ensureProxyServer() ?: return@ProxyRegistrar null
-        val shortUrl = server.registerTrackStream(trackId, directUrl, manifestXml, allowedHost, mimeType)
-        Log.i("PROXY", "registerTrackStream: TrackID=$trackId")
-        shortUrl
-    }
+    private val proxyRegistrar =
+        ProxyRegistrar { trackId, directUrl, manifestXml, allowedHost, mimeType, startPositionMs ->
+            val server = ensureProxyServer() ?: return@ProxyRegistrar null
+            val registered =
+                server.registerTrackStreamAt(trackId, directUrl, manifestXml, allowedHost, mimeType, startPositionMs)
+            Log.i("PROXY", "registerTrackStream: TrackID=$trackId")
+            registered
+        }
 
     private val router = PlaybackCommandRouter(
         auth = authControls,

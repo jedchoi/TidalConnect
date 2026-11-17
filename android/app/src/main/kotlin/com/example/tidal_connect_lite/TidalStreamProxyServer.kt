@@ -103,6 +103,21 @@ class TidalStreamProxyServer(
         return "http://$boundHost:$servingPort/audio/$token.${extensionFor(mime)}"
     }
 
+    /**
+     * 곡을 등록하고 주소와 시작 오프셋을 돌려준다.
+     *
+     * DASH 곡은 [startPositionMs]가 속한 세그먼트부터 보내고, 그 세그먼트의 시작 시각이 시작 오프셋이다.
+     * 단일 파일 곡은 [startPositionMs]를 쓰지 않는다(시작 오프셋 0).
+     */
+    fun registerTrackStreamAt(
+        trackId: String,
+        directUrl: String,
+        manifestXml: String,
+        allowedHost: String,
+        mimeType: String,
+        startPositionMs: Long,
+    ): RegisteredStream = RegisteredStream(registerTrackStream(trackId, directUrl, manifestXml, allowedHost, mimeType), 0L)
+
     /** 스피커에 알려줄 포트. 서버가 떠 있으면 실제로 열린 포트이고, 아니면 생성할 때 받은 포트다. */
     private val servingPort: Int
         get() = listeningPort.takeIf { it > 0 } ?: port
