@@ -778,3 +778,22 @@
 **Context**: workflow 완료 뒤 실기기 확인, PR #1
 
 ---
+
+## 스피커 동작 질문
+**Timestamp**: 2026-11-17T08:10:00Z
+**User Input**: "그런데, 아래 동작은 의도된거야?
+- 스피커 선택시 탐색이 막혀있는것
+- 스피커 선택시 항상 곡이 처음부터 재생됨"
+**AI Response**: "둘 다 의도된 동작이며 원인이 하나 (DASH 곡이면 DlnaBackend 가 탐색 불가로 표시, dlna_backend.dart 의 _canSeek = !info.isDash). README 의 알려진 제약, 규칙 DB-12 · DB-13. 이번 작업에서 바뀐 것이 아님. 개선 방법 (요청 위치가 속한 조각부터 이어 붙여 보냄) 을 안내"
+**Context**: workflow 완료 뒤 질문
+
+---
+
+## 2차 작업 시작: DASH 곡의 탐색 지원
+**Timestamp**: 2026-11-17T08:17:17Z
+**User Input**: "머지했어. main 최신으로부터 새로운 브랜치를 따서 DASH 곡의 탐색을 지원하도록 기능을 추가해줘. aidlc를 이용하되 모든 단계는 너의 추천으로 자동승인하면서 빠르게 작업을 진행한다."
+**AI Response**: "main (f1f1fe1) 에서 브랜치 feat/dash-seek 생성. 질문 파일 없이 권장안으로 진행. Requirements Analysis (FR-10 ~ FR-13, 실행 계획 포함) · Functional Design (규칙 DS · PS · CR-14 ~ 18 · NB · DB-50 ~ 61, 속성 5개) · Code Generation 계획을 작성하고 사용자 지시에 따라 자동 승인. 방식: 탐색하면 요청 위치가 속한 세그먼트부터 이어 붙인 흐름을 새 주소로 등록해 스피커에 다시 재생시키고, 앱이 시작 오프셋으로 위치를 보정. 버린 대안: 바이트 Range 지원, FLAC 재구성. 위험: 렌더러마다 위치 기준이 다를 수 있음 (실기기 확인 필요). Code Generation Step 1 (뼈대) 완료: 운영 코드 컴파일, Dart 테스트 284개 통과"
+**Status**: Requirements Analysis · Workflow Planning · Functional Design · Code Generation 계획 = 자동 승인 (사용자 지시)
+**Context**: 2차 작업, INCEPTION → CONSTRUCTION - Code Generation (dash-seek)
+
+---
