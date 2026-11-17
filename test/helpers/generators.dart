@@ -245,6 +245,66 @@ kc.Arbitrary<List<PollResponse>> pollSequences(int trackSeconds) {
   return kc.list(response, minLength: 0, maxLength: 30);
 }
 
+/// 시작 오프셋이 있는 흐름에서 스피커가 알려주는 위치의 순서(위치 보정 속성용).
+class OffsetFlow {
+  const OffsetFlow({required this.offsetSeconds, required this.relSeconds});
+
+  /// 시작 오프셋(초). 10 이상.
+  final int offsetSeconds;
+
+  /// 스피커가 차례로 알려주는 `RelTime`(초). 모두 0보다 크고 줄어들지 않는다. 1개 이상.
+  final List<int> relSeconds;
+
+  @override
+  String toString() => 'offset=${offsetSeconds}s, rel=$relSeconds';
+}
+
+/// 시작 오프셋 10~3600초. 첫 `RelTime`은 셋 중 둘꼴로 판정 경계(오프셋 - 2초) 근처(±6초)이고,
+/// 나머지는 1~3600초다. 이후 값은 0~30초씩 늘어난다(최대 8개).
+kc.Arbitrary<OffsetFlow> offsetFlows() => kc
+        .combine5(
+      kc.integer(min: 10, max: 3600),
+      kc.frequency([(2, kc.constant(true)), (1, kc.constant(false))]).map((v) => v as bool),
+      kc.integer(min: -6, max: 6),
+      kc.integer(min: 1, max: 3600),
+      kc.list(kc.integer(min: 0, max: 30), minLength: 0, maxLength: 8),
+    )
+        .map((v) {
+      final nearBoundary = v.$1 - 2 + v.$3;
+      final rel = <int>[v.$2 ? (nearBoundary < 1 ? 1 : nearBoundary) : v.$4];
+      for (final step in v.$5) {
+        rel.add(rel.last + step);
+      }
+      return OffsetFlow(offsetSeconds: v.$1, relSeconds: rel);
+    });
+
+/// 재생 시작 요청 하나(시작 위치 속성용).
+class StartRequest {
+  const StartRequest({required this.dash, required this.startPosition});
+
+  /// DASH 곡이면 true, 단일 파일 곡이면 false.
+  final bool dash;
+
+  final Duration startPosition;
+
+  @override
+  String toString() => '${dash ? 'dash' : 'direct'} start=${startPosition.inMilliseconds}ms';
+}
+
+/// 시작 위치는 넷 중 하나꼴로 0이다. DASH 곡은 0~3599999밀리초,
+/// 단일 파일 곡은 0이거나 1000밀리초 이상이다(1초 미만의 양수는 만들지 않는다. red-seam-table-dart.md "정한 것").
+kc.Arbitrary<StartRequest> startRequests() => kc
+        .combine3(
+      kc.boolean(),
+      kc.frequency([(1, kc.constant(0)), (3, kc.integer(min: 1, max: 3599))]).map((v) => v as int),
+      millis(),
+    )
+        .map((v) {
+      final (dash, wholeSeconds, extraMillis) = v;
+      final ms = wholeSeconds * 1000 + (dash || wholeSeconds > 0 ? extraMillis : 0);
+      return StartRequest(dash: dash, startPosition: Duration(milliseconds: ms));
+    });
+
 /// 렌더러가 주소의 표기를 바꿔 돌려주는 경우: 스킴·호스트·포트와 앞뒤 공백만 다르다.
 class UrlRewrite {
   const UrlRewrite({

@@ -11,6 +11,7 @@ import org.junit.Test
  * [PlaybackCommandRouter] 테스트.
  *
  * 규칙은 `business-rules.md` 1절(CR-01 ~ CR-13), 속성은 `business-logic-model.md` 3절(P-CR-1 ~ P-CR-6)이다.
+ * `registerTrackStream`의 시작 위치 · 시작 오프셋은 dash-seek 의 `business-rules.md` 3절(CR-14 ~ CR-18)이다.
  * 기대값은 규칙 문서의 값을 그대로 적었다. 결과(`CommandResult`)와 fake가 받은 호출을 함께 본다.
  */
 class PlaybackCommandRouterTest {
@@ -69,8 +70,10 @@ class PlaybackCommandRouterTest {
         "allowedHost" to "192.0.2.10",
         "mimeType" to "audio/flac",
     )
+
+    // 시작 위치를 넣지 않은 등록이라 여섯 번째 인자는 0 이다 (CR-14). 시작 위치가 있는 등록은 CR-01 #17 과 CR-14 ~ CR-17 이 본다.
     private val registerCall =
-        "registerTrackStream(101, https://cdn.example.test/101.flac, <MPD/>, 192.0.2.10, audio/flac)"
+        "registerTrackStream(101, https://cdn.example.test/101.flac, <MPD/>, 192.0.2.10, audio/flac, 0)"
 
     private fun ok(vararg pairs: Pair<String, Any?>): CommandResult = CommandResult.Success(mapOf(*pairs))
 
@@ -108,6 +111,7 @@ class PlaybackCommandRouterTest {
     @Test
     fun `CR-01 표의 16개 메서드는 정해진 협력 객체 호출 1회와 정해진 성공 값을 만든다`() {
         // CR-01: 메서드 표 17줄. 다른 협력 객체를 부르거나, 인자 · 반환 맵의 키나 값이 표와 다르면 실패
+        // #17 은 CR-14 ~ CR-16 에 따라 인자에 startPositionMs, 성공 값에 startOffsetMs 가 더해진다
         val rows = listOf(
             Row(
                 "#1 initTidalAuth",
@@ -224,12 +228,18 @@ class PlaybackCommandRouterTest {
             Row(
                 "#17 registerTrackStream",
                 "registerTrackStream",
-                registerArgs,
-                setup = { it.proxy.result = "http://192.0.2.1:8765/audio/0123456789abcdef.flac" },
-                expectedResult = ok("proxyUrl" to "http://192.0.2.1:8765/audio/0123456789abcdef.flac"),
+                registerArgs + ("startPositionMs" to 4000),
+                setup = {
+                    it.proxy.result =
+                        RegisteredStream("http://192.0.2.1:8765/audio/0123456789abcdef.flac", 4000L)
+                },
+                expectedResult = ok(
+                    "proxyUrl" to "http://192.0.2.1:8765/audio/0123456789abcdef.flac",
+                    "startOffsetMs" to 4000L,
+                ),
                 expectedCalls = calls(
                     proxy = listOf(
-                        "registerTrackStream(101, https://cdn.example.test/101.flac, <MPD/>, 192.0.2.10, audio/flac)",
+                        "registerTrackStream(101, https://cdn.example.test/101.flac, <MPD/>, 192.0.2.10, audio/flac, 4000)",
                     ),
                 ),
             ),
@@ -293,8 +303,8 @@ class PlaybackCommandRouterTest {
             Row(
                 "#9 registerTrackStream",
                 "registerTrackStream",
-                expectedResult = ok("proxyUrl" to PROXY_URL),
-                expectedCalls = calls(proxy = listOf("registerTrackStream(, , , , audio/mp4)")),
+                expectedResult = ok("proxyUrl" to PROXY_URL, "startOffsetMs" to 0L),
+                expectedCalls = calls(proxy = listOf("registerTrackStream(, , , , audio/mp4, 0)")),
             ),
         )
 
@@ -327,8 +337,8 @@ class PlaybackCommandRouterTest {
                 "③ registerTrackStream",
                 "registerTrackStream",
                 mapOf("trackId" to "101", "manifestXml" to "<MPD/>"),
-                expectedResult = ok("proxyUrl" to PROXY_URL),
-                expectedCalls = calls(proxy = listOf("registerTrackStream(101, , <MPD/>, , audio/mp4)")),
+                expectedResult = ok("proxyUrl" to PROXY_URL, "startOffsetMs" to 0L),
+                expectedCalls = calls(proxy = listOf("registerTrackStream(101, , <MPD/>, , audio/mp4, 0)")),
             ),
         )
 
@@ -378,8 +388,8 @@ class PlaybackCommandRouterTest {
                 "⑥ registerTrackStream",
                 "registerTrackStream",
                 mapOf("trackId" to "101", "mimeType" to null),
-                expectedResult = ok("proxyUrl" to PROXY_URL),
-                expectedCalls = calls(proxy = listOf("registerTrackStream(101, , , , audio/mp4)")),
+                expectedResult = ok("proxyUrl" to PROXY_URL, "startOffsetMs" to 0L),
+                expectedCalls = calls(proxy = listOf("registerTrackStream(101, , , , audio/mp4, 0)")),
             ),
         )
 
@@ -633,8 +643,8 @@ class PlaybackCommandRouterTest {
                 "③ registerTrackStream",
                 "registerTrackStream",
                 mapOf("trackId" to "101", "mimeType" to 5),
-                expectedResult = ok("proxyUrl" to PROXY_URL),
-                expectedCalls = calls(proxy = listOf("registerTrackStream(101, , , , audio/mp4)")),
+                expectedResult = ok("proxyUrl" to PROXY_URL, "startOffsetMs" to 0L),
+                expectedCalls = calls(proxy = listOf("registerTrackStream(101, , , , audio/mp4, 0)")),
             ),
         )
 
@@ -792,6 +802,120 @@ class PlaybackCommandRouterTest {
         assertEquals(calls(player = listOf("playTrack(101)")), h.recorded())
     }
 
+    @Test
+    fun `CR-14 startPositionMs 는 Int 로 오든 Long 으로 오든 같은 값을 Long 으로 넘긴다`() {
+        // CR-14 (a): Int 만 읽거나 Long 만 읽어 0 이 되거나, Int 범위로 잘라 넘기면 실패
+        val positions: List<Pair<Any, String>> = listOf(
+            4000 to "4000",
+            4000L to "4000",
+            0 to "0",
+            3_000_000_000L to "3000000000",
+        )
+        for ((position, text) in positions) {
+            val h = Harness()
+
+            h.router.handle(
+                "registerTrackStream",
+                mapOf("trackId" to "101", "manifestXml" to "<MPD/>", "startPositionMs" to position),
+            )
+
+            assertEquals(
+                "CR-14 (a) startPositionMs=$position (${position.javaClass.simpleName}): 호출 기록",
+                calls(proxy = listOf("registerTrackStream(101, , <MPD/>, , audio/mp4, $text)")),
+                h.recorded(),
+            )
+        }
+    }
+
+    @Test
+    fun `CR-14 startPositionMs 가 없거나 null 이거나 숫자가 아니면 0 으로 넘긴다`() {
+        // CR-14 (b): 형 변환 예외를 내거나, 문자열을 숫자로 해석("4000" → 4000)하거나, 등록을 건너뛰면 실패
+        val cases: List<Pair<String, Map<String, Any?>>> = listOf(
+            "없음" to mapOf("trackId" to "101"),
+            "null" to mapOf("trackId" to "101", "startPositionMs" to null),
+            "문자열" to mapOf("trackId" to "101", "startPositionMs" to "4000"),
+            "불리언" to mapOf("trackId" to "101", "startPositionMs" to true),
+        )
+        for ((label, args) in cases) {
+            val h = Harness()
+
+            h.router.handle("registerTrackStream", args)
+
+            assertEquals(
+                "CR-14 (b) $label: 호출 기록",
+                calls(proxy = listOf("registerTrackStream(101, , , , audio/mp4, 0)")),
+                h.recorded(),
+            )
+        }
+    }
+
+    @Test
+    fun `CR-15 등록 함수에 여섯 인자를 정해진 순서로 한 번 넘긴다`() {
+        // CR-15: startPositionMs 를 빼고 부르거나, 인자 순서가 바뀌거나, 두 번 부르거나, 다른 협력 객체를 부르면 실패
+        val h = Harness()
+
+        h.router.handle(
+            "registerTrackStream",
+            mapOf(
+                "trackId" to "202",
+                "directUrl" to "",
+                "manifestXml" to "<MPD id=\"m\"/>",
+                "allowedHost" to "192.0.2.20",
+                "mimeType" to "audio/mp4",
+                "startPositionMs" to 61500,
+            ),
+        )
+
+        assertEquals(
+            calls(proxy = listOf("registerTrackStream(202, , <MPD id=\"m\"/>, 192.0.2.20, audio/mp4, 61500)")),
+            h.recorded(),
+        )
+    }
+
+    @Test
+    fun `CR-16 등록에 성공하면 proxyUrl 과 Long 타입의 startOffsetMs 를 돌려준다`() {
+        // CR-16: startOffsetMs 가 빠지거나, 요청한 startPositionMs 를 그대로 돌려주거나, Int 로 실리거나, proxyUrl 키가 바뀌면 실패
+        val offsets = listOf(0L, 60000L, 3_000_000_000L)
+        for (offset in offsets) {
+            val h = Harness()
+            h.proxy.result = RegisteredStream("http://192.0.2.1:8765/audio/fedcba9876543210.m4a", offset)
+
+            val result = h.router.handle(
+                "registerTrackStream",
+                mapOf("trackId" to "101", "manifestXml" to "<MPD/>", "startPositionMs" to 61500),
+            )
+
+            assertEquals(
+                "CR-16 startOffsetMs=$offset: 결과",
+                ok("proxyUrl" to "http://192.0.2.1:8765/audio/fedcba9876543210.m4a", "startOffsetMs" to offset),
+                result,
+            )
+        }
+    }
+
+    @Test
+    fun `CR-17 등록 결과가 null 이면 시작 위치가 있든 없든 NO_WIFI 오류다`() {
+        // CR-17: startOffsetMs 만 든 성공 값이나 proxyUrl 이 null 인 성공 값으로 답하거나, 코드 · 메시지가 다르면 실패
+        val cases: List<Pair<String, Map<String, Any?>>> = listOf(
+            "시작 위치 Int" to mapOf("trackId" to "101", "startPositionMs" to 4000),
+            "시작 위치 Long" to mapOf("trackId" to "101", "startPositionMs" to 4000L),
+            "시작 위치 없음" to mapOf("trackId" to "101"),
+        )
+        for ((label, args) in cases) {
+            val h = Harness()
+            h.proxy.result = null
+
+            val result = h.router.handle("registerTrackStream", args)
+
+            assertEquals(
+                "CR-17 $label: 결과",
+                CommandResult.Error("NO_WIFI", "Wi-Fi에 연결되어 있지 않아 스피커로 스트리밍할 수 없습니다."),
+                result,
+            )
+            assertEquals("CR-17 $label: 등록 호출 수", 1, h.proxy.calls.size)
+        }
+    }
+
     // ---------------------------------------------------------------- 속성 테스트
 
     @Test
@@ -902,12 +1026,18 @@ class PlaybackCommandRouterTest {
     }
 
     @Test
-    fun `P-CR-5 등록 인자는 그대로 전달되고 빠진 인자에는 기본값이 들어가며 돌려받은 URL 이 proxyUrl 이다`() {
-        // P-CR-5: 인자 순서가 바뀌거나, 빠진 인자의 기본값이 다르거나, proxyUrl 이 등록 함수의 반환값이 아니면 실패
+    fun `P-CR-5 등록 인자는 시작 위치까지 그대로 전달되고 빠진 인자에는 기본값이 들어가며 돌려받은 주소와 시작 오프셋이 성공 값이다`() {
+        // P-CR-5 (CR-14 ~ CR-16 으로 확장): 인자 순서가 바뀌거나, 빠진 인자의 기본값이 다르거나(startPositionMs 는 0),
+        // proxyUrl · startOffsetMs 가 등록 함수의 반환값이 아니면 실패
         property {
-            checkAll(pbt(100), RouterArbs.registration(), RouterArbs.proxyUrl()) { registration, proxyUrl ->
+            checkAll(
+                pbt(100),
+                RouterArbs.registration(),
+                RouterArbs.proxyUrl(),
+                RouterArbs.startOffsetMs(),
+            ) { registration, proxyUrl, startOffsetMs ->
                 val h = Harness()
-                h.proxy.result = proxyUrl
+                h.proxy.result = RegisteredStream(proxyUrl, startOffsetMs)
 
                 val result = h.router.handle("registerTrackStream", registration.toArgs())
 
@@ -916,8 +1046,10 @@ class PlaybackCommandRouterTest {
                 val manifestXml = registration.manifestXml ?: ""
                 val allowedHost = registration.allowedHost ?: ""
                 val mimeType = registration.mimeType ?: "audio/mp4"
-                val expectedCall = "registerTrackStream($trackId, $directUrl, $manifestXml, $allowedHost, $mimeType)"
-                assertEquals(ok("proxyUrl" to proxyUrl), result)
+                val startPositionMs = registration.startPositionMs ?: 0
+                val expectedCall =
+                    "registerTrackStream($trackId, $directUrl, $manifestXml, $allowedHost, $mimeType, $startPositionMs)"
+                assertEquals(ok("proxyUrl" to proxyUrl, "startOffsetMs" to startOffsetMs), result)
                 assertEquals(calls(proxy = listOf(expectedCall)), h.recorded())
             }
         }

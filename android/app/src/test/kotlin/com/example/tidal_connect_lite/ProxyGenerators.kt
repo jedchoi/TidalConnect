@@ -18,6 +18,11 @@ class ProxyDashContent(val init: ByteArray?, val segments: List<ByteArray>) {
         "ProxyDashContent(init=${init?.size ?: "없음"}바이트, segments=${segments.map { it.size }}바이트)"
 }
 
+/** DASH 탐색 속성(P-PS-1)의 입력: 내용, 세그먼트마다의 시각, 시작 위치(밀리초). */
+class ProxyDashSeek(val content: ProxyDashContent, val timing: DashTiming, val positionMs: Long) {
+    override fun toString(): String = "ProxyDashSeek($content, $timing, positionMs=$positionMs)"
+}
+
 /**
  * 프록시 속성 테스트의 생성기. 범위는 `domain-entities.md` 4절을 따른다.
  * Kotest의 기본 `Arb`와 조합 함수로만 만들고 축소 설정은 건드리지 않는다.
@@ -89,4 +94,18 @@ object ProxyGenerators {
         Arb.bind(Arb.boolean(), segmentBytes, Arb.list(segmentBytes, 1..8)) { hasInit, init, segments ->
             ProxyDashContent(if (hasInit) init else null, segments)
         }
+
+    /**
+     * DASH 탐색 입력: [dashContent]의 세그먼트마다 길이 `d`를 하나씩 붙이고, timescale과 시작 위치를 고른다.
+     * 시작 위치는 곡 안 · 세그먼트 경계와 그 앞뒤 1ms · 0 이하 · 곡 길이 밖이 섞여 나온다.
+     */
+    val dashSeek: Arb<ProxyDashSeek> = Arb.bind(
+        dashContent,
+        DashGenerators.timescale,
+        Arb.list(DashGenerators.duration, 8..8),
+        DashGenerators.positionPick,
+    ) { content, timescale, durations, pick ->
+        val timing = DashTiming(timescale, durations.take(content.segments.size))
+        ProxyDashSeek(content, timing, pick.positionIn(timing))
+    }
 }

@@ -94,17 +94,18 @@ class PlaybackCommandRouter(
             CommandResult.Success(null)
         }
         "registerTrackStream" -> {
-            val proxyUrl = proxy.registerTrackStream(
+            val registered = proxy.registerTrackStream(
                 trackId = args.string("trackId"),
                 directUrl = args.string("directUrl"),
                 manifestXml = args.string("manifestXml"),
                 allowedHost = args.string("allowedHost"),
                 mimeType = args.string("mimeType", "audio/mp4"),
+                startPositionMs = args.number("startPositionMs")?.toLong() ?: 0L,
             )
-            if (proxyUrl == null) {
+            if (registered == null) {
                 CommandResult.Error("NO_WIFI", "Wi-Fi에 연결되어 있지 않아 스피커로 스트리밍할 수 없습니다.")
             } else {
-                CommandResult.Success(mapOf("proxyUrl" to proxyUrl))
+                CommandResult.Success(mapOf("proxyUrl" to registered.url, "startOffsetMs" to registered.startOffsetMs))
             }
         }
         else -> CommandResult.NotImplemented

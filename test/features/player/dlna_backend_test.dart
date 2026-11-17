@@ -13,6 +13,8 @@ import '../../helpers/playback_fixtures.dart';
 // DlnaBackend 테스트. 규칙 ID(DB-xx)와 속성 ID(P-DB-x)는
 // aidlc-docs/construction/dart-playback-tests/functional-design/ 의
 // business-rules.md 3절, business-logic-model.md 5절을 가리킨다.
+// DB-50 이후의 규칙, 바뀐 규칙(DB-12 · 13 · 17 · 39 · 45), 속성 P-DB-6 · 7은
+// aidlc-docs/construction/dash-seek/functional-design/business-rules.md 5절을 가리킨다.
 //
 // 1초 폴링을 실제로 기다리지 않도록 모든 테스트를 fakeAsync 안에서 실행한다.
 // fakeAsync 본문에서는 await할 수 없으므로 호출 결과는 CallResult에 받아 두고
@@ -105,6 +107,44 @@ void main() {
     h.soap.positionInfos.add(rel == null ? null : positionInfo(rel: rel, duration: duration, trackUri: trackUri));
   }
 
+  /// DASH 곡 [id]를 처음부터 재생해 폴링 중인 상태로 만든다(시작 오프셋 0).
+  void startDash(
+    FakeAsync async,
+    DlnaBackendHarness h, {
+    String id = '101',
+    int durationSeconds = 180,
+    String manifest = '<MPD/>',
+  }) {
+    h.api.playbackInfos[id] = dashStream(manifest: manifest);
+    startPlaying(async, h, id: id, durationSeconds: durationSeconds);
+  }
+
+  /// DASH 곡 [id]를 [offsetSeconds]초에서 시작해 폴링 중인 상태로 만든다.
+  /// 프록시는 같은 값을 시작 오프셋으로 답한다(이후의 시작 위치 있는 등록에도 같은 값으로 답한다).
+  void startDashAt(
+    FakeAsync async,
+    DlnaBackendHarness h, {
+    required int offsetSeconds,
+    String id = '101',
+    int durationSeconds = 180,
+  }) {
+    h.api.playbackInfos[id] = dashStream();
+    h.answerStartOffset(Duration(seconds: offsetSeconds));
+    final result = h.play(
+      async,
+      testTrack(id, durationSeconds: durationSeconds),
+      startPosition: Duration(seconds: offsetSeconds),
+    );
+    expect(result.error, isNull);
+    h.clearRecords();
+  }
+
+  /// 다음 곡 등록(갭리스)을 요청하고 끝까지 진행시킨다.
+  void registerNext(FakeAsync async, DlnaBackendHarness h, String? id, {int durationSeconds = 240}) {
+    h.backend.setNext(id == null ? null : testTrack(id, durationSeconds: durationSeconds));
+    async.flushMicrotasks();
+  }
+
   bool? lastStreamingLock(DlnaBackendHarness h) {
     final calls = h.channel.argumentsOf('setStreamingLock');
     return calls.isEmpty ? null : calls.last['enabled'] as bool?;
@@ -172,6 +212,7 @@ void main() {
           'manifestXml': '',
           'allowedHost': fakeSpeakerHost,
           'mimeType': 'audio/flac',
+          'startPositionMs': 0,
         });
       });
     });
@@ -303,23 +344,26 @@ void main() {
       });
     });
 
-    test('[DB-12] DASH 스트림은 시작 위치가 있어도 탐색하지 않는다', () {
+    test('[DB-12] DASH 스트림은 시작 위치가 있어도 Seek를 보내지 않고, 등록할 때 startPositionMs로 넘긴다', () {
+      // DB-12(dash-seek): SOAP Seek 없음. 30초 → startPositionMs 30000.
       withHarness((async, h) {
         h.api.defaultPlaybackInfo = dashStream();
 
         h.play(async, testTrack('101'), startPosition: const Duration(seconds: 30));
 
         expect(h.soap.actions, ['Stop', 'SetAVTransportURI', 'Play']);
+        expect(h.channel.argumentsOf('registerTrackStream').single['startPositionMs'], 30000);
       });
     });
 
-    test('[DB-13] 탐색 가능 여부는 처음에는 가능, DASH 곡을 보내면 불가, 단일 파일 곡을 보내면 다시 가능이다', () {
+    test('[DB-13] 탐색 가능 여부는 처음에도, DASH 곡을 보낸 뒤에도, 단일 파일 곡을 보낸 뒤에도 가능이다', () {
+      // DB-13(dash-seek): 항상 true.
       withHarness((async, h) {
         expect(h.backend.canSeek, isTrue);
 
         h.api.playbackInfos['101'] = dashStream();
         h.play(async, testTrack('101'));
-        expect(h.backend.canSeek, isFalse);
+        expect(h.backend.canSeek, isTrue);
 
         h.play(async, testTrack('102'));
         expect(h.backend.canSeek, isTrue);
@@ -643,10 +687,8 @@ void main() {
 
   group('갭리스', () {
     /// 다음 곡 등록을 요청하고 끝까지 진행시킨다.
-    void setNext(FakeAsync async, DlnaBackendHarness h, String? id, {int durationSeconds = 240}) {
-      h.backend.setNext(id == null ? null : testTrack(id, durationSeconds: durationSeconds));
-      async.flushMicrotasks();
-    }
+    void setNext(FakeAsync async, DlnaBackendHarness h, String? id, {int durationSeconds = 240}) =>
+        registerNext(async, h, id, durationSeconds: durationSeconds);
 
     test('[DB-32] 다음 곡을 조회해 프록시에 등록하고 스피커에 SetNextAVTransportURI를 보낸다', () {
       withHarness((async, h) {
@@ -774,7 +816,8 @@ void main() {
         final started = h.events.single as BackendTrackStarted;
         expect(started.duration, const Duration(seconds: 240));
         expect(started.quality!.audioQuality, 'HI_RES_LOSSLESS');
-        expect(h.backend.canSeek, isFalse);
+        // DB-39(dash-seek): 새 곡이 DASH여도 탐색 가능은 그대로다.
+        expect(h.backend.canSeek, isTrue);
 
         respond(h, state: 'PLAYING', rel: 239, trackUri: reported);
         respond(h, state: 'STOPPED', trackUri: reported);
@@ -876,16 +919,19 @@ void main() {
       });
     });
 
-    test('[DB-45] 탐색은 초 단위 위치로 Seek를 보내고, 거부되어도 예외를 던지지 않는다', () {
+    test('[DB-45] 단일 파일 곡의 탐색은 초 단위 위치로 Seek를 보내고, 거부되어도 예외를 던지지 않는다', () {
+      // DB-45(dash-seek): 지금 곡이 단일 파일이면 그대로. 프록시에 다시 등록하지 않는다.
       withHarness((async, h) {
+        startPlaying(async, h);
         h.soap.commandResults['Seek'] = false;
 
-        final result = capture(h.backend.seek(const Duration(seconds: 42, milliseconds: 900)));
-        async.flushMicrotasks();
+        final result = h.seek(async, const Duration(seconds: 42, milliseconds: 900));
 
         expect(result.error, isNull);
         expect(h.soap.actions, ['Seek']);
         expect(h.soap.lastRelTime, '00:00:42');
+        expect(h.channel.callsOf('registerTrackStream'), isEmpty);
+        expect(h.events, isEmpty);
       });
     });
 
@@ -916,6 +962,1059 @@ void main() {
 
         expect(closed, isTrue);
         expect(h.soap.countOf('GetTransportInfo'), 0);
+      });
+    });
+  });
+
+  group('시작 위치 (dash-seek)', () {
+    test('[DB-50] DASH 곡은 시작 위치를 프록시 등록의 startPositionMs로 넘기고 Seek를 보내지 않는다', () {
+      // DB-50: startPositionMs = P(밀리초). 30.5초 → 30500.
+      withHarness((async, h) {
+        h.api.defaultPlaybackInfo = dashStream(manifest: '<MPD id="m"/>');
+        h.answerStartOffset(const Duration(seconds: 28));
+
+        final result = h.play(async, testTrack('101'), startPosition: const Duration(seconds: 30, milliseconds: 500));
+
+        expect(result.error, isNull);
+        expect(h.channel.argumentsOf('registerTrackStream').single, {
+          'trackId': '101',
+          'directUrl': '',
+          'manifestXml': '<MPD id="m"/>',
+          'allowedHost': fakeSpeakerHost,
+          'mimeType': 'audio/mp4',
+          'startPositionMs': 30500,
+        });
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI', 'Play']);
+        expect(h.soap.lastStreamUrl, proxyUrlAt('101', 30500));
+        expect(h.described, ['started(101)', 'state(playing,buffering)']);
+      });
+    });
+
+    test('[DB-50] 등록 응답의 startOffsetMs를 그 곡의 시작 오프셋으로 기억한다', () {
+      // DB-50: 요청 30초, 응답 28초 → 스피커가 0을 알려 주는 동안 알리는 위치는 28초(요청값 30이 아님).
+      withHarness((async, h) {
+        h.api.defaultPlaybackInfo = dashStream();
+        h.answerStartOffset(const Duration(seconds: 28));
+        h.play(async, testTrack('101', durationSeconds: 180), startPosition: const Duration(seconds: 30));
+        h.clearRecords();
+        respond(h, state: 'PLAYING', rel: 0);
+
+        h.poll(async);
+
+        expect(h.described, ['position(28/180)', 'state(playing)']);
+      });
+    });
+
+    test('[DB-50] DASH 곡을 처음부터 재생하면 startPositionMs는 0이고 시작 오프셋도 0이다', () {
+      // DB-50, DB-17: 오프셋 0이면 위치·길이는 렌더러 값 그대로.
+      withHarness((async, h) {
+        h.api.defaultPlaybackInfo = dashStream();
+        h.answerStartOffset(const Duration(seconds: 28));
+
+        h.play(async, testTrack('101', durationSeconds: 180));
+
+        expect(h.channel.argumentsOf('registerTrackStream').single['startPositionMs'], 0);
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI', 'Play']);
+
+        h.clearRecords();
+        respond(h, state: 'PLAYING', rel: 12, duration: 200);
+        h.poll(async);
+        expect(h.described, ['position(12/200)', 'state(playing)']);
+      });
+    });
+
+    test('[DB-50b] 단일 파일 곡은 startPositionMs를 0으로 보내고 재생 명령 뒤에 Seek를 보낸다', () {
+      // DB-50b: 단일 파일은 등록에 시작 위치를 넘기지 않는다. 시작 오프셋 0(위치 보정 없음).
+      withHarness((async, h) {
+        h.answerStartOffset(const Duration(seconds: 28));
+
+        h.play(async, testTrack('101', durationSeconds: 180), startPosition: const Duration(seconds: 30));
+
+        expect(h.channel.argumentsOf('registerTrackStream').single['startPositionMs'], 0);
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI', 'Play', 'Seek']);
+        expect(h.soap.lastRelTime, '00:00:30');
+        expect(h.soap.lastStreamUrl, proxyUrlFor('101'));
+
+        h.clearRecords();
+        respond(h, state: 'PLAYING', rel: 31, duration: 200);
+        h.poll(async);
+        expect(h.described, ['position(31/200)', 'state(playing)']);
+      });
+    });
+  });
+
+  group('DASH 곡의 탐색 (dash-seek)', () {
+    test('[DB-51] DASH 곡의 탐색은 같은 곡을 그 위치로 다시 등록한 뒤 새 주소로 재생 명령을 보낸다', () {
+      // DB-51: (1) registerTrackStream (2) Stop · SetAVTransportURI · Play. SOAP Seek 없음.
+      withHarness((async, h) {
+        startDash(async, h, manifest: '<MPD id="m"/>');
+        h.answerStartOffset(const Duration(seconds: 40));
+        h.soap.lastMetadata = null;
+        h.channel.hold('registerTrackStream');
+
+        final result = capture(h.backend.seek(const Duration(seconds: 42, milliseconds: 900)));
+        async.flushMicrotasks();
+
+        // 등록 응답을 기다리는 동안에는 스피커에 아무것도 보내지 않는다.
+        expect(h.channel.argumentsOf('registerTrackStream'), [
+          {
+            'trackId': '101',
+            'directUrl': '',
+            'manifestXml': '<MPD id="m"/>',
+            'allowedHost': fakeSpeakerHost,
+            'mimeType': 'audio/mp4',
+            'startPositionMs': 42900,
+          },
+        ]);
+        expect(h.soap.calls, isEmpty);
+
+        h.channel.release('registerTrackStream');
+        async.flushMicrotasks();
+
+        expect(result.error, isNull);
+        expect(result.completed, isTrue);
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI', 'Play']);
+        expect(h.soap.lastStreamUrl, proxyUrlAt('101', 42900));
+      });
+    });
+
+    test('[DB-51] 탐색의 재생 명령에는 재생을 시작할 때와 같은 메타데이터를 보낸다', () {
+      // DB-51: play 와 같은 메타데이터(DB-09).
+      withHarness((async, h) {
+        h.api.defaultPlaybackInfo = dashStream();
+        h.play(
+          async,
+          testTrack(
+            '101',
+            title: '제목',
+            artistName: '가수 이름',
+            albumTitle: '앨범 이름',
+            coverUrl: 'https://resources.example.test/cover.jpg',
+            durationSeconds: 205,
+          ),
+        );
+        h.answerStartOffset(const Duration(seconds: 40));
+        h.soap.lastMetadata = null;
+
+        h.seek(async, const Duration(seconds: 42));
+
+        expect(h.soap.lastMetadata, isNotNull);
+        final metadata = h.soap.lastMetadata!;
+        expect(metadata.title, '제목');
+        expect(metadata.artist, '가수 이름');
+        expect(metadata.album, '앨범 이름');
+        expect(metadata.albumArtUri, 'https://resources.example.test/cover.jpg');
+        expect(metadata.durationSeconds, 205);
+        expect(metadata.mimeType, 'audio/mp4');
+      });
+    });
+
+    test('[DB-51] 탐색은 TIDAL API를 다시 부르지 않고 재생을 시작할 때 받은 스트림 정보를 쓴다', () {
+      // DB-51: 그 사이 API가 다른 매니페스트를 주게 되어도 처음 받은 것으로 등록한다.
+      withHarness((async, h) {
+        startDash(async, h, manifest: '<MPD id="first"/>');
+        h.api.playbackInfos['101'] = dashStream(manifest: '<MPD id="later"/>');
+        h.answerStartOffset(const Duration(seconds: 40));
+
+        h.seek(async, const Duration(seconds: 42));
+
+        expect(h.api.calls, isEmpty);
+        expect(h.channel.argumentsOf('registerTrackStream').map((a) => a['manifestXml']), ['<MPD id="first"/>']);
+      });
+    });
+
+    test('[DB-51, DB-39] 갭리스로 넘어간 곡이 DASH면 탐색은 그 곡을 다시 등록한다', () {
+      // DB-51: "지금 곡" 은 넘어간 뒤의 곡이다. 스트림 정보는 다음 곡으로 등록할 때 받은 것.
+      withHarness((async, h) {
+        startPlaying(async, h);
+        h.api.playbackInfos['102'] = dashStream(manifest: '<MPD id="next"/>');
+        registerNext(async, h, '102', durationSeconds: 240);
+        respond(h, state: 'PLAYING', rel: 1, trackUri: proxyUrlFor('102'));
+        h.poll(async);
+        h.answerStartOffset(const Duration(seconds: 60));
+        h.clearRecords();
+        h.soap.lastMetadata = null;
+
+        h.seek(async, const Duration(seconds: 61));
+
+        expect(h.channel.argumentsOf('registerTrackStream'), hasLength(1));
+        final args = h.channel.argumentsOf('registerTrackStream').single;
+        expect(args['trackId'], '102');
+        expect(args['manifestXml'], '<MPD id="next"/>');
+        expect(args['startPositionMs'], 61000);
+        expect(h.api.calls, isEmpty);
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI', 'Play']);
+        expect(h.soap.lastStreamUrl, proxyUrlAt('102', 61000));
+        expect(h.soap.lastMetadata!.title, '곡 102');
+        expect(h.described, ['position(60/240)', 'state(playing,buffering)']);
+      });
+    });
+
+    test('[DB-45, DB-39] 갭리스로 넘어간 곡이 단일 파일이면 탐색은 Seek만 보낸다', () {
+      // DB-45: 지금 곡이 단일 파일이면 그대로(앞 곡이 DASH였어도).
+      withHarness((async, h) {
+        startDash(async, h);
+        registerNext(async, h, '102');
+        respond(h, state: 'PLAYING', rel: 1, trackUri: proxyUrlFor('102'));
+        h.poll(async);
+        h.clearRecords();
+
+        final result = h.seek(async, const Duration(seconds: 42));
+
+        expect(result.error, isNull);
+        expect(h.soap.actions, ['Seek']);
+        expect(h.soap.lastRelTime, '00:00:42');
+        expect(h.channel.callsOf('registerTrackStream'), isEmpty);
+      });
+    });
+
+    test('[DB-52] 탐색에 성공하면 곧바로 시작 오프셋 위치와 버퍼링을 알리고, 곡 시작은 다시 알리지 않는다', () {
+      // DB-52: BackendPositionChanged(시작 오프셋, duration: 곡의 길이) → BackendStateChanged(playing, buffering).
+      withHarness((async, h) {
+        startDash(async, h, durationSeconds: 180);
+        h.answerStartOffset(const Duration(seconds: 40));
+
+        final result = h.seek(async, const Duration(seconds: 42, milliseconds: 900));
+
+        expect(result.error, isNull);
+        expect(h.described, ['position(40/180)', 'state(playing,buffering)']);
+        final position = h.events.first as BackendPositionChanged;
+        expect(position.position, const Duration(seconds: 40));
+        expect(position.duration, const Duration(seconds: 180));
+        expect(lastStreamingLock(h) ?? true, isTrue);
+      });
+    });
+
+    test('[DB-52] 탐색 뒤의 폴링은 응답의 startOffsetMs를 시작 오프셋으로 쓴다', () {
+      // DB-52: 시작 오프셋이 응답값(40초)이 된다(요청값 42초가 아님). DB-55c 로 관찰.
+      withHarness((async, h) {
+        startDash(async, h, durationSeconds: 180);
+        h.answerStartOffset(const Duration(seconds: 40));
+        h.seek(async, const Duration(seconds: 42));
+        h.clearRecords();
+        respond(h, state: 'PLAYING', rel: 0);
+
+        h.poll(async);
+
+        expect(h.described, ['position(40/180)', 'state(playing)']);
+        expect(h.soap.countOf('GetTransportInfo'), 1);
+      });
+    });
+
+    test('[DB-52] 탐색 뒤에는 PLAYING을 아직 보지 못한 상태로 돌아간다', () {
+      // DB-52, DB-22: 탐색 전에 PLAYING 을 봤어도, 탐색 뒤 PLAYING 전의 STOPPED 는 무시하고 폴링을 계속한다.
+      withHarness((async, h) {
+        startDash(async, h, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 5);
+        h.poll(async);
+        h.answerStartOffset(const Duration(seconds: 60));
+        h.seek(async, const Duration(seconds: 60));
+        h.clearRecords();
+        respond(h, state: 'STOPPED', rel: 0);
+        respond(h, state: 'PLAYING', rel: 1);
+
+        h.poll(async, 2);
+
+        expect(h.described, ['position(60/180)', 'position(61/180)', 'state(playing)']);
+        expect(h.soap.countOf('GetTransportInfo'), 2);
+      });
+    });
+
+    test('[DB-52] 탐색 뒤에는 무응답 횟수를 0부터 다시 센다', () {
+      // DB-52, DB-27: 탐색 전 2회 무응답 + 탐색 뒤 2회 무응답으로는 끊기지 않고, 탐색 뒤 3회째에 끊긴다.
+      withHarness((async, h) {
+        startDash(async, h);
+        respond(h);
+        respond(h);
+        h.poll(async, 2);
+        h.answerStartOffset(const Duration(seconds: 60));
+        h.seek(async, const Duration(seconds: 60));
+        h.clearRecords();
+        respond(h);
+        respond(h);
+        respond(h);
+
+        h.poll(async, 2);
+        expect(h.events, isEmpty);
+
+        h.poll(async);
+        expect(h.described, ['state(stopped)', 'error(DLNA_UNREACHABLE)']);
+      });
+    });
+
+    test('[DB-52] 탐색 뒤의 마지막 위치는 시작 오프셋이다', () {
+      // DB-52, DB-23, DB-25: 스피커가 0만 알려 주다 멈추면 시작 오프셋으로 곡 끝을 판정한다.
+      withHarness((async, h) {
+        // 끝 근처(178초)로 탐색 → 탐색 전 위치(5초)가 아니라 178초로 판정해 곡 종료.
+        startDash(async, h, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 5);
+        h.poll(async);
+        h.answerStartOffset(const Duration(seconds: 178));
+        h.seek(async, const Duration(seconds: 179));
+        h.clearRecords();
+        respond(h, state: 'PLAYING', rel: 0);
+        respond(h, state: 'STOPPED', rel: 0);
+
+        h.poll(async, 2);
+
+        expect(h.described, ['position(178/180)', 'state(playing)', 'position(178/180)', 'ended(101)']);
+      });
+      withHarness((async, h) {
+        // 끝 근처(178초)에서 앞(30초)으로 탐색 → 탐색 전 위치가 아니라 30초로 판정해 스피커 쪽 정지.
+        startDash(async, h, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 178);
+        h.poll(async);
+        h.answerStartOffset(const Duration(seconds: 30));
+        h.seek(async, const Duration(seconds: 31));
+        h.clearRecords();
+        respond(h, state: 'PLAYING', rel: 0);
+        respond(h, state: 'STOPPED', rel: 0);
+
+        h.poll(async, 2);
+
+        expect(h.described, ['position(30/180)', 'state(playing)', 'position(30/180)', 'state(stopped)']);
+      });
+    });
+
+    test('[DB-52] 탐색 뒤에는 위치 기준을 다시 정한다', () {
+      // DB-52, DB-54: 앞 흐름에서 절대로 정했어도 탐색 뒤의 첫 RelTime(5 < 60 − 2)으로 다시 판정 → 상대.
+      withHarness((async, h) {
+        startDashAt(async, h, offsetSeconds: 60);
+        respond(h, state: 'PLAYING', rel: 60);
+        h.poll(async);
+        expect(h.described, ['position(60/180)', 'state(playing)']);
+
+        h.seek(async, const Duration(seconds: 60));
+        h.clearRecords();
+        respond(h, state: 'PLAYING', rel: 5);
+        h.poll(async);
+
+        expect(h.described, ['position(65/180)', 'state(playing)']);
+      });
+    });
+
+    test('[DB-53] 탐색의 프록시 등록이 실패하면 PROXY_FAILED 예외를 던지고 스피커 명령·시작 오프셋·폴링은 그대로다', () {
+      // DB-53: 스피커에 명령 없음. 시작 오프셋 28초와 폴링이 유지된다.
+      withHarness((async, h) {
+        startDashAt(async, h, offsetSeconds: 28);
+        h.channel.failing.add('registerTrackStream');
+
+        final result = h.seek(async, const Duration(seconds: 90));
+
+        expect(result.errorCode, 'PROXY_FAILED');
+        expect(h.soap.calls, isEmpty);
+        expect(h.events, isEmpty);
+
+        respond(h, state: 'PLAYING', rel: 0);
+        h.poll(async);
+        expect(h.soap.countOf('GetTransportInfo'), 1);
+        expect(h.described, ['position(28/180)', 'state(playing)']);
+      });
+    });
+
+    test('[DB-53] 탐색의 등록 응답에 주소가 없어도 PROXY_FAILED 예외를 던진다', () {
+      // DB-53: 프록시 주소가 빈 값(NB-03).
+      withHarness((async, h) {
+        startDash(async, h);
+        h.channel.responses['registerTrackStream'] = (_) => <String, Object?>{'startOffsetMs': 88000};
+
+        final result = h.seek(async, const Duration(seconds: 90));
+
+        expect(result.errorCode, 'PROXY_FAILED');
+        expect(h.soap.calls, isEmpty);
+        expect(h.events, isEmpty);
+      });
+    });
+
+    test('[DB-53b] 탐색의 재생 명령이 거부되면 기기 이름이 든 DLNA_PLAY_FAILED 예외를 던지고 시작 오프셋은 그대로다', () {
+      // DB-53b: 새 오프셋(88초)을 쓰지 않는다. 폴링 유지 여부는 규칙에 없으므로, 위치를 알린다면 28초여야 한다.
+      withHarness((async, h) {
+        startDashAt(async, h, offsetSeconds: 28);
+        h.answerStartOffset(const Duration(seconds: 88));
+        h.soap.commandResults['Play'] = false;
+
+        final result = h.seek(async, const Duration(seconds: 90));
+
+        expect(result.errorCode, 'DLNA_PLAY_FAILED');
+        expect((result.error! as PlaybackException).message, contains(h.device.friendlyName));
+        expect(h.events, isEmpty);
+
+        respond(h, state: 'PLAYING', rel: 0);
+        h.poll(async);
+        expect(h.described.where((e) => e.startsWith('position')), everyElement('position(28/180)'));
+      });
+    });
+
+    test('[DB-57] 일시정지 상태에서 탐색하면 재생 명령 뒤에 Pause를 보내고 정지로 알린다', () {
+      // DB-57: state(playing,buffering) 대신 state(stopped).
+      withHarness((async, h) {
+        startDash(async, h, durationSeconds: 180);
+        capture(h.backend.pause());
+        async.flushMicrotasks();
+        h.answerStartOffset(const Duration(seconds: 60));
+        h.clearRecords();
+
+        final result = h.seek(async, const Duration(seconds: 61));
+
+        expect(result.error, isNull);
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI', 'Play', 'Pause']);
+        expect(h.described, ['position(60/180)', 'state(stopped)']);
+      });
+    });
+
+    test('[DB-57] 일시정지 뒤 재개했으면 탐색에 Pause를 보내지 않는다', () {
+      // DB-57: resume() 이 일시정지 상태를 끝낸다.
+      withHarness((async, h) {
+        startDash(async, h, durationSeconds: 180);
+        capture(h.backend.pause());
+        async.flushMicrotasks();
+        capture(h.backend.resume());
+        async.flushMicrotasks();
+        h.answerStartOffset(const Duration(seconds: 60));
+        h.clearRecords();
+
+        h.seek(async, const Duration(seconds: 61));
+
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI', 'Play']);
+        expect(h.described, ['position(60/180)', 'state(playing,buffering)']);
+      });
+    });
+
+    test('[DB-57] 일시정지 뒤 새로 재생했으면 탐색에 Pause를 보내지 않는다', () {
+      // DB-57: 새 play 가 일시정지 상태를 끝낸다.
+      withHarness((async, h) {
+        startDash(async, h);
+        capture(h.backend.pause());
+        async.flushMicrotasks();
+        startDash(async, h, id: '102', durationSeconds: 180);
+        h.answerStartOffset(const Duration(seconds: 60));
+
+        h.seek(async, const Duration(seconds: 61));
+
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI', 'Play']);
+        expect(h.described, ['position(60/180)', 'state(playing,buffering)']);
+      });
+    });
+
+    test('[DB-57] 일시정지가 거부됐으면 탐색에 Pause를 보내지 않는다', () {
+      // DB-57: 일시정지 상태는 pause() 가 성공했을 때만이다.
+      withHarness((async, h) {
+        startDash(async, h, durationSeconds: 180);
+        h.soap.commandResults['Pause'] = false;
+        capture(h.backend.pause());
+        async.flushMicrotasks();
+        h.soap.commandResults.remove('Pause');
+        h.answerStartOffset(const Duration(seconds: 60));
+        h.clearRecords();
+
+        h.seek(async, const Duration(seconds: 61));
+
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI', 'Play']);
+        expect(h.described, ['position(60/180)', 'state(playing,buffering)']);
+      });
+    });
+
+    test('[DB-59] 다음 곡이 등록되어 있으면 탐색의 재생 명령 뒤에 같은 주소·메타데이터로 다시 등록한다', () {
+      // DB-59: 프록시 등록과 스트림 조회는 다시 하지 않고 SetNextAVTransportURI 만 다시 보낸다. 이후 갭리스 전환은 그대로.
+      withHarness((async, h) {
+        startDash(async, h);
+        registerNext(async, h, '102', durationSeconds: 240);
+        h.answerStartOffset(const Duration(seconds: 60));
+        h.clearRecords();
+        h.soap
+          ..lastNextStreamUrl = null
+          ..lastNextMetadata = null;
+
+        h.seek(async, const Duration(seconds: 61));
+
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI', 'Play', 'SetNextAVTransportURI']);
+        expect(h.soap.lastNextStreamUrl, proxyUrlFor('102'));
+        expect(h.soap.lastNextMetadata!.title, '곡 102');
+        expect(h.soap.lastNextMetadata!.durationSeconds, 240);
+        expect(h.channel.argumentsOf('registerTrackStream').map((a) => a['trackId']), ['101']);
+        expect(h.api.calls, isEmpty);
+
+        h.clearRecords();
+        respond(h, state: 'PLAYING', rel: 1, trackUri: proxyUrlFor('102'));
+        h.poll(async);
+        expect(h.described, ['started(102)']);
+      });
+    });
+
+    test('[DB-59] 다음 곡을 다시 등록하지 못하면 등록 정보를 지우되 그 스피커를 갭리스 불가로 표시하지 않는다', () {
+      // DB-59: 등록 정보가 지워져 DB-39 가 일어나지 않고, 이후 setNext 는 다시 시도된다(DB-37 과 다름).
+      withHarness((async, h) {
+        startDash(async, h);
+        registerNext(async, h, '102');
+        h.answerStartOffset(const Duration(seconds: 60));
+        h.soap.commandResults['SetNextAVTransportURI'] = false;
+        h.clearRecords();
+
+        final result = h.seek(async, const Duration(seconds: 61));
+
+        expect(result.error, isNull);
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI', 'Play', 'SetNextAVTransportURI']);
+
+        h.soap.commandResults.remove('SetNextAVTransportURI');
+        h.clearRecords();
+        respond(h, state: 'PLAYING', rel: 1, trackUri: proxyUrlFor('102'));
+        h.poll(async);
+        expect(h.described, isNot(contains('started(102)')));
+
+        h.clearRecords();
+        registerNext(async, h, '103');
+        expect(h.api.calls, ['getPlaybackInfo:103:LOSSLESS']);
+        expect(h.soap.actions, ['SetNextAVTransportURI']);
+        expect(h.soap.lastNextStreamUrl, proxyUrlFor('103'));
+      });
+    });
+
+    test('[DB-60] 연달아 탐색하면 두 번째의 등록과 스피커 명령은 첫 번째가 끝난 뒤에 시작한다', () {
+      // DB-60: 탐색은 play · setNext 와 같은 직렬화 대상(DB-15).
+      withHarness((async, h) {
+        startDash(async, h);
+        h.answerStartOffset(const Duration(seconds: 10));
+        h.soap.hold('SetAVTransportURI');
+
+        final first = h.seek(async, const Duration(seconds: 20));
+        final second = h.seek(async, const Duration(seconds: 40));
+
+        expect(first.completed, isFalse);
+        expect(second.completed, isFalse);
+        expect(h.channel.argumentsOf('registerTrackStream').map((a) => a['startPositionMs']), [20000]);
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI']);
+
+        h.soap.release('SetAVTransportURI');
+        async.flushMicrotasks();
+
+        expect(first.completed, isTrue);
+        expect(second.completed, isTrue);
+        expect(h.channel.argumentsOf('registerTrackStream').map((a) => a['startPositionMs']), [20000, 40000]);
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI', 'Play', 'Stop', 'SetAVTransportURI', 'Play']);
+        expect(h.soap.lastStreamUrl, proxyUrlAt('101', 40000));
+      });
+    });
+
+    test('[DB-60] 탐색이 진행 중이면 새 재생의 스피커 명령은 탐색이 끝난 뒤에 시작한다', () {
+      // DB-60, DB-15: 탐색의 재생 명령과 새 재생의 등록·SOAP 이 섞이지 않는다.
+      withHarness((async, h) {
+        startDash(async, h);
+        h.answerStartOffset(const Duration(seconds: 10));
+        h.soap.hold('SetAVTransportURI');
+
+        h.seek(async, const Duration(seconds: 20));
+        final played = h.play(async, testTrack('102'));
+
+        expect(played.completed, isFalse);
+        expect(h.channel.argumentsOf('registerTrackStream').map((a) => a['trackId']), ['101']);
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI']);
+
+        h.soap.release('SetAVTransportURI');
+        async.flushMicrotasks();
+
+        expect(played.completed, isTrue);
+        expect(h.channel.argumentsOf('registerTrackStream').map((a) => a['trackId']), ['101', '102']);
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI', 'Play', 'Stop', 'SetAVTransportURI', 'Play']);
+        expect(h.soap.lastStreamUrl, proxyUrlFor('102'));
+      });
+    });
+
+    test('[DB-60] 탐색이 진행 중이면 다음 곡 등록은 탐색이 끝난 뒤에 실행된다', () {
+      // DB-60, DB-42: 탐색의 재생 명령 사이에 SetNextAVTransportURI 가 끼어들지 않는다.
+      withHarness((async, h) {
+        startDash(async, h);
+        h.answerStartOffset(const Duration(seconds: 10));
+        h.soap.hold('SetAVTransportURI');
+
+        h.seek(async, const Duration(seconds: 20));
+        registerNext(async, h, '102');
+
+        expect(h.channel.argumentsOf('registerTrackStream').map((a) => a['trackId']), ['101']);
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI']);
+
+        h.soap.release('SetAVTransportURI');
+        async.flushMicrotasks();
+
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI', 'Play', 'SetNextAVTransportURI']);
+        expect(h.soap.lastNextStreamUrl, proxyUrlFor('102'));
+      });
+    });
+
+    test('[DB-61] 재생한 곡이 없을 때의 탐색은 Seek만 보낸다', () {
+      // DB-61: play 전.
+      withHarness((async, h) {
+        h.api.defaultPlaybackInfo = dashStream();
+
+        final result = h.seek(async, const Duration(seconds: 42, milliseconds: 900));
+
+        expect(result.error, isNull);
+        expect(h.soap.actions, ['Seek']);
+        expect(h.soap.lastRelTime, '00:00:42');
+        expect(h.channel.callsOf('registerTrackStream'), isEmpty);
+      });
+    });
+
+    test('[DB-61] DASH 곡을 정지한 뒤의 탐색은 다시 등록하지 않고 Seek만 보낸다', () {
+      // DB-61: stop() 뒤에는 재생 중인 곡이 없다.
+      withHarness((async, h) {
+        startDash(async, h);
+        h.backend.stop();
+        async.flushMicrotasks();
+        h.answerStartOffset(const Duration(seconds: 40));
+        h.clearRecords();
+
+        final result = h.seek(async, const Duration(seconds: 42, milliseconds: 900));
+
+        expect(result.error, isNull);
+        expect(h.soap.actions, ['Seek']);
+        expect(h.soap.lastRelTime, '00:00:42');
+        expect(h.channel.callsOf('registerTrackStream'), isEmpty);
+        expect(h.events, isEmpty);
+      });
+    });
+  });
+
+  group('탐색 중의 폴링 (dash-seek)', () {
+    test('[DB-62] 탐색의 프록시 등록을 기다리는 동안에는 폴링 차례를 건너뛰고, 끝나면 다음 차례부터 이어진다', () {
+      // DB-62: 탐색 중에는 SOAP 조회도 이벤트도 없다. DB-62b: 성공 뒤에는 새 흐름(오프셋 60초) 기준으로 이어진다.
+      withHarness((async, h) {
+        startDash(async, h, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 5);
+        h.poll(async);
+        h.answerStartOffset(const Duration(seconds: 60));
+        h.clearRecords();
+        h.channel.hold('registerTrackStream');
+
+        final result = h.seek(async, const Duration(seconds: 61));
+        h.poll(async, 2);
+
+        expect(result.completed, isFalse);
+        expect(h.soap.countOf('GetTransportInfo'), 0);
+        expect(h.soap.countOf('GetPositionInfo'), 0);
+        expect(h.events, isEmpty);
+
+        h.channel.release('registerTrackStream');
+        async.flushMicrotasks();
+        expect(result.completed, isTrue);
+        expect(h.described, ['position(60/180)', 'state(playing,buffering)']);
+
+        h.clearRecords();
+        respond(h, state: 'PLAYING', rel: 0);
+        h.poll(async);
+        expect(h.soap.countOf('GetTransportInfo'), 1);
+        expect(h.soap.countOf('GetPositionInfo'), 1);
+        expect(h.described, ['position(60/180)', 'state(playing)']);
+      });
+    });
+
+    test('[DB-62] 탐색의 스피커 명령 도중 스피커가 STOPPED라고 답할 상태여도 정지를 알리지 않는다', () {
+      // DB-62: 재생 명령의 Stop 직후를 흉내 낸다. 폴링을 건너뛰므로 state(stopped) 가 나오지 않는다.
+      withHarness((async, h) {
+        startDash(async, h, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 5);
+        h.poll(async);
+        h.answerStartOffset(const Duration(seconds: 60));
+        h.clearRecords();
+        h.soap
+          ..transportState = 'STOPPED'
+          ..positionInfo = positionInfo(rel: 0);
+        h.soap.hold('SetAVTransportURI');
+
+        final result = h.seek(async, const Duration(seconds: 61));
+        h.poll(async, 2);
+
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI']);
+        expect(h.events, isEmpty);
+
+        h.soap.release('SetAVTransportURI');
+        async.flushMicrotasks();
+        expect(result.error, isNull);
+        expect(result.completed, isTrue);
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI', 'Play']);
+        expect(h.described, ['position(60/180)', 'state(playing,buffering)']);
+      });
+    });
+
+    test('[DB-62] 곡 끝 근처에서 탐색하는 도중 스피커가 STOPPED라고 답할 상태여도 곡 종료를 알리지 않는다', () {
+      // DB-62: 마지막 위치 178초(길이 − 3초 이상)에서 STOPPED 를 보면 곡 종료(DB-23)가 되므로, 탐색 중에는 보지 않는다.
+      withHarness((async, h) {
+        startDash(async, h, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 178);
+        h.poll(async);
+        h.answerStartOffset(const Duration(seconds: 30));
+        h.clearRecords();
+        h.soap
+          ..transportState = 'STOPPED'
+          ..positionInfo = positionInfo(rel: 0);
+        h.soap.hold('Play');
+
+        final result = h.seek(async, const Duration(seconds: 31));
+        h.poll(async, 2);
+
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI', 'Play']);
+        expect(h.events, isEmpty);
+
+        h.soap.release('Play');
+        async.flushMicrotasks();
+        expect(result.completed, isTrue);
+        expect(h.described, ['position(30/180)', 'state(playing,buffering)']);
+
+        // DB-62b: 끝난 뒤에는 새 흐름(오프셋 30초, 상대) 기준으로 이어진다.
+        h.clearRecords();
+        respond(h, state: 'PLAYING', rel: 1);
+        h.poll(async);
+        expect(h.described, ['position(31/180)', 'state(playing)']);
+      });
+    });
+
+    test('[DB-62b] 탐색의 프록시 등록이 실패해도 그 뒤 폴링은 탐색 전 상태 기준으로 이어진다', () {
+      // DB-62: 등록을 기다리는 동안 건너뜀. DB-62b, DB-53: 실패 뒤에는 오프셋 28초 · PLAYING 을 본 상태 그대로.
+      withHarness((async, h) {
+        startDashAt(async, h, offsetSeconds: 28, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 0);
+        h.poll(async);
+        h.clearRecords();
+        h.channel.failing.add('registerTrackStream');
+        h.channel.hold('registerTrackStream');
+
+        final result = h.seek(async, const Duration(seconds: 90));
+        h.poll(async, 2);
+
+        expect(h.soap.calls, isEmpty);
+        expect(h.events, isEmpty);
+
+        h.channel.release('registerTrackStream');
+        async.flushMicrotasks();
+        expect(result.errorCode, 'PROXY_FAILED');
+        expect(h.events, isEmpty);
+
+        respond(h, state: 'PLAYING', rel: 0);
+        respond(h, state: 'STOPPED', rel: 0);
+        h.poll(async, 2);
+        expect(h.soap.countOf('GetTransportInfo'), 2);
+        // 탐색 전에 PLAYING 을 봤으므로 STOPPED 는 스피커 쪽 정지다(28초 < 180 − 3초).
+        expect(h.described, ['position(28/180)', 'state(playing)', 'position(28/180)', 'state(stopped)']);
+      });
+    });
+
+    test('[DB-62b] 탐색의 재생 명령이 거부되어도 그 뒤 폴링은 탐색 전 상태 기준으로 이어진다', () {
+      // DB-62: Play 응답을 기다리는 동안 건너뜀. DB-62b, DB-53b: 실패 뒤에는 오프셋 28초 그대로(응답값 88초를 쓰지 않음).
+      withHarness((async, h) {
+        startDashAt(async, h, offsetSeconds: 28, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 0);
+        h.poll(async);
+        h.answerStartOffset(const Duration(seconds: 88));
+        h.clearRecords();
+        h.soap.commandResults['Play'] = false;
+        h.soap.hold('Play');
+
+        final result = h.seek(async, const Duration(seconds: 90));
+        h.poll(async, 2);
+
+        expect(h.soap.actions, ['Stop', 'SetAVTransportURI', 'Play']);
+        expect(h.events, isEmpty);
+
+        h.soap.release('Play');
+        async.flushMicrotasks();
+        expect(result.errorCode, 'DLNA_PLAY_FAILED');
+        expect(h.events, isEmpty);
+
+        h.clearRecords();
+        respond(h, state: 'PLAYING', rel: 0);
+        h.poll(async);
+        expect(h.soap.countOf('GetTransportInfo'), 1);
+        expect(h.described, ['position(28/180)', 'state(playing)']);
+      });
+    });
+
+    test('[DB-62c] 탐색 전에 보낸 조회의 STOPPED 응답이 탐색 도중 도착하면 버리고, 탐색 뒤 폴링은 새 흐름으로 이어진다', () {
+      // DB-62c: 마지막 위치 178초(길이 − 3초 이상)에서 STOPPED 를 받으면 곡 종료(DB-23)지만, 탐색 중에 도착한 응답은 버린다.
+      withHarness((async, h) {
+        startDash(async, h, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 178);
+        h.poll(async);
+        h.clearRecords();
+        // 폴링 차례: 조회가 나가고 응답(STOPPED)은 붙잡혀 있다.
+        respond(h, state: 'STOPPED', rel: 0);
+        h.soap.hold('GetTransportInfo');
+        h.poll(async);
+        expect(h.soap.countOf('GetTransportInfo'), 1);
+        // 탐색 시작: 등록 응답을 붙잡아 진행 중으로 둔다.
+        h.answerStartOffset(const Duration(seconds: 30));
+        h.channel.hold('registerTrackStream');
+        final result = h.seek(async, const Duration(seconds: 31));
+        expect(result.completed, isFalse);
+
+        h.soap.release('GetTransportInfo');
+        async.flushMicrotasks();
+
+        expect(h.events, isEmpty);
+
+        h.channel.release('registerTrackStream');
+        async.flushMicrotasks();
+        expect(result.error, isNull);
+        expect(result.completed, isTrue);
+        expect(h.described, ['position(30/180)', 'state(playing,buffering)']);
+
+        // 폴링은 멈추지 않았고 새 흐름(오프셋 30초, 상대) 기준이다.
+        h.clearRecords();
+        respond(h, state: 'PLAYING', rel: 1);
+        h.poll(async);
+        expect(h.soap.countOf('GetTransportInfo'), 1);
+        expect(h.described, ['position(31/180)', 'state(playing)']);
+      });
+    });
+
+    test('[DB-62c] 탐색 전에 보낸 조회의 STOPPED 응답이 도착한 뒤 탐색이 실패해도 폴링은 탐색 전 상태로 이어진다', () {
+      // DB-62c, DB-62b, DB-53: 버린 응답은 상태를 바꾸지 않는다(폴링 중지 없음, PLAYING 을 본 상태 · 마지막 위치 178초 유지).
+      withHarness((async, h) {
+        startDash(async, h, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 178);
+        h.poll(async);
+        h.clearRecords();
+        respond(h, state: 'STOPPED', rel: 0);
+        h.soap.hold('GetTransportInfo');
+        h.poll(async);
+        expect(h.soap.countOf('GetTransportInfo'), 1);
+        h.channel.failing.add('registerTrackStream');
+        h.channel.hold('registerTrackStream');
+        final result = h.seek(async, const Duration(seconds: 31));
+
+        h.soap.release('GetTransportInfo');
+        async.flushMicrotasks();
+
+        expect(h.events, isEmpty);
+
+        h.channel.release('registerTrackStream');
+        async.flushMicrotasks();
+        expect(result.errorCode, 'PROXY_FAILED');
+        expect(h.events, isEmpty);
+
+        // 폴링이 이어진다. 탐색 전 상태 그대로이므로 이후의 STOPPED 는 곡 종료다(179초 ≥ 180 − 3초).
+        h.clearRecords();
+        respond(h, state: 'PLAYING', rel: 179);
+        respond(h, state: 'STOPPED', rel: 0);
+        h.poll(async, 2);
+        expect(h.soap.countOf('GetTransportInfo'), 2);
+        expect(h.described, ['position(179/180)', 'state(playing)', 'position(0/180)', 'ended(101)']);
+      });
+    });
+  });
+
+  group('위치 보정 (dash-seek)', () {
+    test('[DB-54] 첫 RelTime으로 위치 기준을 정한다: 오프셋 10초 이상이고 RelTime이 오프셋 − 2초 이상이면 절대, 아니면 상대', () {
+      // DB-54: 경계는 O = 10, RelTime = O − 2. 기대 위치는 절대면 RelTime, 상대면 O + RelTime(DB-55, DB-55b).
+      const cases = [
+        (offset: 10, rel: 8, position: 8, why: 'O = 10, RelTime = O − 2 → 절대'),
+        (offset: 10, rel: 7, position: 17, why: 'O = 10, RelTime = O − 3 → 상대'),
+        (offset: 10, rel: 10, position: 10, why: 'O = 10, RelTime = O → 절대'),
+        (offset: 9, rel: 7, position: 16, why: 'O = 9, RelTime = O − 2 → 상대 (O < 10)'),
+        (offset: 9, rel: 9, position: 18, why: 'O = 9, RelTime = O → 상대 (O < 10)'),
+        (offset: 60, rel: 58, position: 58, why: 'O = 60, RelTime = O − 2 → 절대'),
+        (offset: 60, rel: 57, position: 117, why: 'O = 60, RelTime = O − 3 → 상대'),
+      ];
+      for (final c in cases) {
+        withHarness((async, h) {
+          startDashAt(async, h, offsetSeconds: c.offset, durationSeconds: 180);
+          respond(h, state: 'PLAYING', rel: c.rel);
+
+          h.poll(async);
+
+          expect(h.described, ['position(${c.position}/180)', 'state(playing)'], reason: c.why);
+        });
+      }
+    });
+
+    test('[DB-54] 상대로 정한 기준은 나중 RelTime이 오프셋을 넘어도 바꾸지 않는다', () {
+      // DB-54: 첫 값 3(< 60 − 2) → 상대. 이후 70(≥ 58)이 와도 상대 → 130.
+      withHarness((async, h) {
+        startDashAt(async, h, offsetSeconds: 60, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 3);
+        respond(h, state: 'PLAYING', rel: 70);
+
+        h.poll(async, 2);
+
+        expect(h.described, ['position(63/180)', 'state(playing)', 'position(130/180)', 'state(playing)']);
+      });
+    });
+
+    test('[DB-54] 절대로 정한 기준은 나중 RelTime이 작아져도 바꾸지 않는다', () {
+      // DB-54: 첫 값 60(≥ 58) → 절대. 이후 1이 와도 절대 → 1.
+      withHarness((async, h) {
+        startDashAt(async, h, offsetSeconds: 60, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 60);
+        respond(h, state: 'PLAYING', rel: 1);
+
+        h.poll(async, 2);
+
+        expect(h.described, ['position(60/180)', 'state(playing)', 'position(1/180)', 'state(playing)']);
+      });
+    });
+
+    test('[DB-55] 위치 기준이 상대면 시작 오프셋(초 단위로 버림)에 RelTime을 더해 알린다', () {
+      // DB-55: 오프셋 28.5초 → O = 28. RelTime 5 → 33초.
+      withHarness((async, h) {
+        h.api.defaultPlaybackInfo = dashStream();
+        h.answerStartOffset(const Duration(milliseconds: 28500));
+        h.play(async, testTrack('101', durationSeconds: 180), startPosition: const Duration(seconds: 30));
+        h.clearRecords();
+        respond(h, state: 'PLAYING', rel: 5);
+
+        h.poll(async);
+
+        expect((h.events.first as BackendPositionChanged).position, const Duration(seconds: 33));
+        expect(h.described, ['position(33/180)', 'state(playing)']);
+      });
+    });
+
+    test('[DB-55b] 위치 기준이 절대면 RelTime을 그대로 알린다', () {
+      // DB-55b: O = 60, 첫 값 59 → 절대. 59, 61 그대로.
+      withHarness((async, h) {
+        startDashAt(async, h, offsetSeconds: 60, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 59);
+        respond(h, state: 'PLAYING', rel: 61);
+
+        h.poll(async, 2);
+
+        expect(h.described, ['position(59/180)', 'state(playing)', 'position(61/180)', 'state(playing)']);
+      });
+    });
+
+    test('[DB-55c] 위치 기준이 정해지기 전(RelTime 0)에는 시작 오프셋을 알리고, RelTime 0으로는 기준을 정하지 않는다', () {
+      // DB-55c, DB-54: 0, 0 → 60, 60. 그 뒤 첫 양수 58(= O − 2)로 절대 판정 → 58(0 으로 상대가 정해졌다면 118).
+      withHarness((async, h) {
+        startDashAt(async, h, offsetSeconds: 60, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 0);
+        respond(h, state: 'PLAYING', rel: 0);
+        respond(h, state: 'PLAYING', rel: 58);
+
+        h.poll(async, 3);
+
+        expect(h.described, [
+          'position(60/180)',
+          'state(playing)',
+          'position(60/180)',
+          'state(playing)',
+          'position(58/180)',
+          'state(playing)',
+        ]);
+      });
+    });
+
+    test('[DB-56] 시작 오프셋이 있는 흐름의 길이는 렌더러 값이 아니라 곡의 길이다', () {
+      // DB-56: 렌더러 TrackDuration 120(남은 흐름의 길이)을 쓰지 않고 곡 길이 180.
+      withHarness((async, h) {
+        startDashAt(async, h, offsetSeconds: 60, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 5, duration: 120);
+
+        h.poll(async);
+
+        expect(h.described, ['position(65/180)', 'state(playing)']);
+      });
+    });
+
+    test('[DB-56] 시작 오프셋이 있는 흐름에서 곡의 길이를 모르면 길이 없이 알린다', () {
+      // DB-56: 곡 정보에 길이가 없으면 null(렌더러 값 120 을 쓰지 않음).
+      withHarness((async, h) {
+        startDashAt(async, h, offsetSeconds: 60, durationSeconds: 0);
+        respond(h, state: 'PLAYING', rel: 5, duration: 120);
+
+        h.poll(async);
+
+        expect(h.described, ['position(65/-)', 'state(playing)']);
+        expect((h.events.first as BackendPositionChanged).duration, isNull);
+      });
+    });
+
+    test('[DB-56b] 곡 끝은 보정한 위치로 판정한다: 길이 − 3초 이상이면 곡 종료, 그보다 앞이면 스피커 쪽 정지', () {
+      // DB-56b, DB-23, DB-25: O = 170(상대), 길이 180. RelTime 7 → 177(종료), 6 → 176(정지).
+      withHarness((async, h) {
+        startDashAt(async, h, offsetSeconds: 170, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 7);
+        respond(h, state: 'STOPPED');
+
+        h.poll(async, 2);
+
+        expect(h.described, ['position(177/180)', 'state(playing)', 'ended(101)']);
+      });
+      withHarness((async, h) {
+        startDashAt(async, h, offsetSeconds: 170, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 6);
+        respond(h, state: 'STOPPED');
+
+        h.poll(async, 2);
+
+        expect(h.described, ['position(176/180)', 'state(playing)', 'state(stopped)']);
+      });
+    });
+
+    test('[DB-56b] 위치 기준이 절대면 오프셋을 더하지 않은 위치로 곡 끝을 판정한다', () {
+      // DB-56b: O = 100, 첫 값 100 → 절대, 위치 100(< 177) → 스피커 쪽 정지(오프셋을 더한 200 으로 보면 곡 종료).
+      withHarness((async, h) {
+        startDashAt(async, h, offsetSeconds: 100, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 100);
+        respond(h, state: 'STOPPED');
+
+        h.poll(async, 2);
+
+        expect(h.described, ['position(100/180)', 'state(playing)', 'state(stopped)']);
+      });
+    });
+
+    test('[DB-56b] 멈춘 시점에 RelTime이 0이면 직전의 보정 위치로 판정한다', () {
+      // DB-56b, DB-26: RelTime 8 → 178 을 기억. 이어진 RelTime 0(알리는 위치 170)은 기억하지 않는다 → 곡 종료.
+      withHarness((async, h) {
+        startDashAt(async, h, offsetSeconds: 170, durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 8);
+        respond(h, state: 'STOPPED', rel: 0);
+
+        h.poll(async, 2);
+
+        expect(h.described, ['position(178/180)', 'state(playing)', 'position(170/180)', 'ended(101)']);
+      });
+    });
+
+    test('[DB-58] 갭리스로 넘어가면 시작 오프셋이 0이 되어 새 곡의 위치와 길이를 그대로 알린다', () {
+      // DB-58, DB-17: 앞 곡의 오프셋 60 을 더하지 않고, 렌더러 길이 200 을 쓴다.
+      withHarness((async, h) {
+        startDashAt(async, h, offsetSeconds: 60, durationSeconds: 180);
+        registerNext(async, h, '102', durationSeconds: 240);
+        h.clearRecords();
+        respond(h, state: 'PLAYING', rel: 1, trackUri: proxyUrlFor('102'));
+        respond(h, state: 'PLAYING', rel: 5, duration: 200, trackUri: proxyUrlFor('102'));
+
+        h.poll(async, 2);
+
+        expect(h.described, ['started(102)', 'position(5/200)', 'state(playing)']);
+      });
+    });
+
+    test('[DB-58] 새로 재생하면 시작 오프셋이 0이 된다', () {
+      // DB-58, DB-17: 앞 곡의 오프셋 60 이 남지 않는다.
+      withHarness((async, h) {
+        startDashAt(async, h, offsetSeconds: 60);
+        startPlaying(async, h, id: '102', durationSeconds: 180);
+        respond(h, state: 'PLAYING', rel: 5, duration: 200);
+
+        h.poll(async);
+
+        expect(h.described, ['position(5/200)', 'state(playing)']);
+      });
+    });
+
+    test('[DB-58] 새로 재생하면 위치 기준을 다시 정한다', () {
+      // DB-58, DB-54: 앞 곡에서 절대로 정했어도 새 곡의 첫 RelTime(5 < 60 − 2)으로 다시 판정 → 상대 65.
+      withHarness((async, h) {
+        startDashAt(async, h, offsetSeconds: 60);
+        respond(h, state: 'PLAYING', rel: 60);
+        h.poll(async);
+        expect(h.described, ['position(60/180)', 'state(playing)']);
+
+        startDashAt(async, h, id: '102', offsetSeconds: 60);
+        respond(h, state: 'PLAYING', rel: 5);
+        h.poll(async);
+
+        expect(h.described, ['position(65/180)', 'state(playing)']);
       });
     });
   });
@@ -1029,6 +2128,49 @@ void main() {
 
           expect(h.channel.argumentsOf('registerTrackStream').single['allowedHost'], host);
         }, device: remoteSpeaker(host: host, port: port));
+      });
+    });
+
+    property('[P-DB-6] 시작 오프셋이 있는 흐름의 위치는 첫 RelTime으로 정한 기준을 끝까지 따르고 줄어들지 않는다', () {
+      forAll(offsetFlows(), (flow) {
+        withHarness((async, h) {
+          startDashAt(async, h, offsetSeconds: flow.offsetSeconds, durationSeconds: 36000);
+          for (final rel in flow.relSeconds) {
+            respond(h, state: 'PLAYING', rel: rel);
+          }
+
+          h.poll(async, flow.relSeconds.length);
+
+          // 첫 값이 O − 2 이상이면 RelTime 그대로, 미만이면 O + RelTime.
+          final absolute = flow.relSeconds.first >= flow.offsetSeconds - 2;
+          final positions = h.events.whereType<BackendPositionChanged>().map((e) => e.position.inSeconds).toList();
+          expect(
+            positions,
+            [for (final rel in flow.relSeconds) absolute ? rel : flow.offsetSeconds + rel],
+            reason: '$flow',
+          );
+          for (var i = 1; i < positions.length; i++) {
+            expect(positions[i], greaterThanOrEqualTo(positions[i - 1]), reason: '$flow');
+          }
+        });
+      });
+    });
+
+    property('[P-DB-7] 어떤 시작 위치든 DASH 곡은 startPositionMs로만, 단일 파일 곡은 Seek로만 넘긴다', () {
+      forAll(startRequests(), (request) {
+        withHarness((async, h) {
+          h.api.defaultPlaybackInfo = request.dash ? dashStream() : directStream();
+
+          h.play(async, testTrack('101'), startPosition: request.startPosition);
+
+          final ms = request.startPosition.inMilliseconds;
+          expect(
+            h.channel.argumentsOf('registerTrackStream').single['startPositionMs'],
+            request.dash ? ms : 0,
+            reason: '$request',
+          );
+          expect(h.soap.countOf('Seek'), !request.dash && ms > 0 ? 1 : 0, reason: '$request');
+        });
       });
     });
 

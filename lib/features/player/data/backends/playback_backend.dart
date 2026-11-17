@@ -79,7 +79,8 @@ typedef IsCancelled = bool Function();
 abstract class PlaybackBackend {
   Stream<BackendEvent> get events;
 
-  /// 탐색(seek)이 가능한지. DASH 중계처럼 불가능한 경로가 있다.
+  /// 탐색(seek)이 가능한지. 지금의 두 출력(폰, DLNA)은 항상 가능하다.
+  /// DLNA의 DASH 곡은 그 위치부터 프록시에 다시 등록해 재생하는 방식으로 탐색한다.
   bool get canSeek;
 
   /// [track]을 [startPosition]부터 재생한다. 실패하면 예외를 던진다.

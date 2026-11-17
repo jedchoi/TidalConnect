@@ -47,14 +47,27 @@ interface DeviceControls {
     fun setWifiLock(enabled: Boolean)
 }
 
+/**
+ * 프록시에 등록한 곡.
+ *
+ * @param url 스피커가 접근할 프록시 주소
+ * @param startOffsetMs 이 주소의 흐름이 곡의 몇 밀리초부터 시작하는지. 처음부터면 0
+ */
+data class RegisteredStream(val url: String, val startOffsetMs: Long)
+
 /** DLNA 프록시에 곡을 등록한다. 운영 구현은 [PlaybackCore] 안에 있다. */
 fun interface ProxyRegistrar {
-    /** 스피커가 접근할 프록시 주소를 돌려준다. Wi-Fi가 없어 프록시를 띄울 수 없으면 null. */
+    /**
+     * 곡을 등록하고 스피커가 접근할 주소를 돌려준다. Wi-Fi가 없어 프록시를 띄울 수 없으면 null.
+     *
+     * @param startPositionMs 재생을 시작할 위치. DASH 곡은 이 위치가 속한 세그먼트부터 보낸다
+     */
     fun registerTrackStream(
         trackId: String,
         directUrl: String,
         manifestXml: String,
         allowedHost: String,
         mimeType: String,
-    ): String?
+        startPositionMs: Long,
+    ): RegisteredStream?
 }

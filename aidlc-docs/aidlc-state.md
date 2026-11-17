@@ -77,3 +77,23 @@ unit 순서: dart-playback-tests → android-native-tests → ci-quality-gate (`
 | Security Baseline | No | Requirements Analysis |
 | Resiliency Baseline | Yes | Requirements Analysis |
 | Property-Based Testing | Yes | Requirements Analysis |
+
+---
+
+## 2차 작업: DASH 곡의 탐색 지원 (`dash-seek`)
+
+- **시작**: 2026-11-17T08:17:17Z, 브랜치 `feat/dash-seek`
+- **요청**: DLNA 스피커에서 DASH 곡의 탐색 지원
+- **진행 방식**: 사용자 지시에 따라 모든 stage 를 권장안으로 자동 승인 (기록은 `audit.md`)
+- **Current Stage**: 완료 (실기기 확인 대기)
+
+| Stage | 상태 |
+| --- | --- |
+| Workspace Detection, Reverse Engineering | 앞 작업의 산출물 재사용 |
+| Requirements Analysis | [x] 2026-11-17T08:17:17Z (`inception/requirements/requirements-dash-seek.md`, 실행 계획 포함) |
+| User Stories, Application Design, Units Generation | SKIP (unit 하나, 화면 변화 없음) |
+| Functional Design (dash-seek) | [x] 2026-11-17T08:17:17Z (`construction/dash-seek/functional-design/business-rules.md`) |
+| NFR Requirements, NFR Design, Infrastructure Design | SKIP (앞 작업의 결정 재사용) |
+| Code Generation (dash-seek) | [x] 2026-11-17 (`construction/dash-seek/code/code-summary.md`) |
+| Build and Test | [x] 2026-11-17 (`tool/check.sh` 전체 통과, 결과는 code-summary.md. 실제 스피커 확인은 사용자 몫으로 남음) |
+| Operations 7 stage | SKIP |

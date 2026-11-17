@@ -16,7 +16,18 @@ data class DashManifest(
     val mediaTemplate: String,
     val startNumber: Int,
     val segmentCount: Int,
+    /** 세그먼트마다의 시작 시각(밀리초). 시각을 알 수 없는 매니페스트면 빈 목록. */
+    val segmentStartsMs: List<Long> = emptyList(),
 ) {
+    /** [index]번째(0부터) 세그먼트의 시작 시각(밀리초). 시각을 알 수 없는 매니페스트면 0. */
+    fun segmentStartMs(index: Int): Long = segmentStartsMs.getOrNull(index) ?: 0L
+
+    /** [positionMs]가 속한 세그먼트의 번호(0부터). 시각을 알 수 없는 매니페스트면 0. */
+    fun segmentIndexAt(positionMs: Long): Int {
+        if (positionMs <= 0) return 0
+        return segmentStartsMs.indexOfLast { it <= positionMs }.coerceAtLeast(0)
+    }
+
     /** [index]번째(0부터) 세그먼트 주소. */
     fun segmentUrl(index: Int): String = mediaTemplate.replace("\$Number\$", (startNumber + index).toString())
 
@@ -53,11 +64,26 @@ data class DashManifest(
             val startNumber = template.getAttribute("startNumber").toIntOrNull() ?: 1
 
             // SegmentTimeline의 <S r="n"/>은 같은 길이의 세그먼트가 n번 더 반복된다는 뜻이다.
+            // 시작 시각은 앞 세그먼트들의 d(timescale 단위) 합을 밀리초로 바꾼 값이다.
+            // d를 알 수 없는 <S>가 있거나 timescale이 0 이하이면 시각을 알 수 없는 매니페스트로 본다.
+            val timescale = template.getAttribute("timescale").toLongOrNull() ?: 1L
+            var timed = timescale > 0
+            val startsMs = mutableListOf<Long>()
+            var elapsed = 0L
             var count = 0
             val segments = template.getElementsByTagName("S")
             for (i in 0 until segments.length) {
                 val s = segments.item(i) as Element
-                count += 1 + (s.getAttribute("r").toIntOrNull() ?: 0).coerceAtLeast(0)
+                val repeat = 1 + (s.getAttribute("r").toIntOrNull() ?: 0).coerceAtLeast(0)
+                count += repeat
+                val duration = s.getAttribute("d").toLongOrNull()?.takeIf { it > 0 }
+                if (duration == null) timed = false
+                if (timed && duration != null) {
+                    repeat(repeat) {
+                        startsMs += elapsed * 1000 / timescale
+                        elapsed += duration
+                    }
+                }
             }
             if (count == 0) return null.also { lastError = "SegmentTimeline에 세그먼트 없음" }
             lastError = null
@@ -67,6 +93,7 @@ data class DashManifest(
                 mediaTemplate = resolve(baseUrl, media),
                 startNumber = startNumber,
                 segmentCount = count,
+                segmentStartsMs = if (timed) startsMs else emptyList(),
             )
         }
 

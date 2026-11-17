@@ -4,12 +4,16 @@ import android.util.Log
 import fi.iki.elonen.NanoHTTPD
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.ByteArrayInputStream
 import java.io.InputStream
+import java.io.PrintWriter
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import java.net.Inet4Address
 import java.security.SecureRandom
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /**
@@ -36,6 +40,9 @@ class TidalStreamProxyServer(
         const val PROXY_PORT = 8765
         private const val MAX_REGISTERED = 3
         private const val TAG = "TidalStreamProxy"
+
+        /** [dashSegmentLengths]에서 초기화 세그먼트를 가리키는 번호. */
+        private const val INIT_SEGMENT = -1
 
         /**
          * Wi-Fi(또는 유선 LAN) 네트워크의 IPv4 주소. 없으면 null.
@@ -74,6 +81,8 @@ class TidalStreamProxyServer(
         val allowedHost: String = "",
         /** 실제 오디오 MIME. DASH는 fMP4이므로 audio/mp4. */
         val mimeType: String = "audio/mp4",
+        /** DASH 곡에서 초기화 세그먼트 다음에 보낼 첫 세그먼트 번호(0부터). */
+        val startSegment: Int = 0,
     )
 
     // 토큰 -> 곡 정보. 최근 MAX_REGISTERED곡만 남긴다(삽입 순서 유지).
@@ -93,14 +102,38 @@ class TidalStreamProxyServer(
         manifestXml: String,
         allowedHost: String,
         mimeType: String,
-    ): String {
+    ): String = registerTrackStreamAt(trackId, directUrl, manifestXml, allowedHost, mimeType, 0L).url
+
+    /**
+     * 곡을 등록하고 주소와 시작 오프셋을 돌려준다.
+     *
+     * DASH 곡은 [startPositionMs]가 속한 세그먼트부터 보내고, 그 세그먼트의 시작 시각이 시작 오프셋이다.
+     * 단일 파일 곡은 [startPositionMs]를 쓰지 않는다(시작 오프셋 0).
+     */
+    fun registerTrackStreamAt(
+        trackId: String,
+        directUrl: String,
+        manifestXml: String,
+        allowedHost: String,
+        mimeType: String,
+        startPositionMs: Long,
+    ): RegisteredStream {
         val token = newToken()
-        val mime = if (manifestXml.isNotEmpty() && directUrl.isEmpty()) "audio/mp4" else mimeType.ifEmpty { "audio/mp4" }
+        val isDash = manifestXml.isNotEmpty() && directUrl.isEmpty()
+        val mime = if (isDash) "audio/mp4" else mimeType.ifEmpty { "audio/mp4" }
+        // 위치가 0 이하이면 항상 처음부터이므로 매니페스트를 해석하지 않는다.
+        val manifest = if (isDash && startPositionMs > 0) DashManifest.parse(manifestXml) else null
+        val startSegment = manifest?.segmentIndexAt(startPositionMs) ?: 0
+        val startOffsetMs = manifest?.segmentStartMs(startSegment) ?: 0L
         synchronized(streamRegistry) {
-            streamRegistry[token] = StreamInfo(trackId, directUrl, manifestXml, allowedHost, mime)
+            streamRegistry[token] = StreamInfo(trackId, directUrl, manifestXml, allowedHost, mime, startSegment)
         }
-        Log.i(TAG, "트랙 스트림 등록: TrackID=$trackId, mime=$mime, direct=${directUrl.isNotEmpty()}")
-        return "http://$boundHost:$servingPort/audio/$token.${extensionFor(mime)}"
+        Log.i(
+            TAG,
+            "트랙 스트림 등록: TrackID=$trackId, mime=$mime, direct=${directUrl.isNotEmpty()}, " +
+                "시작 세그먼트=$startSegment, 시작 오프셋=${startOffsetMs}ms",
+        )
+        return RegisteredStream("http://$boundHost:$servingPort/audio/$token.${extensionFor(mime)}", startOffsetMs)
     }
 
     /** 스피커에 알려줄 포트. 서버가 떠 있으면 실제로 열린 포트이고, 아니면 생성할 때 받은 포트다. */
@@ -184,18 +217,17 @@ class TidalStreamProxyServer(
             proxyDirectCdn(session, token, info, allowRefresh = true)
         } else {
             Log.i(TAG, "🚀 DASH 매니페스트 세그먼트 중계 시작: TrackID=$trackId")
-            proxyDashManifest(session, info.manifestXml)
+            proxyDashManifest(info.manifestXml, info.startSegment)
         }
     }
 
-    /**
-     * TIDAL Direct CDN URL을 스피커로 투명하게 릴레이 (Range 및 Content-Type 완벽 지원)
-     */
     /** HEAD 요청에는 본문 없이 형식과 길이만 알려준다. */
     private fun headResponse(info: StreamInfo): Response {
         var length = -1L
         if (info.directUrl.isEmpty() && info.manifestXml.isNotEmpty()) {
-            DashManifest.parse(info.manifestXml)?.let { length = dashLength(info.manifestXml, it) ?: -1L }
+            DashManifest.parse(info.manifestXml)?.let {
+                length = dashLength(info.manifestXml, it, info.startSegment) ?: -1L
+            }
         }
         if (info.directUrl.isNotEmpty()) {
             try {
@@ -209,18 +241,21 @@ class TidalStreamProxyServer(
         // 본문은 보내지 않지만 Content-Length는 실제 파일 길이로 알린다. 길이를 모르면 알리지 않는다(0으로 알리면
         // 렌더러가 빈 파일로 여긴다).
         val response = if (length >= 0) {
-            newFixedLengthResponse(Response.Status.OK, info.mimeType, java.io.ByteArrayInputStream(ByteArray(0)), length)
+            newFixedLengthResponse(Response.Status.OK, info.mimeType, ByteArrayInputStream(ByteArray(0)), length)
         } else {
             // NanoHTTPD는 HEAD 응답이면 길이를 모르는(chunked) 응답에도 Content-Length를 써서 "-1"이 나간다.
             // 그 헤더를 쓰는 메서드만 막아 헤더 없이 보낸다. 본문 스트림이 비어 있어 본문은 그대로 0바이트다.
-            object : Response(Response.Status.OK, info.mimeType, java.io.ByteArrayInputStream(ByteArray(0)), -1L) {
-                override fun sendContentLengthHeaderIfNotAlreadyPresent(pw: java.io.PrintWriter, size: Long) = size
+            object : Response(Response.Status.OK, info.mimeType, ByteArrayInputStream(ByteArray(0)), -1L) {
+                override fun sendContentLengthHeaderIfNotAlreadyPresent(pw: PrintWriter, size: Long) = size
             }
         }
         if (info.directUrl.isNotEmpty()) response.addHeader("Accept-Ranges", "bytes")
         return response
     }
 
+    /**
+     * TIDAL Direct CDN URL을 스피커로 투명하게 릴레이 (Range 및 Content-Type 완벽 지원)
+     */
     private fun proxyDirectCdn(session: IHTTPSession, token: String, info: StreamInfo, allowRefresh: Boolean): Response {
         val cdnUrl = info.directUrl
         val mimeType = info.mimeType
@@ -248,7 +283,7 @@ class TidalStreamProxyServer(
                 return if (refreshed.directUrl.isNotEmpty()) {
                     proxyDirectCdn(session, token, refreshed, allowRefresh = false)
                 } else {
-                    proxyDashManifest(session, refreshed.manifestXml)
+                    proxyDashManifest(refreshed.manifestXml)
                 }
             }
 
@@ -293,19 +328,25 @@ class TidalStreamProxyServer(
     /**
      * DASH 매니페스트 세그먼트를 Lazy Enumeration으로 연결하여
      * 전체 세그먼트를 스피커 재생 흐름에 맞춰 실시간 스트리밍합니다.
+     *
+     * 초기화 세그먼트 다음에 [startSegment]번째(0부터) 세그먼트부터 보낸다.
      */
-    private fun proxyDashManifest(session: IHTTPSession, manifestXml: String): Response {
+    private fun proxyDashManifest(manifestXml: String, startSegment: Int = 0): Response {
         return try {
             val manifest = DashManifest.parse(manifestXml)
             if (manifest == null) {
                 Log.e(TAG, "DASH 매니페스트 해석 실패: ${DashManifest.lastError}")
                 return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "Invalid DASH manifest")
             }
-            val length = dashLength(manifestXml, manifest)
-            Log.i(TAG, "DASH 중계 시작 - init: ${manifest.initializationUrl != null}, 세그먼트 ${manifest.segmentCount}개, 길이 $length")
+            val length = dashLength(manifestXml, manifest, startSegment)
+            Log.i(
+                TAG,
+                "DASH 중계 시작 - init: ${manifest.initializationUrl != null}, 세그먼트 ${manifest.segmentCount}개, " +
+                    "시작 세그먼트 $startSegment, 길이 $length",
+            )
             // 이어 붙인 스트림은 바이트 위치로 탐색할 수 없으므로 Accept-Ranges를 알리지 않는다.
             // 길이를 알면 Content-Length를 보낸다. 많은 렌더러가 길이 없는 chunked 응답을 재생하지 않는다.
-            val stream = DashSegmentInputStream(httpClient, manifest)
+            val stream = DashSegmentInputStream(httpClient, manifest, startSegment)
             val proxyResponse = if (length != null) {
                 newFixedLengthResponse(Response.Status.OK, "audio/mp4", stream, length)
             } else {
@@ -320,46 +361,55 @@ class TidalStreamProxyServer(
         }
     }
 
-    /** 매니페스트별로 계산한 전체 길이(초기화 + 모든 세그먼트). 알 수 없으면 저장하지 않는다. */
-    private val dashLengthCache = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    /**
+     * 매니페스트별로 알아낸 세그먼트 길이. 안쪽 키는 세그먼트 번호(0부터)이고 초기화 세그먼트는 [INIT_SEGMENT]다.
+     * 길이를 모르는 세그먼트는 저장하지 않아 다음 요청에서 다시 조회한다.
+     */
+    private val dashSegmentLengths =
+        ConcurrentHashMap<String, ConcurrentHashMap<Int, Long>>()
 
     /**
-     * 세그먼트마다 HEAD 요청을 보내 전체 바이트 수를 구한다. 하나라도 길이를 모르면 null.
-     * 렌더러가 HEAD와 GET을 여러 번 보내도 매니페스트당 한 번만 계산한다.
+     * 초기화 세그먼트와 [startSegment]번째부터의 세그먼트 바이트 수를 더한다. 그 범위에 길이를 모르는 것이 있으면 null.
+     * 길이는 세그먼트마다 HEAD 요청으로 구하며, 한 번 알아낸 길이는 같은 매니페스트의 다른 요청에도 다시 쓴다.
      */
-    private fun dashLength(manifestXml: String, manifest: DashManifest): Long? {
-        dashLengthCache[manifestXml]?.let { return it }
-        val urls = buildList {
-            manifest.initializationUrl?.let { add(it) }
-            for (i in 0 until manifest.segmentCount) add(manifest.segmentUrl(i))
+    private fun dashLength(manifestXml: String, manifest: DashManifest, startSegment: Int): Long? {
+        val known = dashSegmentLengths.getOrPut(manifestXml) { ConcurrentHashMap() }
+        val wanted = buildList {
+            if (manifest.initializationUrl != null) add(INIT_SEGMENT)
+            for (i in startSegment until manifest.segmentCount) add(i)
         }
-        val pool = java.util.concurrent.Executors.newFixedThreadPool(8)
-        return try {
-            val futures = urls.map { url ->
-                pool.submit<Long?> {
-                    try {
-                        httpClient.newCall(Request.Builder().url(url).head().build()).execute().use {
-                            if (it.isSuccessful) it.header("Content-Length")?.toLongOrNull() else null
+        val missing = wanted.filter { !known.containsKey(it) }
+        if (missing.isNotEmpty()) {
+            val pool = Executors.newFixedThreadPool(8)
+            try {
+                val futures = missing.map { index ->
+                    val url = if (index == INIT_SEGMENT) manifest.initializationUrl!! else manifest.segmentUrl(index)
+                    index to pool.submit<Long?> {
+                        try {
+                            httpClient.newCall(Request.Builder().url(url).head().build()).execute().use {
+                                if (it.isSuccessful) it.header("Content-Length")?.toLongOrNull() else null
+                            }
+                        } catch (e: Exception) {
+                            null
                         }
-                    } catch (e: Exception) {
-                        null
                     }
                 }
-            }
-            var total = 0L
-            for (f in futures) {
-                val size = f.get(10, TimeUnit.SECONDS) ?: return null.also {
-                    Log.w(TAG, "DASH 세그먼트 길이를 알 수 없어 chunked로 보냄")
+                for ((index, future) in futures) {
+                    future.get(10, TimeUnit.SECONDS)?.let { known[index] = it }
                 }
-                total += size
+            } catch (e: Exception) {
+                Log.w(TAG, "DASH 길이 계산 실패: ${e.message}")
+                return null
+            } finally {
+                pool.shutdownNow()
             }
-            dashLengthCache[manifestXml] = total
-            total
-        } catch (e: Exception) {
-            Log.w(TAG, "DASH 길이 계산 실패: ${e.message}")
-            null
-        } finally {
-            pool.shutdownNow()
         }
+        var total = 0L
+        for (index in wanted) {
+            total += known[index] ?: return null.also {
+                Log.w(TAG, "DASH 세그먼트 길이를 알 수 없어 chunked로 보냄")
+            }
+        }
+        return total
     }
 }
