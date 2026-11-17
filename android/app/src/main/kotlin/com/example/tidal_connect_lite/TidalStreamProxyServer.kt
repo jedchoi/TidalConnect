@@ -211,7 +211,11 @@ class TidalStreamProxyServer(
         val response = if (length >= 0) {
             newFixedLengthResponse(Response.Status.OK, info.mimeType, java.io.ByteArrayInputStream(ByteArray(0)), length)
         } else {
-            newChunkedResponse(Response.Status.OK, info.mimeType, java.io.ByteArrayInputStream(ByteArray(0)))
+            // NanoHTTPD는 HEAD 응답이면 길이를 모르는(chunked) 응답에도 Content-Length를 써서 "-1"이 나간다.
+            // 그 헤더를 쓰는 메서드만 막아 헤더 없이 보낸다. 본문 스트림이 비어 있어 본문은 그대로 0바이트다.
+            object : Response(Response.Status.OK, info.mimeType, java.io.ByteArrayInputStream(ByteArray(0)), -1L) {
+                override fun sendContentLengthHeaderIfNotAlreadyPresent(pw: java.io.PrintWriter, size: Long) = size
+            }
         }
         if (info.directUrl.isNotEmpty()) response.addHeader("Accept-Ranges", "bytes")
         return response
