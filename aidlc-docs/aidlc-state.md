@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-11-16T08:15:48Z
-- **Current Stage**: CONSTRUCTION - Functional Design (dart-playback-tests)
+- **Current Stage**: CONSTRUCTION - Code Generation (dart-playback-tests)
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -31,8 +31,8 @@
 ### 🟢 CONSTRUCTION PHASE
 unit 순서: dart-playback-tests → android-native-tests → ci-quality-gate (`aidlc-docs/inception/application-design/unit-of-work.md`)
 - [x] Functional Design (dart-playback-tests) - Completed on 2026-11-17T00:17:43Z
-- [ ] NFR Requirements (dart-playback-tests) - EXECUTE
-- [ ] NFR Design (dart-playback-tests) - EXECUTE
+- [x] NFR Requirements (dart-playback-tests) - Completed on 2026-11-17T00:39:55Z
+- [x] NFR Design (dart-playback-tests) - Completed on 2026-11-17T00:45:31Z
 - [ ] Infrastructure Design (dart-playback-tests) - SKIP (서버 · 클라우드 인프라 없음)
 - [ ] Code Generation (dart-playback-tests) - EXECUTE
 - [ ] Functional Design (android-native-tests) - EXECUTE
@@ -63,8 +63,8 @@ unit 순서: dart-playback-tests → android-native-tests → ci-quality-gate (`
 
 ## Current Status
 - **Lifecycle Phase**: CONSTRUCTION
-- **Current Stage**: Functional Design (dart-playback-tests)
-- **Next Stage**: NFR Requirements (dart-playback-tests)
+- **Current Stage**: Code Generation (dart-playback-tests)
+- **Next Stage**: Functional Design (android-native-tests)
 - **Status**: Ready to proceed
 
 ## Reverse Engineering Status
