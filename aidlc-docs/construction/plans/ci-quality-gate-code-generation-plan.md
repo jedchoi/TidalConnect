@@ -92,7 +92,7 @@ Functional Design 을 건너뛰었으므로 `CoverageGate` 의 동작을 여기�
 
 - [ ] **Step 2. 실패하는 테스트 작성과 고정** (NFR-01-C1 ~ C5, NFR-07-C1 ~ C4, PBT-01 ~ 10)
   - [x] 2.1 하위 에이전트가 이 계획의 규칙 표만 보고 테스트 경계 표를 만든다 (열: 규칙 ID · 경계 · 입력 · 기대값). 경계는 `parseLcov`, `evaluateCoverage`, `formatReport`, `runCoverageGate`
-  - [ ] 2.2 **사람 승인 대기 (관문 1)**
+  - [x] 2.2 **사람 승인 대기 (관문 1)**
   - [ ] 2.3 승인된 표대로 `test/tool/coverage_gate_test.dart` 를 쓴다 (새로 만듦). 예시 기반 테스트는 GT-01 ~ GT-13, 속성 테스트는 P-GT-1 ~ P-GT-5. 테스트 이름 맨 앞에 `[GT-01]` 형식 (unit 1 의 Dart 테스트 표기). 생성기는 이 테스트 파일 안에 둔다. `runCoverageGate` 의 파일 읽기는 임시 폴더로 검증한다
   - [ ] 2.4 실행 → RED 판정 표. 테스트 쪽 오류는 RED 로 인정하지 않고 고쳐 다시 실행한다
   - [ ] 2.5 **사람 판정 대기 (관문 2)**: "RED 확인" 응답 전에는 고정하지 않는다
