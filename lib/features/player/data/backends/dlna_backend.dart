@@ -226,6 +226,7 @@ class DlnaBackend implements PlaybackBackend {
       final pos = results[1] as DlnaPosition?;
       if (_pollTimer == null || trackId != _trackId) return; // 그 사이 정지되었거나 곡이 바뀜
       if (generation != _pollGeneration) return; // 그 사이 탐색으로 흐름이 바뀜
+      if (_seeking) return; // 탐색 전에 보낸 조회의 응답이 탐색 도중 도착함. 탐색의 Stop이 섞였을 수 있어 버린다
       if (pos != null && _checkGaplessTransition(pos.trackUri)) return; // 다음 확인부터 새 곡 기준
 
       if (state == null && pos == null) {
