@@ -131,3 +131,22 @@ DB-54 경계 표 (테스트 1개, 표로 묶음):
 | D-10 | NB-02 의 "숫자가 아님" 은 없음 · null · `'abc'` 로 검증한다. `'28000'` 같은 숫자 문자열과 소수 (28000.5) 는 검증하지 않는다 | 규칙에 없다. Kotlin 은 Long 으로만 보낸다 (CR-16) |
 | D-11 | NB 테스트는 새 파일 `test/core/native/tidal_sdk_native_bridge_test.dart` 에 둔다 | `test/` 가 `lib/` 의 경로를 따른다 (`test/core/utils` 등) |
 | D-12 | DB-57 과 DB-59 가 함께 걸릴 때 (`Pause` 와 `SetNextAVTransportURI` 의 순서) 는 테스트하지 않는다 | 두 규칙 모두 "재생 명령 뒤" 라고만 한다 |
+
+## 추가분 (DB-62)
+
+기준: `business-rules.md` 5절 "새 규칙: 탐색 중의 폴링" (2026-11-17 추가). 테스트는 `dlna_backend_test.dart` 의 group "탐색 중의 폴링 (dash-seek)". 탐색을 도중에 멈춰 두는 데는 기존 도우미의 응답 붙잡기 (`FakeNativeChannel.hold`, `FakeSoapClient.hold`) 를 쓴다. 곡 길이 180초.
+
+| 규칙 ID | 경계 | 입력 | 기대값 |
+| --- | --- | --- | --- |
+| DB-62 (+ DB-62b 성공) | 폴링 (등록 대기 중) | `PLAYING`/5 를 본 뒤 등록 응답을 붙잡고 `seek(61초)` (응답 오프셋 60), 2초 진행 | 그 사이 `GetTransportInfo` 0회, `GetPositionInfo` 0회, 이벤트 없음. 풀면 `position(60/180)`, `state(playing,buffering)`. 다음 1초 (`RelTime` 0): 조회 각 1회, `position(60/180)`, `state(playing)` |
+| DB-62 | 폴링 (스피커 명령 중, `STOPPED`) | `PLAYING`/5 를 본 뒤 스피커가 `STOPPED`/0 을 답하게 하고 `SetAVTransportURI` 를 붙잡은 채 탐색, 2초 진행 | SOAP 는 `Stop` · `SetAVTransportURI` 뿐, 이벤트 없음 (`state(stopped)` 없음). 풀면 예외 없이 `Play` 까지, 이벤트는 `position(60/180)`, `state(playing,buffering)` 뿐 |
+| DB-62 (+ DB-62b 성공) | 폴링 (곡 끝 근처, `STOPPED`) | `PLAYING`/178 을 본 뒤 스피커가 `STOPPED`/0 을 답하게 하고 `Play` 를 붙잡은 채 `seek(31초)` (응답 오프셋 30), 2초 진행 | SOAP 는 `Stop` · `SetAVTransportURI` · `Play` 뿐, 이벤트 없음 (`ended(101)` 없음). 풀면 `position(30/180)`, `state(playing,buffering)`. 다음 1초 (`PLAYING`/1): `position(31/180)`, `state(playing)` |
+| DB-62b (DB-53 실패) | 폴링 (실패 뒤) | 오프셋 28 흐름에서 `PLAYING`/0 을 본 뒤, 등록이 채널 오류가 되게 하고 응답을 붙잡은 채 `seek(90초)`, 2초 진행 | 그 사이 SOAP 없음, 이벤트 없음. 풀면 `PROXY_FAILED`, 이벤트 없음. 이어서 `PLAYING`/0 → `STOPPED`/0: 조회 2회, `position(28/180)`, `state(playing)`, `position(28/180)`, `state(stopped)` (탐색 전에 `PLAYING` 을 본 상태 그대로) |
+| DB-62b (DB-53b 실패) | 폴링 (실패 뒤) | 오프셋 28 흐름에서 `PLAYING`/0 을 본 뒤, `Play` 를 거부하게 하고 붙잡은 채 `seek(90초)` (응답 오프셋 88), 2초 진행 | 그 사이 SOAP 는 재생 명령 3개뿐, 이벤트 없음. 풀면 `DLNA_PLAY_FAILED`, 이벤트 없음. 다음 1초 (`PLAYING`/0): 조회 1회, `position(28/180)`, `state(playing)` |
+
+정한 것 (추가):
+
+| # | 정한 것 | 근거 |
+| --- | --- | --- |
+| D-13 | 탐색이 끝난 뒤 첫 폴링은 "1초 뒤에 정확히 1회" 로 단언한다 | DB-62b 의 "다음 차례부터". 타이머를 그대로 두든 다시 만들든 1초 뒤 1회다 |
+| D-14 | D-4 (DB-53b 뒤 폴링이 계속되는지는 단언하지 않음) 는 DB-62b 로 정해졌다. 새 테스트는 재생 명령 실패 뒤에도 폴링이 이어진다고 단언한다. 앞서 고정한 DB-53b 테스트는 그대로 둔다 (더 약한 단언이라 어긋나지 않음) | DB-62b "성공 · 실패 모두 다음 차례부터 폴링이 이어진다" |

@@ -4,13 +4,15 @@
 
 | 명령 | 결과 |
 | --- | --- |
-| `flutter test` (전체) | 345개 가운데 통과 301, 실패 44 |
+| `flutter test` (전체) | 335개 가운데 통과 291, 실패 44 |
 | `flutter test test/features/player/dlna_backend_test.dart` | 108개 가운데 통과 67, 실패 41 |
 | `flutter test test/core/native/tidal_sdk_native_bridge_test.dart` | 6개 가운데 통과 3, 실패 3 |
 | `dart format --output=none --set-exit-if-changed --line-length 120 lib test tool` | 통과 |
 | `flutter analyze --fatal-infos` | 통과 (No issues found) |
 
-합계: RED 인정 44 (새 테스트 40 + 고친 기존 테스트 4), 보호 12 (새 테스트 11 + 고친 기존 테스트 1), 건드리지 않은 기존 테스트 289개는 모두 통과 (`dlna_backend_test.dart` 안 58개 포함). 실패 44개는 모두 기대값 비교 실패다. 테스트 쪽 오류 (컴파일 · 도우미 · 생성기 · 예외) 는 없다. skip 없음.
+(2026-11-17 정정: 처음에는 전체를 345개 · 통과 301 로 적었으나, 집계에 `setUpAll` · `tearDownAll` 같은 숨은 항목 10개가 들어가 있었다. 실패 44 · 보호 12 는 그대로다.)
+
+합계: RED 인정 44 (새 테스트 40 + 고친 기존 테스트 4), 보호 12 (새 테스트 11 + 고친 기존 테스트 1), 건드리지 않은 기존 테스트 279개는 모두 통과 (`dlna_backend_test.dart` 안 58개 포함). 실패 44개는 모두 기대값 비교 실패다. 테스트 쪽 오류 (컴파일 · 도우미 · 생성기 · 예외) 는 없다. skip 없음.
 
 첫 실행에서 DB-51 테스트 4개가 테스트 쪽 예외 (`.single` 의 `Bad state: No element` 3개, null 확인 1개) 로 실패해, 호출 목록 전체를 비교하는 단언으로 고쳐 다시 실행했다.
 
@@ -102,7 +104,7 @@
 
 ## 건드리지 않은 기존 테스트
 
-`dlna_backend_test.dart` 의 나머지 58개 (DB-01 ~ DB-49 가운데 위 5개를 뺀 것, P-DB-1 ~ P-DB-5) 와 다른 테스트 파일 231개는 모두 통과했다. 커버리지 검사 (`test/tool/coverage_gate_test.dart`) 도 통과했다.
+`dlna_backend_test.dart` 의 나머지 58개 (DB-01 ~ DB-49 가운데 위 5개를 뺀 것, P-DB-1 ~ P-DB-5) 와 다른 테스트 파일 221개는 모두 통과했다. 커버리지 검사 (`test/tool/coverage_gate_test.dart`) 도 통과했다.
 
 ## 규칙별 새 테스트 수
 
@@ -121,3 +123,24 @@
 | DB-54 | 3 (경계 표 1개 포함) | P-DB-6 · P-DB-7 | 2 |
 
 새 테스트 51개 (NB 6, DB 43, 속성 2). 고친 기존 테스트 5개 (DB-05, DB-12, DB-13, DB-39, DB-45).
+
+## 추가분 (DB-62)
+
+실행: 2026-11-17, 구현 (GREEN, `040f37d`) 과 규칙 추가 (`3e8b626`) 뒤. 새 규칙 DB-62 · DB-62b 의 테스트 5개를 `dlna_backend_test.dart` 의 새 group "탐색 중의 폴링 (dash-seek)" 에 더했다. 기존 테스트는 고치지 않았다.
+
+| 명령 | 결과 |
+| --- | --- |
+| `flutter test` (전체) | 340개 가운데 통과 335, 실패 5 |
+| `flutter test test/features/player/dlna_backend_test.dart` | 113개 가운데 통과 108, 실패 5 |
+| `dart format --output=none --set-exit-if-changed --line-length 120 lib test tool` | 통과 |
+| `flutter analyze --fatal-infos` | 통과 |
+
+| 테스트 | 결과 | 실패 종류 | 판정 |
+| --- | --- | --- | --- |
+| [DB-62] 탐색의 프록시 등록을 기다리는 동안에는 폴링 차례를 건너뛰고, 끝나면 다음 차례부터 이어진다 | FAILED | 기대값 비교 (`GetTransportInfo` 0회 기대, 2회) | RED |
+| [DB-62] 탐색의 스피커 명령 도중 스피커가 STOPPED라고 답할 상태여도 정지를 알리지 않는다 | FAILED | 기대값 비교 (SOAP `Stop` · `SetAVTransportURI` 기대, 뒤에 `GetTransportInfo` · `GetPositionInfo` 가 붙음) | RED |
+| [DB-62] 곡 끝 근처에서 탐색하는 도중 스피커가 STOPPED라고 답할 상태여도 곡 종료를 알리지 않는다 | FAILED | 기대값 비교 (SOAP 3개 기대, 뒤에 조회 2개가 붙음) | RED |
+| [DB-62b] 탐색의 프록시 등록이 실패해도 그 뒤 폴링은 탐색 전 상태 기준으로 이어진다 | FAILED | 기대값 비교 (탐색 중 SOAP 없음 기대, 조회 4개) | RED |
+| [DB-62b] 탐색의 재생 명령이 거부되어도 그 뒤 폴링은 탐색 전 상태 기준으로 이어진다 | FAILED | 기대값 비교 (SOAP 3개 기대, 뒤에 조회 4개가 붙음) | RED |
+
+합계: RED 5, 보호 0. 5개 모두 "탐색 중 SOAP 조회 없음" 단언에서 먼저 실패하므로, 그 뒤의 단언 (탐색 중 이벤트 없음, 끝난 뒤 폴링이 이어짐) 은 지금 구현에서 통과하는지 이 실행으로는 알 수 없다. 나머지 335개 (앞서 고정한 테스트 포함) 는 모두 통과했다.
