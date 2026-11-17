@@ -26,7 +26,7 @@ import kotlinx.coroutines.launch
 class TidalPlayerManager(
     private val context: Context,
     private val credentialsProvider: CredentialsProvider?
-) {
+) : PlayerControls {
     private var tidalPlayer: Player? = null
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -162,7 +162,7 @@ class TidalPlayerManager(
     // 아래 동작들은 실패하면 예외를 던진다. 호출하는 쪽(MainActivity)이 Flutter에 오류로 돌려준다.
 
     /** TIDAL 공식 Player SDK로 트랙을 재생한다. */
-    fun playTrack(trackId: String) {
+    override fun playTrack(trackId: String) {
         require(trackId.isNotEmpty()) { "trackId가 비어 있습니다" }
         val player = requirePlayer()
         Log.i(TAG, "Loading TIDAL track: $trackId")
@@ -171,7 +171,7 @@ class TidalPlayerManager(
     }
 
     /** 다음 트랙을 미리 등록한다(SDK setNext). 빈 값이면 등록을 지운다. */
-    fun setNextTrack(trackId: String) {
+    override fun setNextTrack(trackId: String) {
         val player = requirePlayer()
         player.playbackEngine.setNext(
             if (trackId.isEmpty()) null else MediaProduct(productType = ProductType.TRACK, productId = trackId)
@@ -182,7 +182,7 @@ class TidalPlayerManager(
     private var audioQuality: AudioQuality? = null
 
     /** Wi-Fi·모바일 데이터 스트리밍 음질을 바꾼다. 다음에 불러오는 곡부터 적용된다. */
-    fun setAudioQuality(name: String) {
+    override fun setAudioQuality(name: String) {
         audioQuality = AudioQuality.valueOf(name)
         applyAudioQuality()
     }
@@ -195,24 +195,24 @@ class TidalPlayerManager(
         Log.i(TAG, "Streaming audio quality set to $quality")
     }
 
-    fun skipToNext() {
+    override fun skipToNext() {
         requirePlayer().playbackEngine.skipToNext()
     }
 
-    fun pause() {
+    override fun pause() {
         requirePlayer().playbackEngine.pause()
     }
 
-    fun resume() {
+    override fun resume() {
         requirePlayer().playbackEngine.play()
     }
 
     /** SDK의 seek(time)은 내부에서 ExoPlayer.seekTo(time.toLong())을 호출하므로 밀리초 단위다. */
-    fun seekTo(msec: Int) {
+    override fun seekTo(msec: Int) {
         requirePlayer().playbackEngine.seek(msec.toFloat())
     }
 
-    fun stop() {
+    override fun stop() {
         val player = tidalPlayer ?: return
         stopPositionTicker()
         player.playbackEngine.pause()
