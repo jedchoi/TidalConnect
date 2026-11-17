@@ -4,6 +4,7 @@
 // 경로를 주지 않으면 coverage/lcov.info 를 읽는다. 먼저 `flutter test --coverage` 로 만들어야 한다.
 // 종료 코드: 통과 0, 실패 1.
 import 'dart:io';
+import 'dart:math' show max;
 
 /// 커버리지를 검사하는 파일. 저장소 루트 기준 경로이며, 보고서도 이 순서로 출력한다.
 const coverageTargets = <String>[
@@ -113,9 +114,8 @@ GateResult evaluateCoverage(
 /// 검사 결과를 사람이 읽는 보고서로 만든다. 줄 끝마다 줄바꿈이 있다.
 String formatReport(GateResult result) {
   final counts = [for (final target in result.targets) '${target.hitLines}/${target.totalLines}'];
-  final pathWidth =
-      result.targets.fold(0, (width, target) => target.target.length > width ? target.target.length : width);
-  final countWidth = counts.fold(0, (width, count) => count.length > width ? count.length : width);
+  final pathWidth = result.targets.fold(0, (width, target) => max(width, target.target.length));
+  final countWidth = counts.fold(0, (width, count) => max(width, count.length));
 
   final out = StringBuffer();
   for (final (index, target) in result.targets.indexed) {
