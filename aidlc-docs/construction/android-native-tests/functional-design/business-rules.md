@@ -48,7 +48,7 @@
 | CR-07 | 플레이어 동작 8개 (`stopTrack` 포함) 에서 플레이어가 예외를 던짐 | 오류 `PLAYER_ERROR`, 메시지는 예외의 메시지. 메시지가 null 이면 예외 클래스의 단순 이름 (패키지 없이, 예: `IllegalStateException`). 메시지가 빈 문자열이면 빈 문자열 그대로 |
 | CR-08 | `registerTrackStream`, 프록시 등록이 null (Wi-Fi 없음) | 오류 `NO_WIFI`, 메시지 `"Wi-Fi에 연결되어 있지 않아 스피커로 스트리밍할 수 없습니다."` |
 | CR-09 | `setStreamingLock` | `enabled` 가 정확히 true 일 때만 `setWifiLock(true)`, 그 밖 (false, 없음) 은 `setWifiLock(false)` |
-| CR-10 | 숫자 인자 (`positionMs`, `percent`, `expiresInSeconds`) | 정수 타입의 크기 (Int · Long) 와 상관없이 읽는다. `expiresInSeconds` 는 Long 으로, 나머지는 Int 로 넘긴다. 성공 값에 실리는 `positionMs` 도 Int 로 바꾼 값이다 (Long 90000 이 오면 Int 90000). 소수나 Int 범위를 넘는 값은 테스트 입력 범위 밖이다 |
+| CR-10 | 숫자 인자 (`positionMs`, `percent`, `expiresInSeconds`) | 정수 타입의 크기 (Int · Long) 와 상관없이 읽는다. `expiresInSeconds` 는 Long 으로, 나머지는 Int 로 넘긴다. 성공 값에 실리는 `positionMs` 도 Int 로 바꾼 값이다 (Long 90000 이 오면 Int 90000). 소수나 Int 범위를 넘는 값은 테스트 입력 범위 밖이다. 이 규칙은 router 의 동작이며, 재구성 전의 `onMethodCall` 은 `positionMs` · `percent` 를 Int 로만 읽는다 (O-7) |
 | CR-11 | 인자의 타입이 계약과 다름 (예: `trackId` 가 숫자) | 그 인자가 없는 것으로 보고 기본값을 쓴다 (테스트 입력 범위 밖, 아래 관찰 사항 O-1) |
 | CR-12 | 인증 · 기기 · 프록시 협력 객체가 예외를 던짐 | router 가 잡지 않고 그대로 전파한다. 예외를 오류 결과로 바꾸는 것은 플레이어 동작뿐이다 (지금 코드와 같음) |
 | CR-13 | 같은 호출을 두 번 | router 는 상태를 갖지 않는다. 협력 객체가 같은 답을 주면 결과도 같다 |
@@ -218,3 +218,5 @@ unit 1 의 Dart 테스트가 검증한 채널 문자열과 이 unit 의 규칙�
 | O-4 | `proxyDirectCdn` 의 400 분기 (`CDN URL required`) 는 도달할 수 없다 | 코드에 그대로 둔다 (계획 Q2=A) |
 | O-5 | DASH 전체 길이 캐시는 매니페스트 원문을 키로 쓰고 지우지 않는다 | 규칙 없음. 곡마다 매니페스트가 달라 재생한 곡 수만큼 늘지만 항목이 작다 |
 | O-6 | `initTidalAuth` 는 지금 채널 객체가 없으면 응답 없이 끝난다. 재구성 뒤에는 `AuthControls.initialize` 가 결과를 돌려주므로 항상 응답한다 | 채널을 통해 호출이 왔다면 채널 객체는 항상 있다. 생기지 않는 상태에서만 동작이 달라진다 |
+| O-7 | 재구성 전의 `onMethodCall` 은 `positionMs` · `percent` 를 `call.argument<Int>` 로 읽는다. Long 이 오면 형 변환 예외가 나서 `seekTrack` 은 `PLAYER_ERROR`, `setPhoneVolume` 은 예외가 밖으로 나간다. router 는 Long 도 읽어 Int 로 넘긴다 (CR-10). 2026-11-17 보완 때 CR-10 을 "지금 코드 기준" 이라고 적었으나 이 부분은 지금 코드와 다르다 (GREEN 에이전트가 발견) | 입력 범위 밖. Flutter 의 표준 코덱은 32비트에 들어가는 정수를 Integer 로 보내므로, 재생 위치 (약 24.8일 미만) 와 볼륨 (0 ~ 100) 은 항상 Int 로 온다. `onMethodCall` 을 router 로 넘기면 생기지 않는 입력에 대한 동작만 달라진다 (O-1 과 같은 성격) |
+| O-8 | 재구성 전의 `runPlayerAction` 은 플레이어 동작이 실패하면 `Log.e` 로 예외의 스택 트레이스를 남긴다. router 는 Android 타입을 쓰지 않아 로그를 남기지 않는다 | REFACTOR 의 위임 단계에서 처리 방법을 정한다 (후보 표에 올림) |

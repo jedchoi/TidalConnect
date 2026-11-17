@@ -82,14 +82,14 @@
 
 ### GREEN (`tdd-green` 스킬, 패턴 TW-6)
 
-- [ ] **Step 5. 고정된 테스트를 고치지 않고 구현** (FR-06, FR-07)
-  - [ ] 5.1 새 하위 에이전트 (GREEN 담당) 가 `tdd-green` 스킬의 절차를 따른다. 이 세션은 조율 · 테스트 변경 여부 확인 · 커밋만 맡는다. 시작 확인: 테스트가 고정 커밋과 같은지 (`git diff --exit-code`), 실패 테스트 목록 = 구현 대상
-  - [ ] 5.2 `PlaybackCommandRouter.kt` 구현 (CR-01 ~ CR-13): 실패 테스트를 규칙 묶음씩 통과시킨다
-  - [ ] 5.3 `ChannelAdapter.kt` 구현 (PC-01, PC-02)
-  - [ ] 5.4 프록시 테스트 가운데 실패가 남아 있으면 고치지 않고 정리해 보고한다 (Step 8 에서 처리)
-  - [ ] 5.5 테스트가 이상하다고 판단되면 **고치지 않고 멈춘다**. 테스트 이름 · 문서와 다른 점 · 근거 (규칙 ID) 를 보고한다
-  - [ ] 5.6 완료 확인: router · 변환 테스트 전체 통과, 기존 `DashManifestTest` 통과, 테스트가 고정 커밋과 같음
-  - [ ] 커밋: `feat: PlaybackCommandRouter 와 채널 응답 변환 구현 (GREEN)`
+- [x] **Step 5. 고정된 테스트를 고치지 않고 구현** (FR-06, FR-07)
+  - [x] 5.1 새 하위 에이전트 (GREEN 담당) 가 `tdd-green` 스킬의 절차를 따른다. 이 세션은 조율 · 테스트 변경 여부 확인 · 커밋만 맡는다. 시작 확인: 테스트가 고정 커밋과 같은지 (`git diff --exit-code`), 실패 테스트 목록 = 구현 대상
+  - [x] 5.2 `PlaybackCommandRouter.kt` 구현 (CR-01 ~ CR-13): 실패 테스트를 규칙 묶음씩 통과시킨다
+  - [x] 5.3 `ChannelAdapter.kt` 구현 (PC-01, PC-02)
+  - [x] 5.4 프록시 테스트 가운데 실패가 남아 있으면 고치지 않고 정리해 보고한다 (Step 8 에서 처리)
+  - [x] 5.5 테스트가 이상하다고 판단되면 **고치지 않고 멈춘다**. 테스트 이름 · 문서와 다른 점 · 근거 (규칙 ID) 를 보고한다
+  - [x] 5.6 완료 확인: router · 변환 테스트 전체 통과, 기존 `DashManifestTest` 통과, 테스트가 고정 커밋과 같음
+  - [x] 커밋: `feat: PlaybackCommandRouter 와 채널 응답 변환 구현 (GREEN)`
 
 ### REFACTOR (`tdd-refactor` 스킬, 패턴 TW-7 · KR-1 ~ KR-3)
 
