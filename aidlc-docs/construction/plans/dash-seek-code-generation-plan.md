@@ -27,23 +27,23 @@
   - [x] 2.3 테스트를 커밋으로 고정, 해시 기록
   - [x] 커밋: `test: DASH 탐색 테스트 추가 (RED)`
 
-  고정 커밋 해시: `375ca35` (2026-11-17). 확인 명령: `git diff --exit-code 375ca35 -- test android/app/src/test`
-- [ ] **Step 3. GREEN** (RED 와 다른 하위 에이전트 2개: Kotlin 담당, Dart 담당. 테스트를 고치지 않음)
-  - [ ] 3.1 Kotlin: `DashManifest`, `DashSegmentInputStream`, `TidalStreamProxyServer`, `PlaybackCommandRouter` (DS, PS, CR-14 ~ 18)
-  - [ ] 3.2 Dart: `TidalSdkNativeBridge`, `DlnaBackend` (NB, DB)
-  - [ ] 3.3 주 세션 확인: 테스트 전부 통과, 테스트가 고정 커밋과 같음, 포맷 · 분석 · 커버리지 검사
-  - [ ] 커밋: `feat: 프록시가 DASH 곡을 중간 세그먼트부터 보냄`, `feat: DLNA 스피커에서 DASH 곡 탐색 지원`
-- [ ] **Step 4. REFACTOR** (GREEN 을 끝낸 에이전트): 후보 표 → 주 세션이 권고대로 자동 승인 → 적용. 후보마다 커밋. 없으면 "대상 없음"
-- [ ] **Step 5. 문서** (주 세션): `README.md` 의 알려진 제약, `CLAUDE.md` 의 DASH 경로 설명, `docs/dlna-compat.md` 와 `docs/failure-scenarios.md` 에 확인 항목
-  - [ ] 커밋: `docs: DASH 곡 탐색 지원 반영`
-- [ ] **Step 6. 검증** (주 세션)
-  - [ ] 6.1 `tool/check.sh` 전체 통과 (커버리지 검사 포함)
-  - [ ] 6.2 규칙 ID 대조 (DS, PS, CR-14 ~ 18, NB, DB-50 ~ 61, 속성 5개)
-  - [ ] 6.3 변형 확인 (새 코드)
-  - [ ] 6.4 새 테스트 10회 반복
-  - [ ] 6.5 debug APK 빌드, 연결된 폰에 설치
-- [ ] **Step 7. 요약**: `aidlc-docs/construction/dash-seek/code/code-summary.md`
-  - [ ] 커밋: `docs(aidlc): Code Generation (dash-seek) 요약`
+  고정 커밋 해시: `375ca35` (2026-11-17). 확인 명령: `git diff --exit-code 375ca35 -- android/app/src/test`. Dart 쪽은 규칙 추가 (DB-62, DB-62c) 로 두 번 더 고정: `bc9dfed`, `7d41b2b` (`git diff --exit-code 7d41b2b -- test`)
+- [x] **Step 3. GREEN** (RED 와 다른 하위 에이전트 2개: Kotlin 담당, Dart 담당. 테스트를 고치지 않음)
+  - [x] 3.1 Kotlin: `DashManifest`, `DashSegmentInputStream`, `TidalStreamProxyServer`, `PlaybackCommandRouter` (DS, PS, CR-14 ~ 18)
+  - [x] 3.2 Dart: `TidalSdkNativeBridge`, `DlnaBackend` (NB, DB)
+  - [x] 3.3 주 세션 확인: 테스트 전부 통과, 테스트가 고정 커밋과 같음, 포맷 · 분석 · 커버리지 검사
+  - [x] 커밋: `feat: 프록시가 DASH 곡을 중간 세그먼트부터 보냄`, `feat: DLNA 스피커에서 DASH 곡 탐색 지원`
+- [x] **Step 4. REFACTOR** (GREEN 을 끝낸 에이전트): 후보 표 → 주 세션이 권고대로 자동 승인 → 적용. 후보마다 커밋. 없으면 "대상 없음"
+- [x] **Step 5. 문서** (주 세션): `README.md` 의 알려진 제약, `CLAUDE.md` 의 DASH 경로 설명, `docs/dlna-compat.md` 와 `docs/failure-scenarios.md` 에 확인 항목
+  - [x] 커밋: `docs: DASH 곡 탐색 지원 반영`
+- [x] **Step 6. 검증** (주 세션)
+  - [x] 6.1 `tool/check.sh` 전체 통과 (커버리지 검사 포함)
+  - [x] 6.2 규칙 ID 대조 (DS, PS, CR-14 ~ 18, NB, DB-50 ~ 61, 속성 5개)
+  - [ ] 6.3 변형 확인 (새 코드) — 하지 않음 (사용자 지시: 반복 테스트 중단)
+  - [ ] 6.4 새 테스트 10회 반복 — 하지 않음 (사용자 지시: 반복 테스트 중단)
+  - [x] 6.5 debug APK 빌드, 연결된 폰에 설치
+- [x] **Step 7. 요약**: `aidlc-docs/construction/dash-seek/code/code-summary.md`
+  - [x] 커밋: `docs(aidlc): Code Generation (dash-seek) 요약`
 
 ## 요구사항 추적
 
