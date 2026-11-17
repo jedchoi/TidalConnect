@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:tidal_connect_lite/features/auth/domain/models/auth_token.dart';
 import 'package:tidal_connect_lite/features/dlna/data/dlna_manager.dart';
 import 'package:tidal_connect_lite/features/dlna/domain/models/dlna_device.dart';
@@ -133,6 +134,9 @@ VoidCallback muteDebugLogs() {
   debugPrint = (String? message, {int? wrapWidth}) {};
   return () => debugPrint = original;
 }
+
+/// [code]를 가진 [PlaybackException]을 던지는지 확인하는 matcher.
+Matcher throwsPlaybackException(String code) => throwsA(isA<PlaybackException>().having((e) => e.code, 'code', code));
 
 /// 비동기 호출 하나의 결과. `fakeAsync` 안에서는 `await`할 수 없으므로 결과를 여기에 받아 둔다.
 class CallResult {
