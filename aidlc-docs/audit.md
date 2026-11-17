@@ -577,3 +577,11 @@
 **Context**: CONSTRUCTION - Code Generation (android-native-tests) 완료 → NFR Requirements (ci-quality-gate)
 
 ---
+
+## NFR Requirements (ci-quality-gate) - 계획과 질문
+**Timestamp**: 2026-11-17T05:49:19Z
+**User Input**: (없음)
+**AI Response**: "aidlc-docs/construction/plans/ci-quality-gate-nfr-requirements-plan.md 생성. 사전 확인: 지금의 check.sh · check.yml, .gitignore 에 coverage/ 없음, 저장소가 공개 (workflow 산출물을 로그인한 누구나 받을 수 있음), 키 없는 debug APK 는 시작 시 assert 로 멈춤, 로컬 셸에 Java 가 PATH 에 없음. 질문 8개: CoverageGate 의 언어, lcov 해석의 PBT 적용, 대상 · 기준값 위치, CI APK 의 키 포함 여부, APK 빌드 실행 조건, 산출물 보관 기간, check.sh 의 Java 탐색, 검사 출력 형식. 답변 대기"
+**Context**: CONSTRUCTION - NFR Requirements (ci-quality-gate), Step 2 ~ 4
+
+---
