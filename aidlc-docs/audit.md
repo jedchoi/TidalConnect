@@ -141,3 +141,38 @@
 
 ---
 
+## Units Generation - Part 1 계획 · 질문 제시
+**Timestamp**: 2026-11-17T00:00:23Z
+**User Input**: (없음)
+**AI Response**: "unit-of-work-plan.md 생성 (실행 단계 9개, 질문 4개: unit 수, Dart · Kotlin 순서, CI unit 설계 stage, 버그 수정 위치). 팀 정렬 · 비즈니스 도메인 · 코드 구성 범주는 질문하지 않은 이유를 계획에 기록. 답변 대기"
+**Context**: INCEPTION - Units Generation, Part 1 Step 5
+
+---
+
+## Units Generation - Part 1 답변 수신 · 계획 승인
+**Timestamp**: 2026-11-17T00:02:01Z
+**AI Prompt**: "Unit of work 계획이 완료되었습니다. aidlc-docs/inception/plans/unit-of-work-plan.md 에서 계획을 검토해 주세요. 생성 단계로 진행할까요?" (계획 파일과 질문 4개를 제시하며 '권장안대로 가시려면 추천으로 진행이라고만 하셔도 됩니다' 로 안내)
+**User Input**: "추천으로 진행해줘"
+**AI Response**: "Q1~Q4 [Answer] 에 권장안 A 기입 (기입 주체 표시). 모호성 분석: 단일 선택지 4개, 모순 없음 (Q1 A 의 3개 unit 과 Q2 A 의 Dart 우선, Q3 A 의 CI unit 설계 축소가 서로 맞음). 사용자의 '진행' 지시를 계획 승인으로 해석해 Part 2 Generation 시작. Part 2 결과는 완료 메시지에서 다시 승인받음"
+**Status**: Approved
+**Context**: INCEPTION - Units Generation, Part 1 완료 → Part 2
+
+---
+
+## Units Generation - Part 2 산출물 생성 · 승인 요청
+**Timestamp**: 2026-11-17T00:03:27Z
+**User Input**: (없음)
+**AI Response**: "unit-of-work.md, unit-of-work-dependency.md, unit-of-work-story-map.md 생성. unit 3개: dart-playback-tests (FR-01~04), android-native-tests (FR-05~06), ci-quality-gate (FR-09). 순서 1→2→3, 순환 없음. 계획 체크박스 1~9 완료. aidlc-state.md 에 unit 별 stage 표시 반영, execution-plan.md 에 unit 별 확정 메모 추가. 확장 준수: Resiliency · PBT 모두 이 stage 직접 적용 규칙 없음 (N/A), RESILIENCY-14 · 15 는 unit 1 NFR Design 에 배정. 승인 요청 문구: 'units generation 산출물을 확인해 주세요: aidlc-docs/inception/application-design/ - 변경 요청 (Request Changes) / 승인 후 계속 (Approve & Continue) - unit 을 승인하고 CONSTRUCTION PHASE 로 진행'"
+**Context**: INCEPTION - Units Generation, 완료 메시지 제시 · 승인 대기
+**AI 점검**: ✅ 5 · ⚠️ 1 · ❌ 0
+
+---
+
+## Units Generation - 승인
+**Timestamp**: 2026-11-17T00:08:02Z
+**User Input**: "승인 후 계속"
+**AI Response**: "Units Generation 승인. INCEPTION 완료. phase 경계 안내: 추적 점검 /traceability-check inception 실행 가능 (자동 실행 안 함). CONSTRUCTION - Functional Design (dart-playback-tests) 시작"
+**Context**: INCEPTION - Units Generation 승인 → CONSTRUCTION - Functional Design (dart-playback-tests)
+
+---
+

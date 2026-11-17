@@ -158,6 +158,7 @@ flowchart TD
   - **근거 (Rationale)**: Dart, Kotlin, CI 설정이라는 서로 다른 패키지를 바꾼다. 언어마다 테스트 도구와 PBT 프레임워크가 다르고, Dart 안에서도 의존 순서 (`DlnaManager` · 채널 대체 → 백엔드 → `WaveAudioHandler`) 가 있다. CI 커버리지 검사는 테스트가 들어온 뒤에만 통과하므로 순서 구분이 필요하다
 
 ### 🟢 CONSTRUCTION PHASE
+unit 별 확정 (Units Generation, 2026-11-17): `dart-playback-tests` 와 `android-native-tests` 는 Functional Design · NFR Requirements · NFR Design · Code Generation 실행. `ci-quality-gate` 는 NFR Requirements · Code Generation 만 실행하고 Functional Design · NFR Design 은 SKIP. 상세는 `aidlc-docs/inception/application-design/unit-of-work.md`.
 - [ ] Functional Design - EXECUTE (unit 별, 로직이 있는 unit 만)
   - **근거 (Rationale)**: PBT 확장 (PBT-01) 이 변환 · 상태 로직을 가진 unit 마다 이 stage 에서 속성을 식별하도록 강제한다 (이벤트 변환, 폴링 상태 기계, 시간 문자열 변환, 프록시 토큰 · 접근 제어). CI 설정 unit 은 로직이 없어 SKIP 예상 (Units Generation 뒤 unit 별로 확정)
 - [ ] NFR Requirements - EXECUTE (unit 별)
